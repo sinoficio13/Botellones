@@ -1,6 +1,6 @@
 # EPIC-2 — Configuración del Negocio
 
-> **Estado**: ⬜ Pendiente  
+> **Estado**: 🟢 Completado  
 > **Historias**: 3  
 > **Depende de**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
 > **Siguiente**: [[03-Clientes|EPIC-3 — Clientes]]
@@ -22,31 +22,31 @@ El dueño sube su logo, nombre y datos. El sistema lo refleja en header, PDFs y 
 Formulario para que el admin configure nombre, logo, teléfono, dirección y email del negocio.
 
 **AC:**
-- [ ] Ruta `/configuracion` accesible solo por admin
-- [ ] Formulario con campos: nombre_negocio, telefono, direccion, email
-- [ ] Guardado en tabla `configuracion` (upsert en single row)
+- [x] Ruta `/configuracion` accesible solo por admin
+- [x] Formulario con campos: nombre_negocio, telefono, direccion, email
+- [x] Guardado en tabla `configuracion` (upsert en single row)
 
 ### HIST-2.2 — Upload de logo con vista previa
 
 Upload de logo con validación y preview en 3 contextos (header, PDF, etiqueta).
 
 **AC:**
-- [ ] Acepta solo SVG y PNG
-- [ ] Valida peso máximo (200 KB SVG, 500 KB PNG)
-- [ ] Valida dimensiones mínimas para PNG
-- [ ] Vista previa en vivo: header, reporte PDF, etiqueta QR
-- [ ] Advertencia si la relación de aspecto no es horizontal (no bloquea)
-- [ ] Upload a bucket `logos` en Supabase Storage
+- [x] Acepta solo SVG y PNG
+- [x] Valida peso máximo (200 KB SVG, 500 KB PNG)
+- [x] Valida dimensiones mínimas para PNG
+- [x] Vista previa en vivo: header, reporte PDF, etiqueta QR
+- [x] Advertencia si la relación de aspecto no es horizontal (no bloquea)
+- [x] Upload a bucket `logos` en Supabase Storage (dev: data URL)
 
 ### HIST-2.3 — Header con logo y nombre
 
 Componente Header que muestra el logo (o fallback de texto) y el nombre del negocio en toda la app.
 
 **AC:**
-- [ ] Si hay logo → lo muestra (32-40px alto)
-- [ ] Si no hay logo → muestra nombre del negocio con ícono genérico
-- [ ] Visible en todas las páginas autenticadas
-- [ ] Responsive: en mobile se adapta sin romper layout
+- [x] Si hay logo → lo muestra (32-40px alto)
+- [x] Si no hay logo → muestra nombre del negocio con ícono genérico
+- [x] Visible en todas las páginas autenticadas
+- [x] Responsive: en mobile se adapta sin romper layout
 
 ---
 

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LoginPage from '@/app/(auth)/login/page'
 
+// Mock the server action
 vi.mock('@/app/(auth)/login/actions', () => ({
   login: vi.fn(),
 }))
@@ -19,10 +20,10 @@ describe('LoginPage — client-side validation', () => {
     // Type valid password, leave email empty
     await userEvent.type(screen.getByLabelText('Password'), 'validPassword123')
 
-    // fireEvent.submit triggers onSubmit → validate() → setErrors
     fireEvent.submit(form)
 
-    expect(screen.getByText('Email is required')).toBeInTheDocument()
+    // Error comes through the wrapper action's state.error
+    expect(await screen.findByText('Email is required')).toBeInTheDocument()
   })
 
   it('shows "Password must be at least 6 characters" when password is too short', async () => {
@@ -35,7 +36,7 @@ describe('LoginPage — client-side validation', () => {
     fireEvent.submit(form)
 
     expect(
-      screen.getByText('Password must be at least 6 characters')
+      await screen.findByText('Password must be at least 6 characters')
     ).toBeInTheDocument()
   })
 
@@ -48,6 +49,9 @@ describe('LoginPage — client-side validation', () => {
 
     fireEvent.submit(form)
 
+    // Client validation passes — no "Email is required" or "Password must be..."
+    // The form delegates to server action (mocked, won't actually redirect)
+    await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByText('Email is required')).not.toBeInTheDocument()
     expect(
       screen.queryByText('Password must be at least 6 characters')

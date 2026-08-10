@@ -37,6 +37,12 @@ export async function Header() {
         {/* Navigation */}
         <nav className="flex items-center gap-4 text-sm">
           <Link
+            href="/botellones"
+            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Botellones
+          </Link>
+          <Link
             href="/clientes"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
           >

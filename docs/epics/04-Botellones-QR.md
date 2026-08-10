@@ -1,6 +1,6 @@
 # EPIC-4 — Gestion de Botellones + QR
 
-> **Estado**: Pendiente  
+> **Estado**: 🟢 Completado  
 > **Historias**: 6  
 > **Depende de**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
 > **Siguiente**: [[05-Recargas|EPIC-5 — Recargas]]
@@ -20,10 +20,10 @@ Cada botellon tiene codigo, estado, QR imprimible e historial publico via QR.
 Crear, listar, editar y eliminar botellones (admin).
 
 **AC:**
-- [ ] Formulario de creacion: codigo auto (BOT-XXXXX), estado inicial (disponible)
-- [ ] Lista paginada: codigo, estado, cliente asignado, fecha creacion, total recargas
-- [ ] Edicion: cambiar estado, reasignar cliente
-- [ ] Eliminacion logica (no borrar si tiene recargas)
+- [x] Formulario de creacion: codigo auto (BOT-XXXXX), estado inicial (disponible)
+- [x] Lista paginada: codigo, estado, cliente asignado, fecha creacion, total recargas
+- [x] Edicion: cambiar estado, reasignar cliente
+- [x] Eliminacion logica (no borrar si tiene recargas)
 
 ### HIST-4.2 — Estados y transiciones
 
@@ -40,47 +40,47 @@ Sistema de estados del botellon con reglas de transicion validas.
 - perdido → disponible (si se recupera)
 
 **AC:**
-- [ ] Dropdown con solo transiciones validas
+- [x] Dropdown con solo transiciones validas
 
 ### HIST-4.3 — Asignar / desasignar a cliente
 
 Vincular botellon a un cliente o liberarlo a planta.
 
 **AC:**
-- [ ] Select de cliente con busqueda en formulario de botellon
-- [ ] Al asignar: estado cambia a "asignado"
-- [ ] Al desasignar: estado cambia a "disponible"
-- [ ] No se puede asignar un botellon danado o perdido
+- [x] Select de cliente con busqueda en formulario de botellon
+- [x] Al asignar: estado cambia a "asignado"
+- [x] Al desasignar: estado cambia a "disponible"
+- [x] No se puede asignar un botellon danado o perdido
 
 ### HIST-4.4 — Generacion de QR
 
 Al crear un botellon, se genera automaticamente un codigo QR que enlaza a su pagina publica.
 
 **AC:**
-- [ ] QR generado con `qrcode.react` (SVG)
-- [ ] Enlace: `/b/BOT-XXXXX`
-- [ ] Boton "Descargar QR" que exporta el SVG
-- [ ] QR visible en ficha del botellon
+- [x] QR generado con `qrcode.react` (SVG)
+- [x] Enlace: `/b/BOT-XXXXX`
+- [x] Boton "Descargar QR" que exporta el SVG
+- [x] QR visible en ficha del botellon
 
 ### HIST-4.5 — Pagina publica del botellon
 
 Pagina accesible sin login que muestra info basica del botellon al escanear el QR.
 
 **AC:**
-- [ ] Ruta `/b/[codigo]` publica (sin autenticacion)
-- [ ] Muestra: codigo del botellon, total de recargas, ultima recarga (fecha)
-- [ ] NO muestra datos personales del cliente
-- [ ] Muestra logo del negocio (si esta configurado)
+- [x] Ruta `/b/[codigo]` publica (sin autenticacion)
+- [x] Muestra: codigo del botellon, total de recargas, ultima recarga (fecha)
+- [x] NO muestra datos personales del cliente
+- [x] Muestra logo del negocio (si esta configurado)
 
 ### HIST-4.6 — Vista de impresion de etiqueta
 
 Pagina con formato de impresion para etiquetas fisicas con QR.
 
 **AC:**
-- [ ] Ruta `/botellones/[id]/imprimir` con layout de impresion (sin header/sidebar)
-- [ ] Formato A4 con multiples etiquetas por hoja
-- [ ] Cada etiqueta: codigo, QR, nombre del cliente, logo del negocio
-- [ ] CSS `@media print` optimizado
+- [x] Ruta `/botellones/[id]/imprimir` con layout de impresion (sin header/sidebar)
+- [x] Formato A4 con multiples etiquetas por hoja
+- [x] Cada etiqueta: codigo, QR, nombre del cliente, logo del negocio
+- [x] CSS `@media print` optimizado
 
 ---
 

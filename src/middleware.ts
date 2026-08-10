@@ -33,6 +33,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Already on /login — let the page render (prevents redirect loops)
+  if (pathname === '/login') {
+    return supabaseResponse;
+  }
+
   // No session → redirect to login
   if (!user) {
     const loginUrl = new URL('/login', request.url);

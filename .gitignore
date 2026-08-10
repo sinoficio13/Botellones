@@ -51,3 +51,6 @@ next-env.d.ts
 # Dev artifacts
 dev-output.txt
 dev-error.txt
+
+# Playwright
+test-results/

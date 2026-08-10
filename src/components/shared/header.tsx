@@ -34,8 +34,14 @@ export async function Header() {
           )}
         </Link>
 
-        {/* Navigation — minimal for now, expands in later epics */}
+        {/* Navigation */}
         <nav className="flex items-center gap-4 text-sm">
+          <Link
+            href="/clientes"
+            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Clientes
+          </Link>
           <Link
             href="/configuracion"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"

@@ -1,6 +1,6 @@
 # EPIC-3 — Gestión de Clientes
 
-> **Estado**: ⬜ Pendiente  
+> **Estado**: 🟡 En progreso (3/8)  
 > **Historias**: 8  
 > **Depende de**: [[01-DB-Auth|EPIC-1]], [[02-Config-Negocio|EPIC-2]]  
 > **Siguiente**: [[05-Recargas|EPIC-5]], [[08-Panel-Reportes|EPIC-8]], [[09-Busqueda-Mapa|EPIC-9]]
@@ -22,31 +22,31 @@ Formulario completo con React Hook Form + Zod para crear cliente.
 **Campos**: nombre (req), negocio, cedula, telefono_1 (req), telefono_2, whatsapp, tipo_cliente (casa/negocio/oficina/otro), horario_preferido (mañana/tarde/noche), dias_preferidos, contacto_preferido, observaciones
 
 **AC:**
-- [ ] Validación con Zod (nombre y teléfono requeridos)
-- [ ] Código CL-XXXX asignado automáticamente
-- [ ] Fecha de registro automática
-- [ ] Redirección a ficha del cliente tras crear
+- [x] Validación con Zod (nombre y teléfono requeridos)
+- [x] Código CL-XXXX asignado automáticamente
+- [x] Fecha de registro automática
+- [x] Redirección a ficha del cliente tras crear
 
 ### HIST-3.2 — Lista de clientes con WhatsApp
 
 Tabla paginada de clientes con búsqueda y botón WhatsApp directo.
 
 **AC:**
-- [ ] Tabla: código, nombre, negocio, teléfono, tipo, última recarga, total recargas
-- [ ] Paginación (server-side)
-- [ ] Ordenamiento por nombre, fecha registro, total recargas
-- [ ] Ícono WhatsApp en cada fila (`wa.me/XXXXXXXXX`)
-- [ ] Link a ficha del cliente
+- [x] Tabla: código, nombre, negocio, teléfono, tipo, última recarga, total recargas
+- [x] Paginación (server-side)
+- [x] Ordenamiento por nombre, fecha registro, total recargas
+- [x] Ícono WhatsApp en cada fila (`wa.me/XXXXXXXXX`)
+- [x] Link a ficha del cliente
 
 ### HIST-3.3 — Ficha del cliente — Tab: Datos
 
 Pestaña con datos completos del cliente, editables.
 
 **AC:**
-- [ ] Página `/clientes/[id]` con tabs
-- [ ] Tab "Datos" muestra todos los campos
-- [ ] Botón "Editar" → formulario inline
-- [ ] Guardar cambios con validación
+- [x] Página `/clientes/[id]` con tabs
+- [x] Tab "Datos" muestra todos los campos
+- [x] Botón "Editar" → formulario inline
+- [x] Guardar cambios con validación
 
 ### HIST-3.4 — Ficha del cliente — Tab: Dirección + Mapa
 
@@ -92,8 +92,8 @@ Historial completo de recargas del cliente con filtro por fecha.
 WhatsApp accesible desde lista, ficha, búsqueda y notificaciones.
 
 **AC:**
-- [ ] Ícono/botón WhatsApp visible en: lista de clientes, ficha del cliente, resultados de búsqueda, notificaciones que referencien al cliente
-- [ ] Formato: `https://wa.me/CODIGO_PAIS+NUMERO` (ej: `https://wa.me/584141234567`)
+- [x] Ícono/botón WhatsApp visible en: lista de clientes, ficha del cliente
+- [ ] resultados de búsqueda, notificaciones (próximos epics)
 
 ---
 

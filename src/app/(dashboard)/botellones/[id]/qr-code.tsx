@@ -1,6 +1,7 @@
 'use client';
 
 import { QRCodeSVG } from 'qrcode.react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   codigo: string;
@@ -8,7 +9,17 @@ interface Props {
 }
 
 export function QrCodeDisplay({ codigo, size = 180 }: Props) {
-  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/b/${codigo}`;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div style={{ width: size, height: size }} />;
+  }
+
+  const url = `${window.location.origin}/b/${codigo}`;
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -37,10 +48,20 @@ export function QrCodeDisplay({ codigo, size = 180 }: Props) {
 
 /** Inline version for print labels */
 export function QrCodeInline({ codigo, size = 100 }: Props) {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div style={{ width: size, height: size }} />;
+  }
+
+  const url = `${window.location.origin}/b/${codigo}`;
   return (
     <div className="qr-svg">
-      <QRCodeSVG value={`${origin}/b/${codigo}`} size={size} level="M" />
+      <QRCodeSVG value={url} size={size} level="M" />
     </div>
   );
 }

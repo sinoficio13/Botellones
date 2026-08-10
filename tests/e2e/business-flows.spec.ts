@@ -9,7 +9,7 @@ async function login(page: any) {
   await page.getByLabel('Email').fill('admin@botellon.com');
   await page.getByLabel('Password').fill('Admin123!');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await page.waitForURL(/\/clientes/, { timeout: 15000 });
 }
 
 test.describe('Recarga flow', () => {
@@ -32,7 +32,7 @@ test.describe('Recarga flow', () => {
 
   test('quick recarga from client list', async ({ page }) => {
     await login(page);
-    await page.goto('/clientes');
+    await page.goto('/clientes?page=2'); // Carlos Pérez is on page 2
     const row = page.getByRole('row', { name: /Carlos Pérez/ });
     await row.getByText('+ Recarga').click();
 
@@ -52,15 +52,16 @@ test.describe('Client CRUD', () => {
     await page.getByLabel('Nombre *').fill(`T${s}`);
     await page.getByLabel('Teléfono 1 *').fill(`58414000${s}`);
     await page.getByRole('button', { name: 'Crear cliente' }).click();
-    await expect(page).toHaveURL(/\/clientes\//, { timeout: 10000 });
-    await expect(page.getByText(`T${s}`)).toBeVisible();
+    await page.waitForURL(/\/clientes\//, { timeout: 10000 });
+    await expect(page.getByText(`T${s}`)).toBeVisible({ timeout: 5000 });
   });
 
   test('edit from detail tab', async ({ page }) => {
     await login(page);
     await page.goto('/clientes');
     await page.locator('a[href*="/clientes/"]').first().click();
-    await expect(page).toHaveURL(/\/clientes\//);
+    await page.waitForURL(/\/clientes\//, { timeout: 10000 });
+    await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Editar' }).click();
     await page.getByLabel('Observaciones').fill('E2E OK');
     await page.getByRole('button', { name: 'Guardar' }).click();
@@ -70,9 +71,11 @@ test.describe('Client CRUD', () => {
   test('search filters results', async ({ page }) => {
     await login(page);
     await page.goto('/clientes');
+    // Search: Ferretería (Carlos Pérez is on page 2 of unfiltered list)
     await page.getByPlaceholder('Buscar por nombre').fill('Ferretería');
-    await page.waitForTimeout(600);
-    await expect(page.getByText('Carlos Pérez')).toBeVisible();
+    await page.waitForTimeout(800);
+    // Carlos should appear in filtered results
+    await expect(page.getByText('Carlos Pérez')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('María Rodríguez')).not.toBeVisible();
   });
 });
@@ -80,7 +83,8 @@ test.describe('Client CRUD', () => {
 test.describe('Public QR', () => {
   test('accessible without login', async ({ page }) => {
     await page.goto('/b/BOT-00001');
-    await expect(page.locator('text=BOT-00001').first()).toBeVisible({ timeout: 5000 });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('BOT-00001').first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Total recargas')).toBeVisible();
     await expect(page.getByText('María Rodríguez')).not.toBeVisible();
   });

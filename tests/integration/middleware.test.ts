@@ -62,9 +62,9 @@ describe('Middleware — dev mode (cookie-based auth)', () => {
     expect(response.status).toBe(200)
   })
 
-  it('allows authenticated user on /dashboard', async () => {
+  it('allows authenticated user on /clientes', async () => {
     const devSession = JSON.stringify({ email: 'admin@botellon.com', role: 'admin', name: 'Administrador' })
-    const req = createMockRequest('/dashboard', {
+    const req = createMockRequest('/clientes', {
       botellon_dev_session: devSession,
     })
 

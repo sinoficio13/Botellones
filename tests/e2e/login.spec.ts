@@ -1,7 +1,7 @@
 /**
  * E2E Login Flow (task 3.5)
  *
- * Full end-to-end test: visit / → redirected to /login → authenticate → /dashboard
+ * Full end-to-end test: visit / → redirected to /login → authenticate → /clientes
  * Requires: Supabase project running, admin seed applied, valid .env.local
  */
 import { test, expect } from '@playwright/test'
@@ -39,7 +39,7 @@ test.describe('Login Flow', () => {
     ).toBeVisible()
   })
 
-  test('successful login redirects to dashboard', async ({ page }) => {
+  test('successful login redirects to clientes', async ({ page }) => {
     await page.goto('/login')
 
     // Seed credentials: admin@botellon.com / Admin123!
@@ -47,8 +47,10 @@ test.describe('Login Flow', () => {
     await page.getByLabel('Password').fill('Admin123!')
     await page.getByRole('button', { name: 'Sign in' }).click()
 
-    // Should be redirected to dashboard
-    await expect(page).toHaveURL(/\/dashboard/)
+    // Wait for redirect to clientes
+    await page.waitForURL(/\/clientes/, { timeout: 15000 });
+    // Verify we landed
+    await expect(page).toHaveURL(/\/clientes/);
   })
 
   test('shows error on invalid credentials', async ({ page }) => {

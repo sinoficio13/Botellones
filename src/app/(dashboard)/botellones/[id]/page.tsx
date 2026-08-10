@@ -1,4 +1,5 @@
-import { getBotellon, getTransiciones, getClientesForSelect } from '@/lib/db/botellones';
+import { getBotellon, getClientesForSelect } from '@/lib/db/botellones';
+import { getTransiciones } from '@/lib/utils/estados';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, QrCode, Printer } from 'lucide-react';
 import Link from 'next/link';

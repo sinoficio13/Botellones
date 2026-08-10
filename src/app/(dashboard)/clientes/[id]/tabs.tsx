@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import dynamic from 'next/dynamic';
 import { updateCliente } from '@/lib/db/clientes';
-import { saveDireccion, getDireccion, parseWhatsAppLocation } from '@/lib/db/direcciones';
+import { saveDireccion, getDireccion } from '@/lib/db/direcciones';
+import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { MapPin, ExternalLink, Upload, Trash2 } from 'lucide-react';
 

@@ -5,22 +5,6 @@ import { redirect } from 'next/navigation';
 
 export type BotellonState = { success?: boolean; error?: string; id?: string };
 
-const ESTADOS = ['disponible', 'asignado', 'en_recarga', 'mantenimiento', 'dañado', 'perdido'] as const;
-export type Estado = (typeof ESTADOS)[number];
-
-const TRANSICIONES: Record<Estado, Estado[]> = {
-  disponible: ['asignado', 'mantenimiento', 'dañado', 'perdido'],
-  asignado: ['en_recarga', 'disponible', 'perdido'],
-  en_recarga: ['asignado', 'disponible', 'mantenimiento'],
-  mantenimiento: ['disponible', 'dañado'],
-  dañado: [],
-  perdido: ['disponible'],
-};
-
-export function getTransiciones(estado: Estado): Estado[] {
-  return TRANSICIONES[estado] || [];
-}
-
 function getSupabase() {
   return import('@supabase/supabase-js').then(({ createClient }) => {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';

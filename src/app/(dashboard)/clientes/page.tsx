@@ -56,12 +56,13 @@ export default async function ClientesPage({ searchParams }: Props) {
               <Th label="Última recarga" field="fecha_registro" {...{ order, dir }} />
               <Th label="Total" field="fecha_registro" {...{ order, dir }} />
               <th className="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">WA</th>
+              <th className="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {clientes.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-zinc-400">
+                <td colSpan={9} className="px-3 py-8 text-center text-zinc-400">
                   {q ? 'Sin resultados para esta búsqueda.' : 'No hay clientes todavía.'}
                 </td>
               </tr>
@@ -101,6 +102,14 @@ export default async function ClientesPage({ searchParams }: Props) {
                       <MessageCircle size={16} />
                     </a>
                   )}
+                </td>
+                <td className="px-3 py-2.5">
+                  <a
+                    href={`/recargas/nueva?cliente_id=${c.id}`}
+                    className="inline-flex items-center rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                  >
+                    + Recarga
+                  </a>
                 </td>
               </tr>
             ))}

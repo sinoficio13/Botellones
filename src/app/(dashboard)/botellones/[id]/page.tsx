@@ -57,6 +57,48 @@ export default async function BotellonDetailPage({ params }: Props) {
 
       {/* Form: state + client assignment */}
       <BotellonForm botellon={botellon} transiciones={transiciones} clientes={clientes} />
+
+      {/* Recarga history */}
+      <RecargasHistorial botellonId={botellon.id} />
+    </div>
+  );
+}
+
+async function RecargasHistorial({ botellonId }: { botellonId: string }) {
+  const { getRecargasBotellon } = await import('@/lib/db/recargas');
+  const { recargas, total } = await getRecargasBotellon(botellonId);
+
+  return (
+    <div className="mt-8 space-y-4">
+      <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+        Historial de recargas <span className="text-sm font-normal text-zinc-400">({total})</span>
+      </h2>
+      {recargas.length === 0 ? (
+        <p className="text-sm text-zinc-400">No hay recargas registradas.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <table className="w-full text-sm">
+            <thead className="bg-zinc-50 text-left dark:bg-zinc-900">
+              <tr>
+                <th className="px-3 py-2 font-medium text-zinc-500">Fecha</th>
+                <th className="px-3 py-2 font-medium text-zinc-500">Hora</th>
+                <th className="px-3 py-2 font-medium text-zinc-500">Registro</th>
+                <th className="px-3 py-2 font-medium text-zinc-500">Cliente</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {recargas.map((r: any) => (
+                <tr key={r.id}>
+                  <td className="px-3 py-2">{new Date(r.fecha).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-zinc-500">{r.hora?.slice(0, 5)}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{r.numero_registro}</td>
+                  <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{r.clientes?.nombre || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

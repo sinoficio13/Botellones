@@ -1,0 +1,36 @@
+{
+	"nodes":[
+		{"id":"epic0","type":"text","text":"# EPIC-0 ✅\n## Fundación\n\n**5 historias | 17/18 tasks**\n\nNext.js + Supabase + shadcn/ui\nPWA + ESLint + Prettier\n\n🔽 Listo para EPIC-1","x":-40,"y":-320,"width":280,"height":160,"color":"5"},
+		{"id":"epic1","type":"text","text":"# EPIC-1\n## DB + Auth\n\n**7 historias**\n\n9 tablas SQL, RLS policies\nLogin, middleware, roles\nSeed admin\nStorage buckets\n\n⬆️ EPIC-0 → ⬇️ EPIC-2,3,4,7","x":-40,"y":0,"width":280,"height":180,"color":"1"},
+		{"id":"epic2","type":"text","text":"# EPIC-2\n## Config Negocio\n\n**3 historias**\n\nLogo, nombre, datos\nPágina /configuracion\nHeader con logo\n\n⬆️ EPIC-1 → ⬇️ EPIC-3","x":-180,"y":240,"width":260,"height":140,"color":"2"},
+		{"id":"epic4","type":"text","text":"# EPIC-4\n## Botellones + QR\n\n**6 historias**\n\nCRUD, estados + transiciones\nQR por botellón\nPágina pública /b/CODIGO\nEtiquetas de impresión\n\n⬆️ EPIC-1 → ⬇️ EPIC-5","x":840,"y":295,"width":260,"height":170,"color":"3"},
+		{"id":"epic7","type":"text","text":"# EPIC-7\n## Notificaciones\n\n**4 historias**\n\nCampanita + badge\nTipos automáticos\nWhatsApp integrado\nSupabase Realtime\n\n⬆️ EPIC-1 → ⬇️ EPIC-8","x":1360,"y":295,"width":260,"height":170,"color":"2"},
+		{"id":"epic5","type":"text","text":"# EPIC-5\n## Recargas\n\n**5 historias**\n\nRegistro rápido (3 taps)\nHistorial por cliente/botellón\nContadores para dashboard\nAtajo desde lista clientes\n\n⬆️ EPIC-3,4 → ⬇️ EPIC-6,8","x":160,"y":585,"width":280,"height":170,"color":"6"},
+		{"id":"epic3","type":"text","text":"# EPIC-3\n## Clientes\n\n**8 historias**\n\nCRUD + formulario completo\nFicha con tabs (Datos, Dir,\nFotos, Botellones, Historial)\nWhatsApp everywhere\n\n⬆️ EPIC-1,2 → ⬇️ EPIC-5,8,9","x":-480,"y":585,"width":260,"height":170,"color":"4"},
+		{"id":"epic8","type":"text","text":"# EPIC-8\n## Panel + Reportes\n\n**6 historias**\n\nDashboard admin: KPIs, gráficos\nDashboard repartidor\nAlertas, resúmenes inteligentes\nSección reportes\n\n⬆️ EPIC-3,4,5,6,7 → ⬇️ EPIC-9,10","x":100,"y":1060,"width":280,"height":180,"color":"4"},
+		{"id":"epic6","type":"text","text":"# EPIC-6\n## Fidelidad\n\n**4 historias**\n\nCada 100 = premio\nGestión de premios (admin)\nBarra progreso en ficha\nAlerta al repartidor\n\n⬆️ EPIC-5 → ⬇️ EPIC-8","x":-660,"y":1080,"width":260,"height":160,"color":"1"},
+		{"id":"epic10","type":"text","text":"# EPIC-10\n## PDF + Excel\n\n**3 historias**\n\nPDF (@react-pdf/renderer)\nExcel (xlsx/SheetJS)\nFicha individual en PDF\n\n⬆️ EPIC-8,9 → ⬇️ EPIC-11","x":680,"y":1530,"width":260,"height":140,"color":"6"},
+		{"id":"epic11","type":"text","text":"# EPIC-11\n## Pulido PWA + Seguridad\n\n**3 historias**\n\nVerificación PWA mobile\nSecurity advisors\nPerformance + accesibilidad\n\n⬆️ Todos los epics","x":240,"y":1960,"width":280,"height":140,"color":"5"},
+		{"id":"epic9","type":"text","text":"# EPIC-9\n## Búsqueda + Mapa\n\n**3 historias**\n\nBúsqueda global (debounce)\nMapa Leaflet con clientes\nFiltros avanzados\n\n⬆️ EPIC-3 → ⬇️ EPIC-10","x":-350,"y":1530,"width":260,"height":140,"color":"3"}
+	],
+	"edges":[
+		{"id":"e0-1","fromNode":"epic0","fromSide":"bottom","toNode":"epic1","toSide":"top","label":"Fundación lista"},
+		{"id":"e1-2","fromNode":"epic1","fromSide":"left","toNode":"epic2","toSide":"top"},
+		{"id":"e1-3","fromNode":"epic1","fromSide":"left","toNode":"epic3","toSide":"left"},
+		{"id":"e1-4","fromNode":"epic1","fromSide":"right","toNode":"epic4","toSide":"top"},
+		{"id":"e1-7","fromNode":"epic1","fromSide":"right","toNode":"epic7","toSide":"left"},
+		{"id":"e2-3","fromNode":"epic2","fromSide":"bottom","toNode":"epic3","toSide":"top"},
+		{"id":"e3-5","fromNode":"epic3","fromSide":"right","toNode":"epic5","toSide":"left"},
+		{"id":"e4-5","fromNode":"epic4","fromSide":"left","toNode":"epic5","toSide":"right"},
+		{"id":"e5-6","fromNode":"epic5","fromSide":"left","toNode":"epic6","toSide":"top"},
+		{"id":"e3-8","fromNode":"epic3","fromSide":"bottom","toNode":"epic8","toSide":"top","label":"vía EPIC-5"},
+		{"id":"e5-8","fromNode":"epic5","fromSide":"bottom","toNode":"epic8","toSide":"left"},
+		{"id":"e4-8","fromNode":"epic4","fromSide":"bottom","toNode":"epic8","toSide":"right"},
+		{"id":"e6-8","fromNode":"epic6","fromSide":"right","toNode":"epic8","toSide":"left"},
+		{"id":"e7-8","fromNode":"epic7","fromSide":"bottom","toNode":"epic8","toSide":"right"},
+		{"id":"e8-9","fromNode":"epic8","fromSide":"left","toNode":"epic9","toSide":"top"},
+		{"id":"e8-10","fromNode":"epic8","fromSide":"right","toNode":"epic10","toSide":"top"},
+		{"id":"e9-10","fromNode":"epic9","fromSide":"bottom","toNode":"epic10","toSide":"left"},
+		{"id":"e10-11","fromNode":"epic10","fromSide":"bottom","toNode":"epic11","toSide":"right"}
+	]
+}

@@ -1,14 +1,55 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 
 /**
- * Auth middleware: validates session via getUser() and enforces role-based routing.
+ * Auth middleware: validates session and enforces role-based routing.
+ *
+ * Dev mode (NEXT_PUBLIC_AUTH_MODE=dev):
+ *   Reads botellon_dev_session cookie set by login action.
+ *   No Supabase required for local testing.
+ *
+ * Production:
+ *   Uses Supabase getUser() for server-verified JWT validation.
  *
  * - No session → 302 /login (protected routes only)
  * - Non-admin on /configuracion → 302 /dashboard
  */
 export async function middleware(request: NextRequest) {
-  // Let updateSession handle cookie refresh first
+  const { pathname } = request.nextUrl;
+
+  // Already on /login — let the page render (prevents redirect loops)
+  if (pathname === '/login') {
+    return NextResponse.next();
+  }
+
+  // ── Dev mode: cookie-based auth ──
+  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'dev') {
+    const devSession = request.cookies.get('botellon_dev_session')?.value;
+
+    if (!devSession) {
+      const loginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    try {
+      const session = JSON.parse(devSession) as { email: string; role: string };
+
+      // Role check: /configuracion requires admin
+      if (pathname.startsWith('/configuracion') && session.role !== 'admin') {
+        const dashboardUrl = new URL('/dashboard', request.url);
+        return NextResponse.redirect(dashboardUrl);
+      }
+
+      return NextResponse.next();
+    } catch {
+      // Corrupted cookie — redirect to login
+      const loginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  // ── Production: Supabase Auth ──
+  const { createServerClient } = await import('@supabase/ssr');
+
   const supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -26,25 +67,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // getUser() revalidates the JWT server-side — immune to cookie tampering
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
-  // Already on /login — let the page render (prevents redirect loops)
-  if (pathname === '/login') {
-    return supabaseResponse;
-  }
-
-  // No session → redirect to login
   if (!user) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Role check: /configuracion and sub-routes require admin
   if (pathname.startsWith('/configuracion')) {
     const role = user.app_metadata?.role;
     if (role !== 'admin') {

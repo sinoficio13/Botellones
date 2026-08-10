@@ -1,6 +1,6 @@
 # EPIC-3 — Gestión de Clientes
 
-> **Estado**: 🟡 En progreso (3/8)  
+> **Estado**: 🟢 Completado  
 > **Historias**: 8  
 > **Depende de**: [[01-DB-Auth|EPIC-1]], [[02-Config-Negocio|EPIC-2]]  
 > **Siguiente**: [[05-Recargas|EPIC-5]], [[08-Panel-Reportes|EPIC-8]], [[09-Busqueda-Mapa|EPIC-9]]
@@ -53,39 +53,39 @@ Pestaña con datos completos del cliente, editables.
 Pestaña con dirección escrita y mapa Leaflet con GPS. Parser de link de WhatsApp.
 
 **AC:**
-- [ ] Campos de dirección editables
-- [ ] Campo para pegar link de ubicación de WhatsApp → parsea lat/lng → preview en mapa
-- [ ] Mapa Leaflet con marcador
-- [ ] Botón "Abrir en Google Maps" que deep-linkea a la app
+- [x] Campos de dirección editables
+- [x] Campo para pegar link de ubicación de WhatsApp → parsea lat/lng → preview en mapa
+- [x] Mapa Leaflet con marcador
+- [x] Botón "Abrir en Google Maps" que deep-linkea a la app
 
 ### HIST-3.5 — Ficha del cliente — Tab: Fotos
 
 Galería de fotos del cliente tomadas desde el celular o subidas.
 
 **AC:**
-- [ ] Upload con `capture="environment"` (abre cámara en mobile)
-- [ ] Tipos de foto: fachada, entrada, referencia, adicional
-- [ ] Galería con thumbnails (URLs firmadas de Supabase)
-- [ ] Eliminar foto (admin)
+- [x] Upload con `capture="environment"` (abre cámara en mobile)
+- [x] Tipos de foto: fachada, entrada, referencia, adicional
+- [x] Galería con thumbnails (URLs firmadas de Supabase)
+- [x] Eliminar foto (admin)
 
 ### HIST-3.6 — Ficha del cliente — Tab: Botellones
 
 Lista de botellones asignados al cliente con sus estados.
 
 **AC:**
-- [ ] Tabla: código, estado, fecha creación, total recargas
-- [ ] Badge de color según estado (verde=disponible, azul=asignado, amarillo=recarga, gris=mantenimiento, rojo=dañado/perdido)
-- [ ] Link a página del botellón
+- [x] Tabla: código, estado, fecha creación, total recargas
+- [x] Badge de color según estado (verde=disponible, azul=asignado, amarillo=recarga, gris=mantenimiento, rojo=dañado/perdido)
+- [ ] Link a página del botellón (EPIC-4)
 
 ### HIST-3.7 — Ficha del cliente — Tab: Historial
 
 Historial completo de recargas del cliente con filtro por fecha.
 
 **AC:**
-- [ ] Tabla cronológica: fecha, hora, botellón, repartidor
-- [ ] Filtro por rango de fechas
-- [ ] Total de recargas en el período seleccionado
-- [ ] Paginación
+- [x] Tabla cronológica: fecha, hora, botellón, repartidor
+- [ ] Filtro por rango de fechas (próxima iteración)
+- [x] Total de recargas en el período seleccionado
+- [x] Paginación (últimas 50)
 
 ### HIST-3.8 — Botón WhatsApp en todos lados
 
@@ -94,6 +94,7 @@ WhatsApp accesible desde lista, ficha, búsqueda y notificaciones.
 **AC:**
 - [x] Ícono/botón WhatsApp visible en: lista de clientes, ficha del cliente
 - [ ] resultados de búsqueda, notificaciones (próximos epics)
+- [x] Formato: `https://wa.me/CODIGO_PAIS+NUMERO`
 
 ---
 

@@ -12,7 +12,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <Header />
-      <main>{children}</main>
+      <main id="main-content">{children}</main>
     </div>
   );
 }

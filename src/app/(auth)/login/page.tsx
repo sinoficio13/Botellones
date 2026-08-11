@@ -44,6 +44,7 @@ export default function LoginPage() {
               name="email"
               type="email"
               autoComplete="email"
+              aria-describedby={state?.error ? "login-error" : undefined}
               className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-500"
               placeholder="admin@botellon.com"
             />
@@ -61,13 +62,14 @@ export default function LoginPage() {
               name="password"
               type="password"
               autoComplete="current-password"
+              aria-describedby={state?.error ? "login-error" : undefined}
               className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-500"
               placeholder="••••••"
             />
           </div>
 
           {state?.error && (
-            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-300">
+            <div id="login-error" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-300">
               {state.error}
             </div>
           )}

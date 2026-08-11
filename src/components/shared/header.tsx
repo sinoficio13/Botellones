@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Store } from 'lucide-react';
+import { BellNotification } from '@/components/notificaciones/bell';
 
 /**
  * Header component: shows business logo (or fallback text) and name.
@@ -66,7 +67,16 @@ export async function Header() {
           >
             Configuración
           </Link>
+          <Link
+            href="/notificaciones"
+            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Notificaciones
+          </Link>
         </nav>
+
+        {/* Bell notification island */}
+        <BellNotification />
       </div>
     </header>
   );

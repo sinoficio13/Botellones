@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Store } from 'lucide-react';
 import { BellNotification } from '@/components/notificaciones/bell';
+import GlobalSearch from '@/components/search/global-search';
 
 /**
  * Header component: shows business logo (or fallback text) and name.
@@ -16,25 +17,28 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-black/80">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        {/* Logo + name */}
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={nombre}
-              className="h-8 w-auto max-w-[160px] object-contain"
-              style={{ maxHeight: 40 }}
-            />
-          ) : (
-            <>
-              <Store className="h-6 w-6 text-zinc-600 dark:text-zinc-400" />
-              <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-                {nombre}
-              </span>
-            </>
-          )}
-        </Link>
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
+        {/* Logo + search */}
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={nombre}
+                className="h-8 w-auto max-w-[160px] object-contain"
+                style={{ maxHeight: 40 }}
+              />
+            ) : (
+              <>
+                <Store className="h-6 w-6 text-zinc-600 dark:text-zinc-400" />
+                <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                  {nombre}
+                </span>
+              </>
+            )}
+          </Link>
+          <GlobalSearch />
+        </div>
 
         {/* Navigation */}
         <nav className="flex items-center gap-4 text-sm">

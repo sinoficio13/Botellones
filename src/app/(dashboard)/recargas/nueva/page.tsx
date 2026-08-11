@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getClientesForSearch, getBotellonesDelCliente, registrarRecarga } from '@/lib/db/recargas';
+import { PremioAlertCard } from '@/components/fidelidad/premio-alert-card';
 
 type Step = 'cliente' | 'botellon' | 'confirmar';
 
@@ -54,6 +55,40 @@ export default function NuevaRecargaPage() {
   }
 
   if (showToast || state?.success) {
+    // If a premio was generated, show the loyalty alert card
+    if (state?.premioGenerado && selectedCliente) {
+      return (
+        <div className="mx-auto max-w-md px-4 py-16">
+          <PremioAlertCard
+            nombre={selectedCliente.nombre}
+            telefono={selectedCliente.telefono_1}
+            nivel={state.premioGenerado.nivel}
+            clienteId={selectedCliente.id}
+          />
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              onClick={() => {
+                setStep('cliente');
+                setSelectedCliente(null);
+                setSelectedBotellon(null);
+                setSearch('');
+              }}
+              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900"
+            >
+              Registrar otra
+            </button>
+            <a
+              href="/clientes"
+              className="rounded-md border px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+            >
+              Ir a clientes
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    // Normal success view (no premio generated)
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <div className="rounded-lg bg-green-50 p-8 dark:bg-green-950">

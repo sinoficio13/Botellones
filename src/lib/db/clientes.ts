@@ -26,6 +26,7 @@ export type ClienteRow = {
   contacto_preferido: string | null;
   observaciones: string | null;
   fecha_registro: string | null;
+  total_recargas: number;
 };
 
 export type ClienteListRow = {
@@ -187,7 +188,15 @@ export async function getCliente(id: string): Promise<ClienteRow | null> {
       .select('*')
       .eq('id', id)
       .single();
-    return data;
+
+    if (!data) return null;
+
+    const { count } = await supabase
+      .from('recargas')
+      .select('*', { count: 'exact', head: true })
+      .eq('cliente_id', id);
+
+    return { ...data, total_recargas: count || 0 };
   } catch {
     return null;
   }

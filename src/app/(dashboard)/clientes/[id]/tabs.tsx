@@ -8,11 +8,12 @@ import { saveDireccion, getDireccion } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { MapPin, ExternalLink, Upload, Trash2 } from 'lucide-react';
+import { FidelidadTab } from './fidelidad-tab';
 
 // Leaflet must be imported dynamically (uses window)
 const MapaLeaflet = dynamic(() => import('./mapa'), { ssr: false });
 
-const TABS = ['Datos', 'Dirección', 'Fotos', 'Botellones', 'Historial'] as const;
+const TABS = ['Datos', 'Dirección', 'Fotos', 'Botellones', 'Historial', 'Fidelidad'] as const;
 type Tab = (typeof TABS)[number];
 
 export function ClienteTabs({ cliente }: { cliente: ClienteRow }) {
@@ -41,6 +42,9 @@ export function ClienteTabs({ cliente }: { cliente: ClienteRow }) {
         {activeTab === 'Fotos' && <FotosTab clienteId={cliente.id} />}
         {activeTab === 'Botellones' && <BotellonesTab clienteId={cliente.id} />}
         {activeTab === 'Historial' && <HistorialTab clienteId={cliente.id} />}
+        {activeTab === 'Fidelidad' && (
+          <FidelidadTab clienteId={cliente.id} totalRecargas={cliente.total_recargas} />
+        )}
       </div>
     </div>
   );

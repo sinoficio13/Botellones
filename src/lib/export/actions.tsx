@@ -1,6 +1,6 @@
 'use server';
 
-import { pdf } from '@react-pdf/renderer';
+import { renderToBuffer } from '@react-pdf/renderer';
 import { getBusinessInfo } from '@/lib/export/helpers';
 import { getClientes, getCliente, type ClienteListRow } from '@/lib/db/clientes';
 import {
@@ -35,8 +35,7 @@ function dateFilename(prefix: string, ext: string): string {
 }
 
 async function pdfToBase64(document: React.ReactElement): Promise<string> {
-  const instance = pdf(document);
-  const buffer = await instance.toBuffer();
+  const buffer = await renderToBuffer(document as any);
   return buffer.toString('base64');
 }
 

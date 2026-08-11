@@ -32,7 +32,7 @@ export function generateClientesExcel(clientes: ClienteListRow[]): string {
 
   const headers = ['Código', 'Nombre', 'Teléfono', 'Tipo', 'Total Recargas', 'Última Recarga'];
   autoFitColumns(ws, headers);
-  ws['!autofilter'] = { ref: XLSX.utils.decode_range(ws['!ref']!) };
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(ws['!ref']!)) };
 
   XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
   return toBase64(wb);
@@ -53,7 +53,7 @@ export function generateRecargasExcel(topClientes: TopCliente[]): string {
 
   const headers = ['Posición', 'Cliente', 'Total Recargas'];
   autoFitColumns(ws, headers);
-  ws['!autofilter'] = { ref: XLSX.utils.decode_range(ws['!ref']!) };
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(ws['!ref']!)) };
 
   XLSX.utils.book_append_sheet(wb, ws, 'Recargas');
   return toBase64(wb);
@@ -84,7 +84,7 @@ export function generateBotellonesExcel(botellones: BotellonExcelRow[]): string 
 
   const headers = ['Código', 'Estado', 'Cliente', 'Fecha Creación'];
   autoFitColumns(ws, headers);
-  ws['!autofilter'] = { ref: XLSX.utils.decode_range(ws['!ref']!) };
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(ws['!ref']!)) };
 
   XLSX.utils.book_append_sheet(wb, ws, 'Botellones');
   return toBase64(wb);

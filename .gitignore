@@ -54,3 +54,4 @@ dev-error.txt
 
 # Playwright
 test-results/
+.playwright-mcp/

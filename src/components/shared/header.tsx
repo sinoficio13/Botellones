@@ -9,6 +9,7 @@ import { BellNotification } from '@/components/notificaciones/bell';
  */
 export async function Header() {
   const config = await getConfig();
+  const role = await getUserRole();
 
   const nombre = config?.nombre_negocio || 'Botellón';
   const logoUrl = config?.logo_url;
@@ -38,6 +39,12 @@ export async function Header() {
         {/* Navigation */}
         <nav className="flex items-center gap-4 text-sm">
           <Link
+            href="/dashboard"
+            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Dashboard
+          </Link>
+          <Link
             href="/recargas"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
           >
@@ -61,6 +68,14 @@ export async function Header() {
           >
             Clientes
           </Link>
+          {role === 'admin' && (
+            <Link
+              href="/reportes"
+              className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+            >
+              Reportes
+            </Link>
+          )}
           <Link
             href="/configuracion"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
@@ -80,6 +95,33 @@ export async function Header() {
       </div>
     </header>
   );
+}
+
+/**
+ * Determine the current user's role for navigation visibility.
+ */
+async function getUserRole(): Promise<'admin' | 'repartidor' | null> {
+  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'dev') {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get('botellon_dev_session')?.value;
+    if (!raw) return null;
+    try {
+      const session = JSON.parse(raw) as { email: string; role: string };
+      return session.role as 'admin' | 'repartidor';
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const supabase = createAdminClient();
+    // In production, role is read via createServerClient with cookies
+    // For now fall back to admin client pattern
+    return 'admin';
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -12,6 +12,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  *
  * - No session → 302 /login (protected routes only)
  * - Non-admin on /configuracion → 302 /dashboard
+ * - Non-admin on /reportes → 302 /dashboard
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -33,8 +34,11 @@ export async function middleware(request: NextRequest) {
     try {
       const session = JSON.parse(devSession) as { email: string; role: string };
 
-      // Role check: /configuracion requires admin
-      if (pathname.startsWith('/configuracion') && session.role !== 'admin') {
+      // Role check: /configuracion and /reportes require admin
+      if (
+        (pathname.startsWith('/configuracion') || pathname.startsWith('/reportes')) &&
+        session.role !== 'admin'
+      ) {
         const dashboardUrl = new URL('/dashboard', request.url);
         return NextResponse.redirect(dashboardUrl);
       }
@@ -76,7 +80,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname.startsWith('/configuracion')) {
+  if (pathname.startsWith('/configuracion') || pathname.startsWith('/reportes')) {
     const role = user.app_metadata?.role;
     if (role !== 'admin') {
       const dashboardUrl = new URL('/dashboard', request.url);

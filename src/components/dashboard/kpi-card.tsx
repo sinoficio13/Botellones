@@ -28,7 +28,7 @@ export function KpiCard({ label, value, delta, icon, variant, href }: KpiCardPro
       size="sm"
       className={cn(
         'transition-shadow hover:shadow-md',
-        variant === 'warning' && 'ring-2 ring-amber-400 dark:ring-amber-500',
+        variant === 'warning' && 'ring-2 ring-red-500 dark:ring-red-400',
         href && 'cursor-pointer'
       )}
     >

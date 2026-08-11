@@ -132,7 +132,7 @@ export function ReportesTabs() {
 
   return (
     <div className="space-y-6">
-      <FiltroFechas onFilterChange={handleFilterChange} />
+      <FiltroFechas onFilterChange={handleFilterChange} showTipo tipos={['Clientes', 'Recargas', 'Botellones', 'Fidelidad', 'Operaciones']} />
 
       <Tabs
         defaultValue="clientes"

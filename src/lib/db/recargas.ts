@@ -2,7 +2,39 @@
 
 import { revalidatePath } from 'next/cache';
 
-export type RecargaState = { success?: boolean; error?: string; recargaId?: string };
+// ── Types ──
+
+export type RecargaState = {
+  success?: boolean;
+  error?: string;
+  recargaId?: string;
+  premioGenerado?: { nivel: number; id: string };
+};
+
+// ── Loyalty constants & pure helpers ──
+
+export const NIVELES = [
+  { min: 0, max: 99, label: 'Bronce', color: '#CD7F32' },
+  { min: 100, max: 199, label: 'Plata', color: '#C0C0C0' },
+  { min: 200, max: 499, label: 'Oro', color: '#FFD700' },
+  { min: 500, max: Infinity, label: 'Platino', color: '#E5E4E2' },
+] as const;
+
+export function getNivelLoyalty(total: number): { label: string; color: string } {
+  for (const nivel of NIVELES) {
+    if (total >= nivel.min && total <= nivel.max) {
+      return { label: nivel.label, color: nivel.color };
+    }
+  }
+  // Fallback for totals beyond the last defined range (Platino)
+  return { label: 'Platino', color: '#E5E4E2' };
+}
+
+export function getProgressPercent(total: number): number {
+  // Progress toward next multiple of 100. 500+ → already at cap.
+  if (total >= 500) return 100;
+  return total % 100;
+}
 
 function getSupabase() {
   return import('@supabase/supabase-js').then(({ createClient }) => {
@@ -67,6 +99,9 @@ export async function registrarRecarga(
       : 0;
     const numero_registro = `REC-${String(lastNum + 1).padStart(6, '0')}`;
 
+    // dev placeholder — will be replaced with auth.uid() after EPIC-1 auth hardening
+    const realizada_por = '00000000-0000-0000-0000-000000000000';
+
     // Insert recarga
     const { error } = await supabase.from('recargas').insert({
       numero_registro,
@@ -74,7 +109,7 @@ export async function registrarRecarga(
       botellon_id,
       fecha: new Date().toISOString().slice(0, 10),
       hora: new Date().toTimeString().slice(0, 8),
-      realizada_por: '00000000-0000-0000-0000-000000000000', // dev placeholder
+      realizada_por,
     });
 
     if (error) return { error: error.message };
@@ -86,10 +121,66 @@ export async function registrarRecarga(
       .eq('id', botellon_id)
       .eq('estado', 'asignado');
 
+    // ── Loyalty detection ──
+
+    let premioGenerado: { nivel: number; id: string } | undefined;
+
+    const { count } = await supabase
+      .from('recargas')
+      .select('*', { count: 'exact', head: true })
+      .eq('cliente_id', cliente_id);
+
+    const totalRecargas = count ?? 0;
+
+    if (totalRecargas > 0 && totalRecargas % 100 === 0) {
+      const { data: premioData, error: premioError } = await supabase
+        .from('premios')
+        .insert({
+          cliente_id,
+          nivel_recargas: totalRecargas,
+          estado: 'pendiente',
+          fecha_alcanzado: new Date().toISOString().slice(0, 10),
+        })
+        .select('id')
+        .single();
+
+      // UNIQUE constraint rejects duplicates silently (23505 = unique_violation)
+      if (premioError && premioError.code !== '23505') {
+        console.error('Error inserting premio:', premioError);
+      } else {
+        // Get client name for notification
+        const { data: clienteData } = await supabase
+          .from('clientes')
+          .select('nombre')
+          .eq('id', cliente_id)
+          .single();
+
+        const clienteName = clienteData?.nombre || 'Cliente';
+
+        // Insert notification for EPIC-7 consumption
+        await supabase.from('notificaciones').insert({
+          tipo: 'premio',
+          titulo: `¡${clienteName} alcanzó ${totalRecargas} recargas!`,
+          mensaje: `Premio pendiente — nivel ${totalRecargas}`,
+          usuario_id: realizada_por,
+          cliente_id,
+        });
+
+        if (premioData) {
+          premioGenerado = { nivel: totalRecargas, id: premioData.id };
+        }
+      }
+    }
+
     revalidatePath('/clientes');
     revalidatePath('/recargas');
     revalidatePath('/botellones');
-    return { success: true };
+
+    const result: RecargaState = { success: true };
+    if (premioGenerado) {
+      result.premioGenerado = premioGenerado;
+    }
+    return result;
   } catch (err: any) {
     return { error: err?.message || 'Error al registrar recarga' };
   }

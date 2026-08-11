@@ -38,7 +38,7 @@ export default async function ClientesPage({ searchParams }: Props) {
           type="search"
           name="q"
           defaultValue={q}
-          placeholder="Buscar por nombre, teléfono o código…"
+          placeholder="Buscar por nombre, teléfono, código, cédula o negocio…"
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 sm:max-w-sm"
         />
       </form>

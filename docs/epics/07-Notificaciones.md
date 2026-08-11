@@ -1,6 +1,6 @@
 # EPIC-7 — Notificaciones
 
-> **Estado**: Pendiente  
+> **Estado**: Completado  
 > **Historias**: 4  
 > **Depende de**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
 > **Siguiente**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]
@@ -20,41 +20,41 @@ Campanita con badge de no leidas. Cada alerta del sistema se puede revisar 1 a 1
 Componente de campanita en header + panel desplegable con lista de notificaciones.
 
 **AC:**
-- [ ] Icono de campana en header con badge numerico de no leidas
-- [ ] Click → dropdown con ultimas 5 notificaciones
-- [ ] "Ver todas" → pagina `/notificaciones` con historial completo
-- [ ] Filtro por tipo (premio, inactividad, botellon)
-- [ ] Marcar individual o "Marcar todas como leidas"
-- [ ] Cada notificacion es clickeable → lleva a la ficha correspondiente
-- [ ] Badge se actualiza en tiempo real (Supabase Realtime)
+- [x] Icono de campana en header con badge numerico de no leidas
+- [x] Click → dropdown con ultimas 5 notificaciones
+- [x] "Ver todas" → pagina `/notificaciones` con historial completo
+- [x] Filtro por tipo (premio, inactividad, botellon)
+- [x] Marcar individual o "Marcar todas como leidas"
+- [x] Cada notificacion es clickeable → lleva a la ficha correspondiente
+- [x] Badge se actualiza en tiempo real (Supabase Realtime)
 
 ### HIST-7.2 — Tipos de notificaciones automaticas
 
 El sistema genera notificaciones automaticas para eventos clave.
 
 **AC:**
-- [ ] Cliente alcanza 100 recargas → notificacion para admin + repartidor
-- [ ] Cliente 30 dias sin recarga → notificacion para admin (se ejecuta diariamente)
-- [ ] Botellon cambia a "danado" o "perdido" → notificacion para admin
-- [ ] Cliente a 5 recargas del premio (95, 195, 295...) → notificacion para admin
+- [x] Cliente alcanza 100 recargas → notificacion para admin + repartidor
+- [x] Cliente 30 dias sin recarga → notificacion para admin (se ejecuta diariamente)
+- [x] Botellon cambia a "danado" o "perdido" → notificacion para admin
+- [x] Cliente a 5 recargas del premio (95, 195, 295...) → notificacion para admin
 
 ### HIST-7.3 — Notificacion con accion WhatsApp
 
 Cada notificacion relevante incluye boton directo de WhatsApp.
 
 **AC:**
-- [ ] Notificaciones que referencian un cliente → boton WhatsApp visible
-- [ ] Formato: `https://wa.me/CODIGO+NUMERO`
-- [ ] Icono de WhatsApp reconocible
+- [x] Notificaciones que referencian un cliente → boton WhatsApp visible
+- [x] Formato: `https://wa.me/CODIGO+NUMERO`
+- [x] Icono de WhatsApp reconocible
 
 ### HIST-7.4 — Supabase Realtime
 
 Las notificaciones se reciben en tiempo real sin refrescar la pagina.
 
 **AC:**
-- [ ] Suscripcion a canal `notificaciones` con Supabase Realtime
-- [ ] Nueva notificacion → aparece en dropdown inmediatamente
-- [ ] Badge se actualiza automaticamente
+- [x] Suscripcion a canal `notificaciones` con Supabase Realtime
+- [x] Nueva notificacion → aparece en dropdown inmediatamente
+- [x] Badge se actualiza automaticamente
 
 ---
 

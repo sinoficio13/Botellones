@@ -1,6 +1,6 @@
 # EPIC-6 — Sistema de Fidelidad
 
-> **Estado**: Pendiente  
+> **Estado**: Completado  
 > **Historias**: 4  
 > **Depende de**: [[05-Recargas|EPIC-5 — Recargas]]  
 > **Siguiente**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]
@@ -20,39 +20,39 @@ Cada 100 recargas = premio. El admin elige que entregar. El repartidor ve la ale
 Al registrar una recarga, el sistema detecta si el cliente alcanzo un multiplo de 100 y genera un premio pendiente.
 
 **AC:**
-- [ ] Logica: despues de cada INSERT en `recargas`, verificar `COUNT(*) % 100 === 0`
-- [ ] Si alcanza 100, 200, 300... → INSERT en `premios` con estado "pendiente"
-- [ ] No genera duplicados (verificar que no exista premio para ese nivel)
-- [ ] Registra: cliente_id, nivel_recargas, fecha_alcanzado
+- [x] Logica: despues de cada INSERT en `recargas`, verificar `COUNT(*) % 100 === 0`
+- [x] Si alcanza 100, 200, 300... → INSERT en `premios` con estado "pendiente"
+- [x] No genera duplicados (verificar que no exista premio para ese nivel)
+- [x] Registra: cliente_id, nivel_recargas, fecha_alcanzado
 
 ### HIST-6.2 — Gestion de premios (admin)
 
 Panel para que el admin vea premios pendientes, elija tipo y marque como entregado.
 
 **AC:**
-- [ ] Lista de premios pendientes
-- [ ] Lista de premios entregados (historico)
-- [ ] Modal para entregar premio: elegir tipo (botellon gratis, descuento 50%, termo, otro) + observaciones
-- [ ] Al marcar entregado: se registra fecha, usuario que entrega, tipo de premio
+- [x] Lista de premios pendientes
+- [x] Lista de premios entregados (historico)
+- [x] Modal para entregar premio: elegir tipo (botellon gratis, descuento 50%, termo, otro) + observaciones
+- [x] Al marcar entregado: se registra fecha, usuario que entrega, tipo de premio
 
 ### HIST-6.3 — Barra de progreso en ficha del cliente
 
 Indicador visual de progreso hacia el proximo premio + nivel actual.
 
 **AC:**
-- [ ] Barra circular: "67 / 100 recargas" con progreso hacia proximo multiplo
-- [ ] Insignia de nivel: Bronce (0-99), Plata (100-199), Oro (200-499), Platino (500+)
-- [ ] Si esta en nivel con premio pendiente → badge "Premio pendiente"
-- [ ] Se actualiza en tiempo real tras cada recarga
+- [x] Barra circular: "67 / 100 recargas" con progreso hacia proximo multiplo
+- [x] Insignia de nivel: Bronce (0-99), Plata (100-199), Oro (200-499), Platino (500+)
+- [x] Si esta en nivel con premio pendiente → badge "Premio pendiente"
+- [x] Se actualiza en tiempo real tras cada recarga
 
 ### HIST-6.4 — Alerta al repartidor
 
 Cuando el repartidor registra la recarga que dispara un premio, ve una notificacion inmediata.
 
 **AC:**
-- [ ] Toast/popup al confirmar recarga: "Juan Perez alcanzo 100 recargas! Tiene un premio pendiente."
-- [ ] Botones: "Ver ficha", "WhatsApp"
-- [ ] Tambien se crea notificacion en el centro de notificaciones (EPIC-7)
+- [x] Toast/popup al confirmar recarga: "Juan Perez alcanzo 100 recargas! Tiene un premio pendiente."
+- [x] Botones: "Ver ficha", "WhatsApp"
+- [x] Tambien se crea notificacion en el centro de notificaciones (EPIC-7)
 
 ---
 

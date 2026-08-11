@@ -71,7 +71,7 @@ export function LoyaltyBadge({ total }: Props) {
                 {progress}%
               </span>
               <span className="text-[10px] text-zinc-400">
-                hacia {Math.ceil(total / 100) * 100}
+                hacia {(Math.floor(total / 100) + 1) * 100}
               </span>
             </>
           )}

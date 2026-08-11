@@ -52,6 +52,9 @@ next-env.d.ts
 dev-output.txt
 dev-error.txt
 
+# Supabase dev policies (local-only, NOT applied to production)
+supabase/dev/
+
 # Playwright
 test-results/
 .playwright-mcp/

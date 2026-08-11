@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { Store } from 'lucide-react';
+import { MapPin, Store } from 'lucide-react';
 import { BellNotification } from '@/components/notificaciones/bell';
 import GlobalSearch from '@/components/search/global-search';
 
@@ -65,6 +65,13 @@ export async function Header() {
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
           >
             Premios
+          </Link>
+          <Link
+            href="/mapa"
+            className="inline-flex items-center gap-1 text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            <MapPin size={14} />
+            Mapa
           </Link>
           <Link
             href="/clientes"

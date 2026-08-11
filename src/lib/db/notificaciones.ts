@@ -76,8 +76,8 @@ export async function getNotificaciones(
       .select(
         `
         *,
-        clientes!inner(nombre, telefono_1),
-        botellones!inner(codigo)
+        clientes(nombre, telefono_1),
+        botellones(codigo)
       `,
         { count: 'exact' }
       )
@@ -129,8 +129,8 @@ export async function getLastNotificaciones(
       .select(
         `
         *,
-        clientes!inner(nombre, telefono_1),
-        botellones!inner(codigo)
+        clientes(nombre, telefono_1),
+        botellones(codigo)
       `
       )
       .eq('usuario_id', userId)

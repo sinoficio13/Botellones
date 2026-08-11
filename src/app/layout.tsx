@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { SkipLink } from '@/components/a11y/skip-link';
+import { PwaShell } from '@/components/pwa/pwa-shell';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -43,19 +45,12 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           content="black-translucent"
         />
         <link rel="apple-touch-icon" href="/icon-192.png" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js');
-                });
-              }
-            `,
-          }}
-        />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SkipLink />
+        {children}
+        <PwaShell />
+      </body>
     </html>
   );
 }

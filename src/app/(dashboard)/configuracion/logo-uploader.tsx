@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, type ChangeEvent } from 'react';
+import Image from 'next/image';
 
 type PreviewCtx = 'header' | 'pdf' | 'qr';
 
@@ -26,7 +27,6 @@ export function LogoUploader() {
   const [warning, setWarning] = useState<string | null>(null);
   const [activePreview, setActivePreview] = useState<PreviewCtx>('header');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -147,17 +147,18 @@ export function LogoUploader() {
               activePreview === p.key && (
                 <div
                   key={p.key}
-                  className="flex items-center justify-center rounded border border-zinc-200 bg-white dark:border-zinc-600 dark:bg-zinc-800"
+                  className="relative flex items-center justify-center rounded border border-zinc-200 bg-white dark:border-zinc-600 dark:bg-zinc-800"
                   style={{ height: p.height + 8 }}
                 >
-                  <img
-                    ref={imgRef}
+                  <Image
                     src={preview}
                     alt="Logo preview"
+                    fill
+                    unoptimized
+                    className="object-contain"
                     style={{
                       maxWidth: p.width,
                       maxHeight: p.height,
-                      objectFit: 'contain',
                     }}
                   />
                 </div>

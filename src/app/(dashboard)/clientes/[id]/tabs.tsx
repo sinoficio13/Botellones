@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { updateCliente } from '@/lib/db/clientes';
 import { saveDireccion, getDireccion } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
@@ -423,12 +424,13 @@ function FotosTab({ clienteId }: { clienteId: string }) {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {fotos.map((f) => (
-            <div key={f.id} className="group relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
-              <img
+            <div key={f.id} className="group relative h-40 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+              <Image
                 src={f.ruta_storage}
                 alt={f.descripcion || 'Foto'}
-                className="h-40 w-full object-cover"
-                loading="lazy"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                className="object-cover"
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                 <p className="text-xs text-white">{f.tipo}</p>

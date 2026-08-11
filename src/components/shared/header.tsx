@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import Image from 'next/image';
 import Link from 'next/link';
 import { MapPin, Store } from 'lucide-react';
 import { BellNotification } from '@/components/notificaciones/bell';
@@ -22,11 +23,12 @@ export async function Header() {
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
             {logoUrl ? (
-              <img
+              <Image
                 src={logoUrl}
                 alt={nombre}
+                width={160}
+                height={40}
                 className="h-8 w-auto max-w-[160px] object-contain"
-                style={{ maxHeight: 40 }}
               />
             ) : (
               <>

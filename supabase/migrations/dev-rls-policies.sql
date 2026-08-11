@@ -21,3 +21,17 @@ CREATE POLICY "dev_anon_update_clientes" ON public.clientes
 -- Recargas read for client list stats (total_recargas, ultima_recarga)
 CREATE POLICY "dev_anon_select_recargas" ON public.recargas
   FOR SELECT TO anon USING (true);
+
+-- Premios read/write for dev mode (loyalty system)
+CREATE POLICY "dev_anon_select_premios" ON public.premios
+  FOR SELECT TO anon USING (true);
+
+CREATE POLICY "dev_anon_insert_premios" ON public.premios
+  FOR INSERT TO anon WITH CHECK (true);
+
+-- Notificaciones read/write for dev mode (loyalty events)
+CREATE POLICY "dev_anon_select_notificaciones" ON public.notificaciones
+  FOR SELECT TO anon USING (true);
+
+CREATE POLICY "dev_anon_insert_notificaciones" ON public.notificaciones
+  FOR INSERT TO anon WITH CHECK (true);

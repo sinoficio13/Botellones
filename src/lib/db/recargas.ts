@@ -146,6 +146,37 @@ export async function registrarRecarga(
       }
     }
 
+    // ── premio_cerca: notify when client is 5 recargas away from next prize ──
+    // Triggered at 95, 195, 295, 395, etc. (not at exact multiples of 100)
+    if (totalRecargas > 0 && (totalRecargas + 5) % 100 === 0 && totalRecargas % 100 !== 0) {
+      const nextLevel = Math.ceil(totalRecargas / 100) * 100;
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('nombre')
+        .eq('id', cliente_id)
+        .single();
+
+      const clienteNombre = clienteData?.nombre || 'Cliente';
+
+      // Query all profiles — small user base (EPIC-1 will add role filtering)
+      const { data: perfiles } = await supabase
+        .from('perfiles')
+        .select('id');
+
+      if (perfiles?.length) {
+        const inserts = perfiles.map((p) =>
+          supabase.from('notificaciones').insert({
+            tipo: 'premio_cerca',
+            titulo: `¡${clienteNombre} está a 5 recargas del premio!`,
+            mensaje: `${clienteNombre} tiene ${totalRecargas} recargas. Le faltan 5 para el nivel ${nextLevel}.`,
+            usuario_id: p.id,
+            cliente_id,
+          })
+        );
+        await Promise.all(inserts);
+      }
+    }
+
     revalidatePath('/clientes');
     revalidatePath('/recargas');
     revalidatePath('/botellones');

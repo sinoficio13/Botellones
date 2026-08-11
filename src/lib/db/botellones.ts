@@ -89,6 +89,35 @@ export async function updateBotellon(_prev: BotellonState | null, formData: Form
     const { error } = await supabase.from('botellones').update(update).eq('id', id);
     if (error) return { error: error.message };
 
+    // ── Damage/loss notification: alert admins when botellón breaks ──
+    const newEstado = update.estado;
+    if (newEstado === 'dañado' || newEstado === 'perdido') {
+      const { data: botellon } = await supabase
+        .from('botellones')
+        .select('codigo')
+        .eq('id', id)
+        .single();
+
+      const codigo = botellon?.codigo || 'Desconocido';
+
+      const { data: perfiles } = await supabase
+        .from('perfiles')
+        .select('id');
+
+      if (perfiles?.length) {
+        const inserts = perfiles.map((p) =>
+          supabase.from('notificaciones').insert({
+            tipo: 'botellon_danado',
+            titulo: `Botellón ${codigo} — ${newEstado}`,
+            mensaje: `El botellón ${codigo} fue marcado como ${newEstado}.`,
+            usuario_id: p.id,
+            botellon_id: id,
+          })
+        );
+        await Promise.all(inserts);
+      }
+    }
+
     revalidatePath(`/botellones/${id}`);
     revalidatePath('/botellones');
     return { success: true, id };

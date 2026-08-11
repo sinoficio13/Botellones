@@ -1,6 +1,6 @@
 'use client';
 
-import { getNivelLoyalty, getProgressPercent } from '@/lib/db/recargas';
+import { getNivelLoyalty, getProgressPercent } from '@/lib/loyalty';
 
 interface Props {
   total: number;

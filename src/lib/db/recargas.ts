@@ -11,31 +11,6 @@ export type RecargaState = {
   premioGenerado?: { nivel: number; id: string };
 };
 
-// ── Loyalty constants & pure helpers ──
-
-export const NIVELES = [
-  { min: 0, max: 99, label: 'Bronce', color: '#CD7F32' },
-  { min: 100, max: 199, label: 'Plata', color: '#C0C0C0' },
-  { min: 200, max: 499, label: 'Oro', color: '#FFD700' },
-  { min: 500, max: Infinity, label: 'Platino', color: '#E5E4E2' },
-] as const;
-
-export function getNivelLoyalty(total: number): { label: string; color: string } {
-  for (const nivel of NIVELES) {
-    if (total >= nivel.min && total <= nivel.max) {
-      return { label: nivel.label, color: nivel.color };
-    }
-  }
-  // Fallback for totals beyond the last defined range (Platino)
-  return { label: 'Platino', color: '#E5E4E2' };
-}
-
-export function getProgressPercent(total: number): number {
-  // Progress toward next multiple of 100. 500+ → already at cap.
-  if (total >= 500) return 100;
-  return total % 100;
-}
-
 function getSupabase() {
   return import('@supabase/supabase-js').then(({ createClient }) => {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
@@ -144,11 +119,15 @@ export async function registrarRecarga(
         .select('id')
         .single();
 
-      // UNIQUE constraint rejects duplicates silently (23505 = unique_violation)
-      if (premioError && premioError.code !== '23505') {
-        console.error('Error inserting premio:', premioError);
-      } else {
-        // Get client name for notification
+      if (premioError) {
+        if (premioError.code === '23505') {
+          // Duplicate — already handled in another request, do nothing
+        } else {
+          console.error('Error inserting premio:', premioError);
+        }
+      } else if (premioData) {
+        premioGenerado = { nivel: totalRecargas, id: premioData.id };
+
         const { data: clienteData } = await supabase
           .from('clientes')
           .select('nombre')
@@ -157,7 +136,6 @@ export async function registrarRecarga(
 
         const clienteName = clienteData?.nombre || 'Cliente';
 
-        // Insert notification for EPIC-7 consumption
         await supabase.from('notificaciones').insert({
           tipo: 'premio',
           titulo: `¡${clienteName} alcanzó ${totalRecargas} recargas!`,
@@ -165,10 +143,6 @@ export async function registrarRecarga(
           usuario_id: realizada_por,
           cliente_id,
         });
-
-        if (premioData) {
-          premioGenerado = { nivel: totalRecargas, id: premioData.id };
-        }
       }
     }
 

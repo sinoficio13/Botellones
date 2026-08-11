@@ -137,7 +137,10 @@ export async function getClientes(
       });
 
     if (search) {
-      query = query.or(`nombre.ilike.%${search}%,telefono_1.ilike.%${search}%,codigo.ilike.%${search}%`);
+      query = query.or(
+        `nombre.ilike.%${search}%,telefono_1.ilike.%${search}%,codigo.ilike.%${search}%,` +
+          `cedula.ilike.%${search}%,negocio.ilike.%${search}%,telefono_2.ilike.%${search}%`
+      );
     }
 
     const from = (page - 1) * pageSize;

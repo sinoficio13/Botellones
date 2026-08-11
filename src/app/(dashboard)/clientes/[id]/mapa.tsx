@@ -2,22 +2,7 @@
 
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-
-// Fix default marker icon (Leaflet + bundlers issue)
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-
-const defaultIcon = L.icon({
-  iconUrl: iconUrl.src || iconUrl,
-  iconRetinaUrl: iconRetinaUrl.src || iconRetinaUrl,
-  shadowUrl: shadowUrl.src || shadowUrl,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+import { defaultIcon } from '@/lib/leaflet/icon-fix';
 
 interface Props {
   lat: number;

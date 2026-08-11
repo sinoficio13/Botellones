@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { Bell, BellRing } from 'lucide-react';
+import { Bell, BellRing, MessageCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { timeAgo } from '@/lib/utils';
 import { NotificationIcon } from './notification-icon';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
@@ -159,20 +160,10 @@ export function BellNotification() {
     []
   );
 
-  // Format relative time
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Ahora';
-    if (mins < 60) return `Hace ${mins}m`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `Hace ${hours}h`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `Hace ${days}d`;
-    return new Date(dateStr).toLocaleDateString('es-UY', {
-      day: 'numeric',
-      month: 'short',
-    });
+  // Format relative time — now imported from @/lib/utils
+  const waLink = (telefono: string) => {
+    const digits = telefono.replace(/\D/g, '');
+    return `https://wa.me/${digits}`;
   };
 
   return (
@@ -231,11 +222,23 @@ export function BellNotification() {
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {n.titulo}
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {timeAgo(n.creada_en)}
-                    </p>
-                  </div>
-                  {!n.leida && (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {timeAgo(n.creada_en)}
+                      </p>
+                    </div>
+                    {n.cliente_id && n.cliente_telefono && (
+                      <a
+                        href={waLink(n.cliente_telefono)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 rounded p-1 text-green-600 transition-colors hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950"
+                        title="WhatsApp"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    {!n.leida && (
                     <button
                       type="button"
                       onClick={(e) => {

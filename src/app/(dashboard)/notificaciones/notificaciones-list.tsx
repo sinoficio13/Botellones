@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { markAsRead, markAllAsRead } from '@/lib/db/notificaciones';
 import type { NotificacionRow } from '@/lib/db/notificaciones';
 import { NotificationIcon } from '@/components/notificaciones/notification-icon';
+import { timeAgo } from '@/lib/utils';
 import { MessageCircle, CheckCheck } from 'lucide-react';
 
 const FILTER_TABS = [
@@ -63,22 +64,6 @@ export function NotificacionesList({ items, total, page, userId }: Props) {
   const waLink = (telefono: string) => {
     const digits = telefono.replace(/\D/g, '');
     return `https://wa.me/${digits}`;
-  };
-
-  // Relative time
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Ahora';
-    if (mins < 60) return `Hace ${mins} min`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `Hace ${hours}h`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `Hace ${days}d`;
-    return new Date(dateStr).toLocaleDateString('es-UY', {
-      day: 'numeric',
-      month: 'short',
-    });
   };
 
   return (

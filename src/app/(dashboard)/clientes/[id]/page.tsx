@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { ClienteTabs } from './tabs';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { ExportButton } from '@/components/shared/export-button';
+import { exportClienteFichaPDF } from '@/lib/export/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +51,10 @@ export default async function ClienteDetailPage({ params }: Props) {
                 <MessageCircle size={14} /> WhatsApp
               </a>
             )}
+            <ExportButton
+              onClick={exportClienteFichaPDF.bind(null, id)}
+              label="Exportar ficha"
+            />
           </div>
         </div>
       </div>

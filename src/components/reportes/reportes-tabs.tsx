@@ -29,6 +29,16 @@ import {
 import { getPremios } from '@/lib/db/premios';
 import { getBotellones } from '@/lib/db/botellones';
 import { getContadores } from '@/lib/db/recargas';
+import { ExportButton } from '@/components/shared/export-button';
+import {
+  exportClientesPDF,
+  exportClientesExcel,
+  exportRecargasPDF,
+  exportRecargasExcel,
+  exportBotellonesPDF,
+  exportBotellonesExcel,
+  exportFidelidadPDF,
+} from '@/lib/export/actions';
 
 type TabData = {
   clientes: Awaited<ReturnType<typeof getClientes>> | null;
@@ -163,7 +173,13 @@ export function ReportesTabs() {
           ) : data.clientes ? (
             <Card>
               <CardHeader>
-                <CardTitle>Clientes ({data.clientes.total})</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Clientes ({data.clientes.total})</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <ExportButton onClick={() => exportClientesPDF()} label="PDF" />
+                    <ExportButton onClick={() => exportClientesExcel()} label="Excel" icon="excel" />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -207,6 +223,10 @@ export function ReportesTabs() {
             <p className="py-8 text-center text-sm text-muted-foreground">Cargando...</p>
           ) : data.recargas && data.contadores ? (
             <div className="space-y-6">
+              <div className="flex items-center justify-end gap-2">
+                <ExportButton onClick={() => exportRecargasPDF()} label="PDF" />
+                <ExportButton onClick={() => exportRecargasExcel()} label="Excel" icon="excel" />
+              </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <StatCard label="Recargas hoy" value={data.contadores.recargas_hoy} />
                 <StatCard label="Recargas este mes" value={data.contadores.recargas_mes} />
@@ -256,6 +276,10 @@ export function ReportesTabs() {
             <p className="py-8 text-center text-sm text-muted-foreground">Cargando...</p>
           ) : data.botellonesEstados ? (
             <div className="space-y-6">
+              <div className="flex items-center justify-end gap-2">
+                <ExportButton onClick={() => exportBotellonesPDF()} label="PDF" />
+                <ExportButton onClick={() => exportBotellonesExcel()} label="Excel" icon="excel" />
+              </div>
               <div className="mx-auto max-w-md">
                 <BotellonesDonutChart data={data.botellonesEstados} />
               </div>
@@ -303,7 +327,11 @@ export function ReportesTabs() {
           {loading.fidelidad ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Cargando...</p>
           ) : data.premiosPendientes ? (
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              <div className="flex items-center justify-end gap-2">
+                <ExportButton onClick={() => exportFidelidadPDF()} label="PDF" />
+              </div>
+              <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle>Premios pendientes ({data.premiosPendientes.total})</CardTitle>
@@ -381,6 +409,7 @@ export function ReportesTabs() {
                   )}
                 </CardContent>
               </Card>
+            </div>
             </div>
           ) : null}
         </TabsContent>

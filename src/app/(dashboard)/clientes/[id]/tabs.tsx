@@ -92,9 +92,9 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
               {direccion?.referencia && (
                 <p className="text-xs text-zinc-500">{direccion.referencia}</p>
               )}
-              {direccion?.link_mapa && (
+              {dirCompuesta && (
                 <a
-                  href={direccion.link_mapa}
+                  href={direccion?.link_mapa || `https://www.google.com/maps/search/${encodeURIComponent(dirCompuesta)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"

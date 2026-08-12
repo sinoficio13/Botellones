@@ -10,6 +10,7 @@ import {
   getResumenesNegocio,
   getRepartidorDashboard,
 } from '@/lib/db/analytics';
+import type { RecargaPorDia, BotellonPorEstado, TopCliente } from '@/lib/db/analytics';
 
 /**
  * Dashboard page — role-aware server component.
@@ -30,25 +31,35 @@ export default async function DashboardPage() {
     return <RepartidorDashboard data={data} />;
   }
 
-  // Admin (or fallback)
-  const [kpis, recargasPorDia, botellonesPorEstado, topClientes, alertas, resumenes] =
-    await Promise.all([
-      getDashboardKpis(),
-      getRecargasPorDia(30),
-      getBotellonesPorEstado(),
-      getTopClientes(10),
-      getAlertas(),
-      getResumenesNegocio(),
-    ]);
+  // Admin (or fallback) — each query wrapped individually so one failure doesn't crash the page
+  const [
+    kpis,
+    recargasPorDia,
+    botellonesPorEstado,
+    topClientes,
+    alertas,
+    resumenes,
+  ] = await Promise.all([
+    getDashboardKpis().catch(() => null),
+    getRecargasPorDia(30).catch(() => []),
+    getBotellonesPorEstado().catch(() => []),
+    getTopClientes(10).catch(() => []),
+    getAlertas().catch(() => null),
+    getResumenesNegocio().catch(() => null),
+  ]);
 
   return (
     <AdminDashboard
-      kpis={kpis}
-      recargasPorDia={recargasPorDia}
-      botellonesPorEstado={botellonesPorEstado}
-      topClientes={topClientes}
-      alertas={alertas}
-      resumenes={resumenes}
+      kpis={kpis ?? {
+        totalClientes: 0, nuevosEsteMes: 0, botellonesActivos: 0, botellonesEnPlanta: 0,
+        recargasHoy: 0, recargasMes: 0, recargasMesAnterior: 0, premiosPendientes: 0,
+        variacionPorcentaje: 0,
+      }}
+      recargasPorDia={recargasPorDia as RecargaPorDia[]}
+      botellonesPorEstado={botellonesPorEstado as BotellonPorEstado[]}
+      topClientes={topClientes as TopCliente[]}
+      alertas={alertas ?? { premiosPendientes: [], clientesInactivos30: [], clientesInactivos60: [], botellonesDanados: [] }}
+      resumenes={resumenes ?? { clienteDelMes: null, tendenciaMensual: [], zonasActivas: [], tasaRetorno: 0 }}
     />
   );
 }

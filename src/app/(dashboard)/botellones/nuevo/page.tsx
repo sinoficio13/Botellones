@@ -1,10 +1,19 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createBotellon } from '@/lib/db/botellones';
 
 export default function NuevoBotellonPage() {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(createBotellon, null);
+
+  // Redirect on success — useActionState doesn't propagate server-side redirect()
+  useEffect(() => {
+    if (state?.id) {
+      router.push(`/botellones/${state.id}`);
+    }
+  }, [state?.id, router]);
 
   return (
     <div className="mx-auto max-w-md px-4 py-8 text-center">

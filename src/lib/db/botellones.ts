@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 // ── DB join result types ──
 
@@ -89,7 +88,7 @@ export async function createBotellon(
     const { data, error } = await supabase.from('botellones').insert({}).select('id').single();
     if (error) return { error: error.message };
     revalidatePath('/botellones');
-    redirect(`/botellones/${data.id}`);
+    return { id: data.id, success: true };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : 'Error al crear' };
   }

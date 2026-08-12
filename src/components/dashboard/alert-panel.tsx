@@ -24,7 +24,7 @@ type AlertasPanel = {
   botellonesDanados: AlertaItem[];
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 type SectionKey = 'premiosPendientes' | 'clientesInactivos30' | 'clientesInactivos60' | 'botellonesDanados';
 

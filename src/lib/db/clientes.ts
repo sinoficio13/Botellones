@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 // ── Types ──
 
@@ -106,7 +105,7 @@ export async function createCliente(
     }
 
     revalidatePath('/clientes');
-    redirect(`/clientes/${data.id}`);
+    return { clienteId: data.id, success: true };
   } catch (err) {
     return {
       error:

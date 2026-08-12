@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createCliente } from '@/lib/db/clientes';
 
@@ -9,7 +10,15 @@ const HORARIOS = ['mañana', 'tarde', 'noche'];
 const CONTACTOS = ['telefono_1', 'telefono_2', 'whatsapp'];
 
 export default function NuevoClientePage() {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(createCliente, null);
+
+  // Redirect on success — useActionState doesn't propagate server-side redirect()
+  useEffect(() => {
+    if (state?.clienteId) {
+      router.push(`/clientes/${state.clienteId}`);
+    }
+  }, [state?.clienteId, router]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -126,6 +135,11 @@ export default function NuevoClientePage() {
         {state?.error && (
           <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-300">
             {state.error}
+          </div>
+        )}
+        {state?.success && (
+          <div className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-300">
+            ✅ Cliente creado. Redirigiendo…
           </div>
         )}
 

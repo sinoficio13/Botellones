@@ -10,6 +10,7 @@ import { FidelidadTab } from './fidelidad-tab';
 import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
+const MapaEditable = dynamic(() => import('./mapa-editable'), { ssr: false });
 const MapaLeaflet = dynamic(() => import('./mapa'), { ssr: false });
 
 const TABS = ['Resumen', 'Datos', 'Dirección', 'Botellones', 'Historial', 'Fidelidad'] as const;
@@ -137,6 +138,15 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
           )}
         </div>
       </div>
+
+      {/* Mapa de ubicación GPS (visible si hay coordenadas) */}
+      {direccion?.latitud != null && direccion?.longitud != null && (
+        <div className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-700">
+          <div className="h-52 w-full">
+            <MapaLeaflet lat={Number(direccion.latitud)} lng={Number(direccion.longitud)} />
+          </div>
+        </div>
+      )}
 
       {/* Mini-cards */}
       <div className="grid grid-cols-3 gap-3">
@@ -274,6 +284,7 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [data, setData] = useState<Record<string, string> | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
 
   useEffect(() => {
     getDireccion(clienteId).then((d) => {
@@ -295,14 +306,78 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
     if (parsed) setCoords(parsed);
   };
 
+  // Reverse geocode: fill address fields from coordinates
+  const reverseGeocode = async (lat: number, lng: number) => {
+    setGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=es`
+      );
+      const geo = await res.json();
+      const a = geo?.address;
+      if (a) {
+        setData((prev) => ({
+          ...(prev || {}),
+          calle: a.road || a.pedestrian || prev?.calle || '',
+          avenida: a.avenue || prev?.avenida || '',
+          sector: a.neighbourhood || a.suburb || prev?.sector || '',
+          urbanizacion: a.residential || prev?.urbanizacion || '',
+          ciudad: a.city || a.town || a.village || prev?.ciudad || '',
+          estado: a.state || prev?.estado || '',
+        }));
+        setLocationLink(`https://www.google.com/maps?q=${lat},${lng}`);
+      }
+    } catch {
+      // Reverse geocoding failed — keep existing fields
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const handleMapMove = (lat: number, lng: number) => {
+    setCoords({ lat, lng });
+    reverseGeocode(lat, lng);
+  };
+
   if (!loaded) return <p className="text-sm text-zinc-400">Cargando…</p>;
 
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Dirección</h2>
 
+      {/* ── MAPA (lo más importante, arriba) ── */}
+      <div className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-700">
+        <MapaEditable
+          lat={coords?.lat ?? 10.4806}
+          lng={coords?.lng ?? -66.9036}
+          onMove={handleMapMove}
+        />
+        <div className="flex items-center justify-between bg-zinc-50 px-3 py-2 text-xs text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+          <span className="inline-flex items-center gap-1">
+            <MapPin size={12} />
+            {coords
+              ? `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+              : 'Hacé click en el mapa para ubicar la dirección'}
+          </span>
+          {coords && (
+            <a
+              href={`https://www.google.com/maps?q=${coords.lat},${coords.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+            >
+              <ExternalLink size={10} /> Google Maps
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* ── Formulario (debajo) ── */}
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="cliente_id" value={clienteId} />
+        {geocoding && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">Rellenando dirección desde el mapa…</p>
+        )}
         <Grid2>
           <IField label="Calle" name="calle" def={data?.calle || ''} />
           <IField label="Avenida" name="avenida" def={data?.avenida || ''} />
@@ -318,7 +393,7 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
         <IField label="Referencia" name="referencia" def={data?.referencia || ''} ta />
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Ubicación GPS</label>
+          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Link de Google Maps</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -336,16 +411,6 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
               Pegar
             </button>
           </div>
-          {coords && (
-            <div className="flex items-center gap-2">
-              <MapPin size={12} className="text-zinc-400" />
-              <span className="text-xs text-zinc-500">{coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}</span>
-              <a href={`https://www.google.com/maps?q=${coords.lat},${coords.lng}`} target="_blank" rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline dark:text-blue-400 inline-flex items-center gap-1">
-                <ExternalLink size={10} /> Abrir
-              </a>
-            </div>
-          )}
         </div>
 
         <input type="hidden" name="latitud" value={coords?.lat || ''} />
@@ -364,12 +429,6 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
           Guardar dirección
         </button>
       </form>
-
-      {coords && (
-        <div className="h-64 w-full rounded-lg border overflow-hidden">
-          <MapaLeaflet lat={coords.lat} lng={coords.lng} />
-        </div>
-      )}
     </div>
   );
 }

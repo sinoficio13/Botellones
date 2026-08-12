@@ -133,10 +133,15 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
     if (items.length === 0) continue;
 
     const isExpanded = expandedSections.has(section.key);
-    // Unexpanded: show up to remaining page slots
-    // Expanded: show all
     const remaining = pageSize - shown;
-    const visibleItems = isExpanded ? items : items.slice(0, Math.min(items.length, Math.max(1, remaining)));
+
+    // Expanded sections always show all items
+    // Unexpanded: show only up to the remaining page budget (0 if budget exhausted)
+    const visibleItems = isExpanded
+      ? items
+      : remaining > 0
+        ? items.slice(0, Math.min(items.length, remaining))
+        : [];
 
     shown += visibleItems.length;
 
@@ -166,7 +171,7 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
               onClick={() => toggleSection(section.key)}
               className="w-full py-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              + {items.length - visibleItems.length} más
+              + {items.length - visibleItems.length} más en {section.title.toLowerCase()}
             </button>
           )}
         </div>

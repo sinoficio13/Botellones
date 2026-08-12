@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { updateCliente } from '@/lib/db/clientes';
-import { saveDireccion, getDireccion } from '@/lib/db/direcciones';
+import { saveDireccion, getDireccion, resolveMapLink } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { FidelidadTab } from './fidelidad-tab';
@@ -361,8 +361,24 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
   const handlePasteLocation = async () => {
     const text = await navigator.clipboard.readText();
     setLocationLink(text);
-    const parsed = parseWhatsAppLocation(text);
-    if (parsed) setCoords(parsed);
+    await applyLink(text);
+  };
+
+  // Apply a pasted/typed link: try direct parse, then server-side short-link resolution
+  const applyLink = async (link: string) => {
+    const parsed = parseWhatsAppLocation(link);
+    if (parsed) {
+      setCoords(parsed);
+      return;
+    }
+    // Short link (maps.app.goo.gl) — resolve server-side
+    if (/maps\.app\.goo\.gl|goo\.gl|g\.co\/maps/.test(link)) {
+      const resolved = await resolveMapLink(link);
+      if (resolved) {
+        setCoords(resolved);
+        reverseGeocode(resolved.lat, resolved.lng);
+      }
+    }
   };
 
   // Reverse geocode: fill address fields from coordinates
@@ -461,8 +477,7 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
               value={locationLink}
               onChange={(e) => {
                 setLocationLink(e.target.value);
-                const parsed = parseWhatsAppLocation(e.target.value);
-                if (parsed) setCoords(parsed);
+                applyLink(e.target.value);
               }}
               placeholder="Pega un link de Google Maps o WhatsApp"
               className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"

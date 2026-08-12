@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Auth middleware: validates session and enforces role-based routing.
+ * Auth proxy: validates session and enforces role-based routing.
  *
  * Dev mode (NEXT_PUBLIC_AUTH_MODE=dev):
  *   Reads botellon_dev_session cookie set by login action.
@@ -14,7 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * - Non-admin on /configuracion → 302 /dashboard
  * - Non-admin on /reportes → 302 /dashboard
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Already on /login — let the page render (prevents redirect loops)

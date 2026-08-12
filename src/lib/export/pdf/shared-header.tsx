@@ -42,6 +42,7 @@ export function SharedHeader({ info, title }: SharedHeaderProps) {
     <View style={styles.header} fixed>
       {info.logoBase64 ? (
         <View style={styles.logoContainer}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image does not support alt */}
           <Image src={info.logoBase64} style={styles.logo} />
         </View>
       ) : null}

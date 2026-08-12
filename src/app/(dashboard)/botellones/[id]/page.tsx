@@ -1,7 +1,7 @@
 import { getBotellon, getClientesForSelect } from '@/lib/db/botellones';
-import { getTransiciones } from '@/lib/utils/estados';
+import { getTransiciones, type Estado } from '@/lib/utils/estados';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, QrCode, Printer } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { BotellonForm } from './form';
 import { QrCodeDisplay } from './qr-code';
@@ -17,7 +17,7 @@ export default async function BotellonDetailPage({ params }: Props) {
   const botellon = await getBotellon(id);
   if (!botellon) notFound();
 
-  const transiciones = getTransiciones(botellon.estado);
+  const transiciones = getTransiciones(botellon.estado as Estado);
   const clientes = await getClientesForSelect();
 
   return (
@@ -88,7 +88,7 @@ async function RecargasHistorial({ botellonId }: { botellonId: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {recargas.map((r: any) => (
+              {recargas.map((r: import('@/lib/db/recargas').RecargaConCliente) => (
                 <tr key={r.id}>
                   <td className="px-3 py-2">{new Date(r.fecha).toLocaleDateString()}</td>
                   <td className="px-3 py-2 text-zinc-500">{r.hora?.slice(0, 5)}</td>

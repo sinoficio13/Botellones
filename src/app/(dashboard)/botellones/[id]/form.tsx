@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { updateBotellon } from '@/lib/db/botellones';
+import { useActionState, useState, useEffect } from 'react';
+import { updateBotellon, type BotellonWithCliente } from '@/lib/db/botellones';
+import { type Estado } from '@/lib/utils/estados';
 
 const ESTADO_LABELS: Record<string, string> = {
   disponible: 'Disponible',
@@ -22,8 +23,8 @@ const ESTADO_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  botellon: any;
-  transiciones: string[];
+  botellon: BotellonWithCliente;
+  transiciones: Estado[];
   clientes: Array<{ id: string; nombre: string; codigo: string }>;
 }
 
@@ -31,17 +32,18 @@ export function BotellonForm({ botellon, transiciones, clientes }: Props) {
   const [state, formAction, pending] = useActionState(updateBotellon, null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  async function handleAction(prev: any, fd: FormData) {
-    const result = await formAction(prev, fd);
-    if (result?.success) {
+  // Toast is a side-effect driven by useActionState result — legitimate pattern per design
+  useEffect(() => {
+    if (state?.success) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      const timer = setTimeout(() => setShowSuccess(false), 3000);
+      return () => clearTimeout(timer);
     }
-    return result;
-  }
+  }, [state?.success]);
 
   return (
-    <form action={handleAction} className="mt-8 space-y-6 rounded-lg border border-zinc-200 p-6 dark:border-zinc-700">
+    <form action={formAction} className="mt-8 space-y-6 rounded-lg border border-zinc-200 p-6 dark:border-zinc-700">
       <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Configuración</h2>
       <input type="hidden" name="id" value={botellon.id} />
 

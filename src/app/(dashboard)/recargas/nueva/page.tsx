@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useActionState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useDebounce } from '@/hooks/use-debounce';
 import { getClientesForSearch, getBotellonesDelCliente, registrarRecarga } from '@/lib/db/recargas';
+import { getCliente } from '@/lib/db/clientes';
 import { PremioAlertCard } from '@/components/fidelidad/premio-alert-card';
 
 type Step = 'cliente' | 'botellon' | 'confirmar';
@@ -24,19 +27,23 @@ export default function NuevaRecargaPage() {
   const [state, formAction, pending] = useActionState(registrarRecarga, null);
   const [showToast, setShowToast] = useState(false);
 
-  // Search clients with debounce
-  useEffect(() => {
-    if (search.length < 2) { setClientes([]); return; }
-    const t = setTimeout(() => { getClientesForSearch(search).then(setClientes); }, 300);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 300);
 
-  // Pre-select client if coming from client list
+  // Search clients when debounced value changes — legitimate data-fetching pattern
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (debouncedSearch.length < 2) { setClientes([]); return; }
+    getClientesForSearch(debouncedSearch).then(setClientes);
+  }, [debouncedSearch]);
+
+  // Pre-select client if coming from client list — use direct lookup by ID
   useEffect(() => {
     if (preselectCliente) {
-      getClientesForSearch(preselectCliente).then((c) => {
-        const found = c.find((x: any) => x.id === preselectCliente);
-        if (found) { setSelectedCliente(found); setStep('botellon'); }
+      getCliente(preselectCliente).then((c) => {
+        if (c) {
+          setSelectedCliente({ id: c.id, nombre: c.nombre, codigo: c.codigo, telefono_1: c.telefono_1 });
+          setStep('botellon');
+        }
       });
     }
   }, [preselectCliente]);
@@ -47,12 +54,22 @@ export default function NuevaRecargaPage() {
     }
   }, [selectedCliente]);
 
-  function handleConfirm() {
+  // Success toast — legitimate side-effect from useActionState result
+  useEffect(() => {
     if (state?.success) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+      const timer = setTimeout(() => setShowToast(false), 3000);
+      return () => clearTimeout(timer);
     }
-  }
+  }, [state?.success]);
+
+  const handleReset = useCallback(() => {
+    setStep('cliente');
+    setSelectedCliente(null);
+    setSelectedBotellon(null);
+    setSearch('');
+  }, []);
 
   if (showToast || state?.success) {
     // If a premio was generated, show the loyalty alert card
@@ -67,22 +84,18 @@ export default function NuevaRecargaPage() {
           />
           <div className="mt-6 flex justify-center gap-3">
             <button
-              onClick={() => {
-                setStep('cliente');
-                setSelectedCliente(null);
-                setSelectedBotellon(null);
-                setSearch('');
-              }}
+              type="button"
+              onClick={handleReset}
               className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900"
             >
               Registrar otra
             </button>
-            <a
+            <Link
               href="/clientes"
               className="rounded-md border px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
             >
               Ir a clientes
-            </a>
+            </Link>
           </div>
         </div>
       );
@@ -97,14 +110,14 @@ export default function NuevaRecargaPage() {
             {selectedCliente?.nombre} · {selectedBotellon?.codigo}
           </p>
           <div className="mt-6 flex justify-center gap-3">
-            <button onClick={() => { setStep('cliente'); setSelectedCliente(null); setSelectedBotellon(null); setSearch(''); }}
+            <button type="button" onClick={handleReset}
               className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900">
               Registrar otra
             </button>
-            <a href="/clientes"
+            <Link href="/clientes"
               className="rounded-md border px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300">
               Ir a clientes
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -144,7 +157,7 @@ export default function NuevaRecargaPage() {
           {clientes.length > 0 && (
             <div className="divide-y divide-zinc-200 rounded-lg border dark:divide-zinc-800 dark:border-zinc-700">
               {clientes.map((c) => (
-                <button key={c.id} onClick={() => { setSelectedCliente(c); setStep('botellon'); }}
+                <button key={c.id} type="button" onClick={() => { setSelectedCliente(c); setStep('botellon'); }}
                   className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900">
                   <div>
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{c.nombre}</p>
@@ -161,7 +174,7 @@ export default function NuevaRecargaPage() {
       {/* Step 2: Pick bottle */}
       {step === 'botellon' && selectedCliente && (
         <div className="space-y-4">
-          <button onClick={() => setStep('cliente')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400">
+          <button type="button" onClick={() => setStep('cliente')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400">
             ← Cambiar cliente
           </button>
           <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
@@ -174,7 +187,7 @@ export default function NuevaRecargaPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {botellones.map((b) => (
-                <button key={b.id} onClick={() => { setSelectedBotellon(b); setStep('confirmar'); }}
+                <button key={b.id} type="button" onClick={() => { setSelectedBotellon(b); setStep('confirmar'); }}
                   className={`rounded-lg border p-4 text-center transition-colors ${
                     selectedBotellon?.id === b.id
                       ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-50 dark:bg-zinc-800'
@@ -192,7 +205,7 @@ export default function NuevaRecargaPage() {
       {/* Step 3: Confirm */}
       {step === 'confirmar' && selectedCliente && selectedBotellon && (
         <div className="space-y-4">
-          <button onClick={() => setStep('botellon')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400">
+          <button type="button" onClick={() => setStep('botellon')} className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400">
             ← Cambiar botellón
           </button>
           <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Confirmar recarga</h2>
@@ -211,7 +224,7 @@ export default function NuevaRecargaPage() {
             </div>
           </div>
 
-          <form action={formAction} onSubmit={handleConfirm}>
+          <form action={formAction}>
             <input type="hidden" name="cliente_id" value={selectedCliente.id} />
             <input type="hidden" name="botellon_id" value={selectedBotellon.id} />
             {state?.error && (

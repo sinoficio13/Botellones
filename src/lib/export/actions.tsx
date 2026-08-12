@@ -9,8 +9,8 @@ import {
   getBotellonesPorEstado,
 } from '@/lib/db/analytics';
 import { getPremios } from '@/lib/db/premios';
-import { getBotellones } from '@/lib/db/botellones';
-import { getContadores, getRecargasCliente } from '@/lib/db/recargas';
+import { getBotellones, type BotellonWithCliente } from '@/lib/db/botellones';
+import { getContadores, getRecargasCliente, type RecargaConBotellon } from '@/lib/db/recargas';
 import { getDireccion } from '@/lib/db/direcciones';
 import { ClientesPdf } from '@/lib/export/pdf/clientes-pdf';
 import { RecargasPdf } from '@/lib/export/pdf/recargas-pdf';
@@ -35,6 +35,8 @@ function dateFilename(prefix: string, ext: string): string {
 }
 
 async function pdfToBase64(document: React.ReactElement): Promise<string> {
+  // @react-pdf/renderer types expect ReactElement<DocumentProps> — cast is safe
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const buffer = await renderToBuffer(document as any);
   return buffer.toString('base64');
 }
@@ -81,7 +83,7 @@ export async function exportBotellonesPDF(): Promise<ExportResult> {
 
   const base64 = await pdfToBase64(
     <BotellonesPdf
-      botellones={botellonesResult.botellones as any[]}
+      botellones={botellonesResult.botellones as BotellonWithCliente[]}
       estados={estados}
       info={info}
     />
@@ -124,7 +126,7 @@ export async function exportClienteFichaPDF(
     getDireccion(clienteId),
   ]);
 
-  const recargaItems = (recargas || []).slice(0, 50).map((r: any) => ({
+  const recargaItems = (recargas || []).slice(0, 50).map((r: RecargaConBotellon) => ({
     fecha: r.fecha,
     hora: r.hora,
     botellon_codigo: r.botellones?.codigo ?? undefined,
@@ -150,7 +152,7 @@ export async function exportClientesExcel(): Promise<ExportResult> {
   const { clientes } = await getClientes(1, 200);
 
   // Type assertion needed because getClientes returns ClienteListRow[]
-  const base64 = generateClientesExcel(clientes as ClienteListRow[]);
+  const base64 = await generateClientesExcel(clientes as ClienteListRow[]);
 
   return { base64, filename: dateFilename('clientes', 'xlsx') };
 }
@@ -158,7 +160,7 @@ export async function exportClientesExcel(): Promise<ExportResult> {
 export async function exportRecargasExcel(): Promise<ExportResult> {
   const topClientes = await getTopClientes(20);
 
-  const base64 = generateRecargasExcel(topClientes);
+  const base64 = await generateRecargasExcel(topClientes);
 
   return { base64, filename: dateFilename('recargas_top20', 'xlsx') };
 }
@@ -166,7 +168,7 @@ export async function exportRecargasExcel(): Promise<ExportResult> {
 export async function exportBotellonesExcel(): Promise<ExportResult> {
   const { botellones } = await getBotellones(1, 200);
 
-  const base64 = generateBotellonesExcel(botellones as any[]);
+  const base64 = await generateBotellonesExcel(botellones as BotellonWithCliente[]);
 
   return { base64, filename: dateFilename('botellones', 'xlsx') };
 }

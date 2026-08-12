@@ -43,6 +43,10 @@ export function UpdatePrompt() {
       serwist.addEventListener("waiting", () => {
         setShow(true);
       });
+    }).catch((err: unknown) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[SW] dev mode — skipping', err instanceof Error ? err.message : String(err));
+      }
     });
   }, []);
 

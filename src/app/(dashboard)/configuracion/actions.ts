@@ -13,7 +13,7 @@ export type BusinessConfig = {
   telefono: string;
   direccion: string;
   email: string;
-  logo_url?: string;
+  logo_url: string | null;
 };
 
 /**
@@ -47,7 +47,7 @@ export async function getConfig(): Promise<BusinessConfig | null> {
           telefono: data.telefono || '',
           direccion: data.direccion || '',
           email: data.email || '',
-          logo_url: data.logo_url || undefined,
+          logo_url: data.logo_url || null,
         }
       : null;
   } catch {

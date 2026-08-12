@@ -26,8 +26,8 @@ import {
   type TopCliente,
   type ResumenesNegocio,
 } from '@/lib/db/analytics';
-import { getPremios } from '@/lib/db/premios';
-import { getBotellones } from '@/lib/db/botellones';
+import { getPremios, type PremioRow } from '@/lib/db/premios';
+import { getBotellones, type BotellonWithCliente } from '@/lib/db/botellones';
 import { getContadores } from '@/lib/db/recargas';
 import { ExportButton } from '@/components/shared/export-button';
 import {
@@ -142,7 +142,13 @@ export function ReportesTabs() {
 
   return (
     <div className="space-y-6">
-      <FiltroFechas onFilterChange={handleFilterChange} showTipo tipos={['Clientes', 'Recargas', 'Botellones', 'Fidelidad', 'Operaciones']} />
+      <FiltroFechas onFilterChange={handleFilterChange} showTipo tipos={[
+        { value: 'Clientes', label: 'Clientes' },
+        { value: 'Recargas', label: 'Recargas' },
+        { value: 'Botellones', label: 'Botellones' },
+        { value: 'Fidelidad', label: 'Fidelidad' },
+        { value: 'Operaciones', label: 'Operaciones' },
+      ]} />
 
       <Tabs
         defaultValue="clientes"
@@ -299,7 +305,7 @@ export function ReportesTabs() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {data.botellones.botellones.map((b: any) => (
+                        {data.botellones.botellones.map((b: BotellonWithCliente) => (
                           <TableRow key={b.id}>
                             <TableCell className="pl-4 font-mono text-xs">{b.codigo}</TableCell>
                             <TableCell>{b.estado}</TableCell>
@@ -353,7 +359,7 @@ export function ReportesTabs() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        data.premiosPendientes.premios.map((p: any) => (
+                        data.premiosPendientes.premios.map((p: PremioRow) => (
                           <TableRow key={p.id}>
                             <TableCell className="pl-4">
                               <Link href={`/clientes/${p.cliente_id}`} className="text-primary hover:underline">
@@ -392,7 +398,7 @@ export function ReportesTabs() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          data.premiosEntregados.premios.map((p: any) => (
+                          data.premiosEntregados.premios.map((p: PremioRow) => (
                             <TableRow key={p.id}>
                               <TableCell className="pl-4">
                                 <Link href={`/clientes/${p.cliente_id}`} className="text-primary hover:underline">

@@ -45,7 +45,6 @@ export type ClienteListRow = {
 
 function getSupabase() {
   // Dynamic import so it only runs on server
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return import('@supabase/supabase-js').then(async ({ createClient }) => {
     // In dev mode without service_role, fall back to anon key
     const key =

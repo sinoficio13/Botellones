@@ -1,16 +1,16 @@
 /**
- * Middleware Integration Tests (task 3.4)
+ * Proxy Integration Tests (task 3.4)
  *
  * Tests run with NEXT_PUBLIC_AUTH_MODE=dev — uses cookie-based auth.
  * Supabase path is tested separately below.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // Set dev mode for tests
 process.env.NEXT_PUBLIC_AUTH_MODE = 'dev'
 
-const { middleware, config } = await import('@/middleware')
+const { proxy, config } = await import('@/proxy')
 
 function createMockRequest(
   pathname: string,
@@ -33,7 +33,7 @@ describe('Middleware — dev mode (cookie-based auth)', () => {
   it('redirects to /login when no dev session cookie', async () => {
     const req = createMockRequest('/dashboard')
 
-    const response = await middleware(req)
+    const response = await proxy(req)
 
     expect(response.status).toBe(307)
     expect(response.headers.get('Location')).toBe('http://localhost:3000/login')
@@ -45,7 +45,7 @@ describe('Middleware — dev mode (cookie-based auth)', () => {
       botellon_dev_session: devSession,
     })
 
-    const response = await middleware(req)
+    const response = await proxy(req)
 
     expect(response.status).toBe(307)
     expect(response.headers.get('Location')).toBe('http://localhost:3000/dashboard')
@@ -57,7 +57,7 @@ describe('Middleware — dev mode (cookie-based auth)', () => {
       botellon_dev_session: devSession,
     })
 
-    const response = await middleware(req)
+    const response = await proxy(req)
 
     expect(response.status).toBe(200)
   })
@@ -68,7 +68,7 @@ describe('Middleware — dev mode (cookie-based auth)', () => {
       botellon_dev_session: devSession,
     })
 
-    const response = await middleware(req)
+    const response = await proxy(req)
 
     expect(response.status).toBe(200)
   })

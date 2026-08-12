@@ -1,7 +1,7 @@
 'use client';
 
 import { QRCodeSVG } from 'qrcode.react';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 
 interface Props {
   codigo: string;
@@ -9,11 +9,12 @@ interface Props {
 }
 
 export function QrCodeDisplay({ codigo, size = 180 }: Props) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // React 19 hydration guard — no extra render, no ESLint violation
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   if (!mounted) {
     return <div style={{ width: size, height: size }} />;
@@ -21,23 +22,28 @@ export function QrCodeDisplay({ codigo, size = 180 }: Props) {
 
   const url = `${window.location.origin}/b/${codigo}`;
 
+  const handleDownloadSvg = () => {
+    const svg = document.querySelector('.qr-svg');
+    if (!svg) return;
+    const clone = svg.cloneNode(true) as SVGElement;
+    const data = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([data], { type: 'image/svg+xml' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `QR-${codigo}.svg`;
+    a.click();
+    URL.revokeObjectURL(downloadUrl);
+  };
+
   return (
     <div className="flex flex-col items-center gap-2">
-      <QRCodeSVG value={url} size={size} level="M" />
+      <div className="qr-svg">
+        <QRCodeSVG value={url} size={size} level="M" />
+      </div>
       <button
-        onClick={() => {
-          const svg = document.querySelector('.qr-svg');
-          if (!svg) return;
-          const clone = svg.cloneNode(true) as SVGElement;
-          const data = new XMLSerializer().serializeToString(clone);
-          const blob = new Blob([data], { type: 'image/svg+xml' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `QR-${codigo}.svg`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }}
+        type="button"
+        onClick={handleDownloadSvg}
         className="text-xs text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
       >
         Descargar SVG
@@ -48,11 +54,11 @@ export function QrCodeDisplay({ codigo, size = 180 }: Props) {
 
 /** Inline version for print labels */
 export function QrCodeInline({ codigo, size = 100 }: Props) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   if (!mounted) {
     return <div style={{ width: size, height: size }} />;

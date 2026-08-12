@@ -1,4 +1,4 @@
-import { getBotellones } from '@/lib/db/botellones';
+import { getBotellones, type BotellonWithCliente } from '@/lib/db/botellones';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -55,7 +55,7 @@ export default async function BotellonesPage({ searchParams }: Props) {
             {botellones.length === 0 && (
               <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-400">No hay botellones todavía.</td></tr>
             )}
-            {botellones.map((b: any) => (
+            {botellones.map((b: BotellonWithCliente) => (
               <tr key={b.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
                 <td className="px-3 py-2.5 font-mono text-xs">
                   <Link href={`/botellones/${b.id}`} className="font-medium text-zinc-900 hover:underline dark:text-zinc-50">

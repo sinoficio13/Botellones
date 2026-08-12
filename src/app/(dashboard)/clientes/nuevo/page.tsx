@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { createCliente } from '@/lib/db/clientes';
 
 const TIPOS_CLIENTE = ['casa', 'negocio', 'oficina', 'otro'];
@@ -133,10 +134,10 @@ export default function NuevoClientePage() {
             className="rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200">
             {pending ? 'Creando…' : 'Crear cliente'}
           </button>
-          <a href="/clientes"
+          <Link href="/clientes"
             className="rounded-md border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900">
             Cancelar
-          </a>
+          </Link>
         </div>
       </form>
     </div>

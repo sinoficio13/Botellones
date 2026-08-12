@@ -2,6 +2,27 @@
 
 import { revalidatePath } from 'next/cache';
 
+// ── DB join result types ──
+
+type ClienteJoin = {
+  nombre: string;
+  telefono_1?: string | null;
+};
+
+type NotifJoinRow = {
+  id: string;
+  usuario_id: string;
+  tipo: string;
+  titulo: string;
+  mensaje: string | null;
+  cliente_id: string | null;
+  botellon_id: string | null;
+  leida: boolean;
+  creada_en: string;
+  clientes: ClienteJoin | null;
+  botellones: { codigo: string } | null;
+};
+
 // ── Types ──
 
 export type NotificacionRow = {
@@ -95,7 +116,7 @@ export async function getNotificaciones(
       return { items: [], total: 0 };
     }
 
-    const items: NotificacionRow[] = (data || []).map((row: any) => ({
+    const items: NotificacionRow[] = (data || []).map((row: NotifJoinRow) => ({
       id: row.id,
       usuario_id: row.usuario_id,
       tipo: row.tipo,
@@ -139,7 +160,7 @@ export async function getLastNotificaciones(
 
     if (!data) return [];
 
-    return data.map((row: any) => ({
+    return data.map((row: NotifJoinRow) => ({
       id: row.id,
       usuario_id: row.usuario_id,
       tipo: row.tipo,
@@ -178,8 +199,8 @@ export async function markAsRead(
 
     revalidatePath('/notificaciones');
     return { success: true };
-  } catch (err: any) {
-    return { error: err?.message || 'Error marking as read' };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Error marking as read' };
   }
 }
 
@@ -204,8 +225,8 @@ export async function markAllAsRead(
 
     revalidatePath('/notificaciones');
     return { success: true };
-  } catch (err: any) {
-    return { error: err?.message || 'Error marking all as read' };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Error marking all as read' };
   }
 }
 

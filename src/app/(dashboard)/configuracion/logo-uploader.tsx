@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, type ChangeEvent } from 'react';
-import Image from 'next/image';
+import NextImage from 'next/image';
 
 type PreviewCtx = 'header' | 'pdf' | 'qr';
 
@@ -150,7 +150,7 @@ export function LogoUploader() {
                   className="relative flex items-center justify-center rounded border border-zinc-200 bg-white dark:border-zinc-600 dark:bg-zinc-800"
                   style={{ height: p.height + 8 }}
                 >
-                  <Image
+                  <NextImage
                     src={preview}
                     alt="Logo preview"
                     fill

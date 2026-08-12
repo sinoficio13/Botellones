@@ -79,7 +79,7 @@ export default function BuscarPage() {
 
     for (const c of clientes) {
       // Recarga count
-      let recargaQuery = supabase
+      const recargaQuery = supabase
         .from('recargas')
         .select('*', { count: 'exact', head: true })
         .eq('cliente_id', c.id);

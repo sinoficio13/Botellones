@@ -128,6 +128,7 @@ async function getUserRole(): Promise<'admin' | 'repartidor' | null> {
 
   try {
     const { createAdminClient } = await import('@/lib/supabase/admin');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- placeholder for EPIC-1 auth
     const supabase = createAdminClient();
     // In production, role is read via createServerClient with cookies
     // For now fall back to admin client pattern
@@ -144,7 +145,7 @@ async function getUserRole(): Promise<'admin' | 'repartidor' | null> {
  */
 async function getConfig(): Promise<{
   nombre_negocio: string;
-  logo_url?: string;
+  logo_url: string | null;
 } | null> {
   if (process.env.NEXT_PUBLIC_AUTH_MODE === 'dev') {
     const cookieStore = await cookies();

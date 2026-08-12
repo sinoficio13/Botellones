@@ -1,8 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useEffect } from 'react';
 import { saveConfig } from './actions';
-import type { ConfigState } from './actions';
 import { LogoUploader } from './logo-uploader';
 
 /**
@@ -13,15 +12,15 @@ export default function ConfiguracionPage() {
   const [state, formAction, pending] = useActionState(saveConfig, null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Override formAction to show success toast
-  async function handleAction(prev: ConfigState | null, fd: FormData) {
-    const result = await formAction(prev, fd);
-    if (result?.success) {
+  // Toast is a side-effect driven by useActionState result — legitimate pattern per design
+  useEffect(() => {
+    if (state?.success) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      const timer = setTimeout(() => setShowSuccess(false), 3000);
+      return () => clearTimeout(timer);
     }
-    return result;
-  }
+  }, [state?.success]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">

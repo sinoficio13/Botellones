@@ -17,7 +17,7 @@ function autoFitColumns(ws: XLSX.WorkSheet, headers: string[]) {
  * Generates an XLSX workbook of clients with auto-filter and column widths.
  * Returns the workbook as a base64 string.
  */
-export function generateClientesExcel(clientes: ClienteListRow[]): string {
+export async function generateClientesExcel(clientes: ClienteListRow[]): Promise<string> {
   const rows = clientes.map((c) => ({
     Código: c.codigo,
     Nombre: c.nombre,
@@ -41,7 +41,7 @@ export function generateClientesExcel(clientes: ClienteListRow[]): string {
 /**
  * Generates an XLSX workbook of the top 20 clients by recargas.
  */
-export function generateRecargasExcel(topClientes: TopCliente[]): string {
+export async function generateRecargasExcel(topClientes: TopCliente[]): Promise<string> {
   const rows = topClientes.map((c, i) => ({
     Posición: i + 1,
     Cliente: c.nombre,
@@ -71,7 +71,7 @@ type BotellonExcelRow = {
 /**
  * Generates an XLSX workbook of botellones.
  */
-export function generateBotellonesExcel(botellones: BotellonExcelRow[]): string {
+export async function generateBotellonesExcel(botellones: BotellonExcelRow[]): Promise<string> {
   const rows = botellones.map((b) => ({
     Código: b.codigo,
     Estado: b.estado,

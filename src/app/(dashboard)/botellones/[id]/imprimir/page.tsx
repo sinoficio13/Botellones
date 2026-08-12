@@ -1,5 +1,6 @@
 import { getBotellon } from '@/lib/db/botellones';
 import { notFound } from 'next/navigation';
+import Image from 'next/image';
 import { QrCodeInline } from '../qr-code';
 import { cookies } from 'next/headers';
 
@@ -63,7 +64,7 @@ export default async function ImprimirPage({ params }: Props) {
           {labels.map((_, i) => (
             <div key={i} className="label">
               {logoUrl ? (
-                <img src={logoUrl} alt={negocio} style={{ maxHeight: 24, maxWidth: 120 }} />
+                <Image src={logoUrl} alt={negocio} width={120} height={24} style={{ maxWidth: 120, maxHeight: 24 }} />
               ) : (
                 <p style={{ fontSize: 12, fontWeight: 600 }}>{negocio}</p>
               )}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, MessageCircle } from 'lucide-react';
+import { useDebounce } from '@/hooks/use-debounce';
 import type { SearchResult } from '@/lib/db/search';
 import { searchClientesLight } from '@/lib/db/search';
 
@@ -15,29 +16,30 @@ export default function GlobalSearch() {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Debounced search
+  const debouncedQuery = useDebounce(query, 300);
+
+  // Search when debounced value changes — legitimate async data-fetching pattern
   useEffect(() => {
-    if (query.trim().length < 1) {
+    if (debouncedQuery.trim().length < 1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       setOpen(false);
       return;
     }
 
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const data = await searchClientesLight(query);
+    setLoading(true);
+    searchClientesLight(debouncedQuery)
+      .then((data) => {
         setResults(data);
         setOpen(true);
-      } catch {
+      })
+      .catch(() => {
         setResults([]);
-      } finally {
+      })
+      .finally(() => {
         setLoading(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [query]);
+      });
+  }, [debouncedQuery]);
 
   // Outside click → close
   useEffect(() => {

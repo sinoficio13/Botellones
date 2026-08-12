@@ -232,7 +232,7 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
 // ── BOTELLONES TAB ──
 
 function BotellonesTab({ clienteId }: { clienteId: string }) {
-  const [botellones, setBotellones] = useState<Array<Record<string, unknown>>>([]);
+  const [botellones, setBotellones] = useState<Array<{ id: string; codigo: string; estado: string; fecha_creacion: string | null }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -274,7 +274,7 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {botellones.map((b: any) => (
+              {botellones.map((b) => (
                 <tr key={b.id}>
                   <td className="px-3 py-2 font-mono text-xs">{b.codigo}</td>
                   <td className="px-3 py-2">
@@ -298,7 +298,7 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
 // ── HISTORIAL TAB ──
 
 function HistorialTab({ clienteId }: { clienteId: string }) {
-  const [recargas, setRecargas] = useState<Array<Record<string, unknown>>>([]);
+  const [recargas, setRecargas] = useState<Array<{ id: string; fecha: string; hora: string; botellones: { codigo: string } | null }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -313,7 +313,7 @@ function HistorialTab({ clienteId }: { clienteId: string }) {
         .order('fecha', { ascending: false })
         .order('hora', { ascending: false })
         .limit(50)
-        .then(({ data }) => { setRecargas(data || []); setLoading(false); });
+        .then(({ data }) => { setRecargas((data as unknown as typeof recargas) || []); setLoading(false); });
     });
   }, [clienteId]);
 
@@ -337,7 +337,7 @@ function HistorialTab({ clienteId }: { clienteId: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {recargas.map((r: any) => (
+              {recargas.map((r) => (
                 <tr key={r.id}>
                   <td className="px-3 py-2">{new Date(r.fecha).toLocaleDateString()}</td>
                   <td className="px-3 py-2 text-zinc-500">{r.hora?.slice(0, 5)}</td>

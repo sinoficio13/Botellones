@@ -12,10 +12,20 @@ type NotifPreview = {
   id: string;
   tipo: string;
   titulo: string;
-  creada_en: string;
+  creada_en: string | null;
   leida: boolean;
   cliente_id: string | null;
   cliente_telefono: string | null;
+};
+
+type BellNotifJoinRow = {
+  id: string;
+  tipo: string;
+  titulo: string;
+  creada_en: string | null;
+  leida: boolean | null;
+  cliente_id: string | null;
+  clientes: { telefono_1: string | null } | null;
 };
 
 /**
@@ -78,7 +88,7 @@ export function BellNotification() {
 
       if (notifs) {
         setNotifications(
-          notifs.map((n: any) => ({
+          notifs.map((n: BellNotifJoinRow) => ({
             id: n.id,
             tipo: n.tipo,
             titulo: n.titulo,
@@ -226,7 +236,7 @@ export function BellNotification() {
                       {n.titulo}
                     </p>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {timeAgo(n.creada_en)}
+                        {n.creada_en ? timeAgo(n.creada_en) : ''}
                       </p>
                     </div>
                     {n.cliente_id && n.cliente_telefono && (

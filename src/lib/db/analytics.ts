@@ -1,5 +1,18 @@
 'use server';
 
+// ── DB join result types ──
+
+type ClienteJoin = {
+  nombre: string;
+  telefono_1?: string | null;
+};
+
+type ClienteJoinFull = {
+  id: string;
+  nombre: string;
+  negocio: string | null;
+};
+
 // ── Types ──
 
 export type DashboardKpis = {
@@ -242,7 +255,7 @@ export async function getTopClientes(limit = 10): Promise<TopCliente[]> {
     >();
     for (const r of recargas) {
       const existing = map.get(r.cliente_id);
-      const nombre = (r.clientes as any)?.nombre ?? 'Desconocido';
+      const nombre = (r.clientes as unknown as unknown as ClienteJoin | null)?.nombre ?? 'Desconocido';
       if (existing) {
         existing.total_recargas++;
       } else {
@@ -340,7 +353,7 @@ export async function getAlertas(): Promise<AlertasPanel> {
       premiosPendientes: (premios ?? []).map((p) => ({
         id: p.id,
         tipo: 'premio',
-        titulo: (p.clientes as any)?.nombre ?? 'Cliente',
+        titulo: (p.clientes as unknown as ClienteJoin | null)?.nombre ?? 'Cliente',
         descripcion: `Nivel ${p.nivel_recargas} recargas`,
         href: `/clientes/${p.cliente_id}`,
         entidadId: p.cliente_id,
@@ -351,7 +364,7 @@ export async function getAlertas(): Promise<AlertasPanel> {
         id: b.id,
         tipo: 'danado',
         titulo: `Botellón ${b.codigo}`,
-        descripcion: `Estado: ${b.estado}${(b.clientes as any)?.nombre ? ` — ${(b.clientes as any).nombre}` : ''}`,
+        descripcion: `Estado: ${b.estado}${(b.clientes as unknown as ClienteJoin | null)?.nombre ? ` — ${(b.clientes as unknown as ClienteJoin | null)?.nombre}` : ''}`,
         href: `/botellones/${b.id}`,
         entidadId: b.id,
       })),
@@ -388,7 +401,7 @@ export async function getResumenesNegocio(): Promise<ResumenesNegocio> {
           existing.total++;
         } else {
           map.set(r.cliente_id, {
-            nombre: (r.clientes as any)?.nombre ?? 'Desconocido',
+            nombre: (r.clientes as unknown as ClienteJoin | null)?.nombre ?? 'Desconocido',
             total: 1,
           });
         }
@@ -484,7 +497,7 @@ export async function getRepartidorDashboard(
 
     if (botellones) {
       for (const b of botellones) {
-        const cliente = (b.clientes as any) ?? null;
+        const cliente = (b.clientes as unknown as ClienteJoinFull | null) ?? null;
         if (cliente && !seen.has(cliente.id)) {
           seen.add(cliente.id);
           clientesAsignados.push({

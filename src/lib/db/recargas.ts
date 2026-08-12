@@ -11,6 +11,22 @@ export type RecargaState = {
   premioGenerado?: { nivel: number; id: string };
 };
 
+export type RecargaConBotellon = {
+  id: string;
+  fecha: string;
+  hora: string;
+  numero_registro: string;
+  botellones: { codigo: string } | null;
+};
+
+export type RecargaConCliente = {
+  id: string;
+  fecha: string;
+  hora: string;
+  numero_registro: string;
+  clientes: { nombre: string } | null;
+};
+
 function getSupabase() {
   return import('@supabase/supabase-js').then(({ createClient }) => {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
@@ -186,12 +202,12 @@ export async function registrarRecarga(
       result.premioGenerado = premioGenerado;
     }
     return result;
-  } catch (err: any) {
-    return { error: err?.message || 'Error al registrar recarga' };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Error al registrar recarga' };
   }
 }
 
-export async function getRecargasCliente(clienteId: string, desde?: string, hasta?: string) {
+export async function getRecargasCliente(clienteId: string, desde?: string, hasta?: string): Promise<{ recargas: RecargaConBotellon[]; total: number }> {
   try {
     const supabase = await getSupabase();
     let query = supabase
@@ -206,13 +222,13 @@ export async function getRecargasCliente(clienteId: string, desde?: string, hast
     if (hasta) query = query.lte('fecha', hasta);
 
     const { data, count } = await query;
-    return { recargas: data || [], total: count || 0 };
+    return { recargas: (data as unknown as RecargaConBotellon[]) || [], total: count || 0 };
   } catch {
     return { recargas: [], total: 0 };
   }
 }
 
-export async function getRecargasBotellon(botellonId: string) {
+export async function getRecargasBotellon(botellonId: string): Promise<{ recargas: RecargaConCliente[]; total: number }> {
   try {
     const supabase = await getSupabase();
     const { data } = await supabase
@@ -225,7 +241,7 @@ export async function getRecargasBotellon(botellonId: string) {
       .from('recargas')
       .select('*', { count: 'exact', head: true })
       .eq('botellon_id', botellonId);
-    return { recargas: data || [], total: count || 0 };
+    return { recargas: (data as unknown as RecargaConCliente[]) || [], total: count || 0 };
   } catch {
     return { recargas: [], total: 0 };
   }

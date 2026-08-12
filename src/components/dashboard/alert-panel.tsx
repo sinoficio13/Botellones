@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { AlertTriangle, Gift, UserX, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, Gift, UserX, Wrench, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
@@ -26,89 +25,84 @@ type AlertasPanel = {
 
 const PAGE_SIZE = 5;
 
-type SectionKey = 'premiosPendientes' | 'clientesInactivos30' | 'clientesInactivos60' | 'botellonesDanados';
-
-type SectionConfig = {
-  key: SectionKey;
+type Category = {
+  key: keyof AlertasPanel;
+  label: string;
   icon: React.ReactNode;
-  title: string;
-  variant?: 'destructive';
 };
 
-const SECTIONS: SectionConfig[] = [
-  { key: 'premiosPendientes', icon: <Gift className="h-4 w-4" />, title: 'Premios pendientes' },
-  { key: 'clientesInactivos30', icon: <UserX className="h-4 w-4" />, title: 'Inactivos 30+ días' },
-  { key: 'clientesInactivos60', icon: <UserX className="h-4 w-4" />, title: 'Inactivos 60+ días', variant: 'destructive' },
-  { key: 'botellonesDanados', icon: <Wrench className="h-4 w-4" />, title: 'Botellones dañados', variant: 'destructive' },
+const CATEGORIES: Category[] = [
+  { key: 'premiosPendientes', label: 'Premios', icon: <Gift className="h-3.5 w-3.5" /> },
+  { key: 'clientesInactivos30', label: 'Inact. 30d', icon: <UserX className="h-3.5 w-3.5" /> },
+  { key: 'clientesInactivos60', label: 'Inact. 60d', icon: <UserX className="h-3.5 w-3.5" /> },
+  { key: 'botellonesDanados', label: 'Dañados', icon: <Wrench className="h-3.5 w-3.5" /> },
 ];
 
 /**
- * Alert panel with pagination and Supabase Realtime subscription.
- * Shows alerts grouped by section, paginated at 10 total across sections.
- * Subscribes to premios, botellones, and recargas changes for live updates.
+ * Alert panel: pill selector + paginated list (5 per page).
+ * Subscribes to Supabase Realtime for live updates.
  */
 export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
   const [data, setData] = useState<AlertasPanel>(initialData);
-  const [expandedSections, setExpandedSections] = useState<Set<SectionKey>>(new Set());
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [active, setActive] = useState<keyof AlertasPanel>(firstNonEmpty(initialData));
+  const [page, setPage] = useState(1);
   const supabase = createClient();
+
+  // Reset page when switching categories
+  const setCategory = useCallback((key: keyof AlertasPanel) => {
+    setActive(key);
+    setPage(1);
+  }, []);
 
   // Realtime subscriptions
   useEffect(() => {
-    const handlePremioChange = (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-      // Refresh alerts when premios change
-      refreshAlerts();
-    };
+    const refresh = () => fetch('/api/alertas', { credentials: 'include' })
+      .then((r) => r.ok && r.json())
+      .then((d) => d && setData(d))
+      .catch(() => {});
 
-    const handleBotellonChange = () => refreshAlerts();
-    const handleRecargaChange = () => refreshAlerts();
-
-    const premiosChannel = supabase
+    const p = supabase
       .channel('alertas-premios')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'premios' }, handlePremioChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'premios' }, refresh)
       .subscribe();
-
-    const botellonesChannel = supabase
+    const b = supabase
       .channel('alertas-botellones')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'botellones' }, handleBotellonChange)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'botellones' }, refresh)
       .subscribe();
-
-    const recargasChannel = supabase
+    const r = supabase
       .channel('alertas-recargas')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'recargas' }, handleRecargaChange)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'recargas' }, refresh)
       .subscribe();
 
     return () => {
-      supabase.removeChannel(premiosChannel);
-      supabase.removeChannel(botellonesChannel);
-      supabase.removeChannel(recargasChannel);
+      supabase.removeChannel(p);
+      supabase.removeChannel(b);
+      supabase.removeChannel(r);
     };
   }, []);
 
-  const refreshAlerts = useCallback(async () => {
-    try {
-      const res = await fetch('/api/alertas', { credentials: 'include' });
-      if (res.ok) {
-        const fresh = await res.json();
-        setData(fresh);
-      }
-    } catch {
-      // Keep existing data on error
+  // Ensure active category still has data after refresh
+  useEffect(() => {
+    if (data[active].length === 0) {
+      setActive(firstNonEmpty(data));
+      setPage(1);
     }
-  }, []);
+  }, [data, active]);
 
-  const toggleSection = (key: SectionKey) => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
+  const items = data[active];
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const hasAlerts = SECTIONS.some((s) => data[s.key].length > 0);
+  // Clamp page when total changes
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [total, totalPages, page]);
 
-  if (!hasAlerts) {
+  const paged = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const totalAlerts = CATEGORIES.reduce((s, c) => s + data[c.key].length, 0);
+
+  if (totalAlerts === 0) {
     return (
       <Card>
         <CardHeader>
@@ -124,109 +118,93 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
     );
   }
 
-  // Count total visible items (respecting page size + expanded sections)
-  let shown = 0;
-  const sectionsContent: React.ReactNode[] = [];
-
-  for (const section of SECTIONS) {
-    const items = data[section.key];
-    if (items.length === 0) continue;
-
-    const isExpanded = expandedSections.has(section.key);
-    const remaining = pageSize - shown;
-
-    // Expanded sections always show all items
-    // Unexpanded: show only up to the remaining page budget (0 if budget exhausted)
-    const visibleItems = isExpanded
-      ? items
-      : remaining > 0
-        ? items.slice(0, Math.min(items.length, remaining))
-        : [];
-
-    shown += visibleItems.length;
-
-    sectionsContent.push(
-      <div key={section.key}>
-        <button
-          onClick={() => toggleSection(section.key)}
-          className="mb-2 flex w-full items-center gap-2 text-left"
-        >
-          {section.icon}
-          <span className="text-sm font-medium">{section.title}</span>
-          <Badge variant={section.variant === 'destructive' ? 'destructive' : 'secondary'}>
-            {items.length}
-          </Badge>
-          {isExpanded ? (
-            <ChevronUp className="ml-auto h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-        <div className="space-y-1">
-          {visibleItems.map((a) => (
-            <AlertRow key={a.id} item={a} />
-          ))}
-          {!isExpanded && items.length > visibleItems.length && (
-            <button
-              onClick={() => toggleSection(section.key)}
-              className="w-full py-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              + {items.length - visibleItems.length} más en {section.title.toLowerCase()}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  const totalAlerts = SECTIONS.reduce((sum, s) => sum + data[s.key].length, 0);
-  const allExpanded = SECTIONS.every((s) => !data[s.key].length || expandedSections.has(s.key));
-
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-amber-500" />
           Alertas
-          <span className="ml-auto text-xs font-normal text-muted-foreground">
-            {totalAlerts} total &middot; {allExpanded ? 'todas' : `${pageSize} por página`}
-          </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {sectionsContent}
-        {!allExpanded && shown < totalAlerts && (
-          <button
-            onClick={() => setPageSize((p) => p + PAGE_SIZE)}
-            className="w-full rounded-md border py-2 text-xs text-muted-foreground hover:bg-muted transition-colors"
-          >
-            Mostrar más alertas
-          </button>
-        )}
-        {allExpanded && totalAlerts > PAGE_SIZE && (
-          <button
-            onClick={() => {
-              setPageSize(PAGE_SIZE);
-              setExpandedSections(new Set());
-            }}
-            className="w-full rounded-md border py-2 text-xs text-muted-foreground hover:bg-muted transition-colors"
-          >
-            Colapsar
-          </button>
+      <CardContent className="space-y-3">
+        {/* Pill selector */}
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIES.map((cat) => {
+            const count = data[cat.key].length;
+            const isActive = active === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setCategory(cat.key)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900'
+                    : count > 0
+                      ? 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                      : 'bg-zinc-50 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-600'
+                }`}
+              >
+                {cat.icon}
+                {cat.label}
+                {count > 0 && (
+                  <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] ${
+                    isActive
+                      ? 'bg-white/20'
+                      : 'bg-zinc-200 dark:bg-zinc-700'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Items */}
+        <div className="min-h-[180px] space-y-0.5">
+          {paged.map((a) => (
+            <Link
+              key={a.id}
+              href={a.href}
+              className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+            >
+              <span className="font-medium text-foreground truncate mr-2">{a.titulo}</span>
+              <span className="text-muted-foreground text-xs shrink-0">{a.descripcion}</span>
+            </Link>
+          ))}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded p-0.5 hover:text-foreground disabled:opacity-30"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="tabular-nums">
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="rounded p-0.5 hover:text-foreground disabled:opacity-30"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            <span className="tabular-nums">{total} {active.startsWith('clientes') ? 'inactivos' : active === 'premiosPendientes' ? 'premios' : 'dañados'}</span>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function AlertRow({ item }: { item: AlertaItem }) {
-  return (
-    <Link
-      href={item.href}
-      className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm hover:bg-muted transition-colors"
-    >
-      <span className="font-medium text-foreground">{item.titulo}</span>
-      <span className="text-muted-foreground text-xs">{item.descripcion}</span>
-    </Link>
-  );
+function firstNonEmpty(data: AlertasPanel): keyof AlertasPanel {
+  for (const cat of CATEGORIES) {
+    if (data[cat.key].length > 0) return cat.key;
+  }
+  return 'premiosPendientes';
 }

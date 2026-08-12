@@ -1,6 +1,7 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { useEffect } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { defaultIcon } from '@/lib/leaflet/icon-fix';
 
@@ -26,6 +27,7 @@ export default function MapaEditable({ lat, lng, onMove }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <RecenterOnChange lat={lat} lng={lng} />
       <ClickHandler onMove={onMove} />
       <Marker
         position={[lat, lng]}
@@ -40,6 +42,14 @@ export default function MapaEditable({ lat, lng, onMove }: Props) {
       />
     </MapContainer>
   );
+}
+
+function RecenterOnChange({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng], map.getZoom());
+  }, [lat, lng, map]);
+  return null;
 }
 
 function ClickHandler({ onMove }: { onMove?: (lat: number, lng: number) => void }) {

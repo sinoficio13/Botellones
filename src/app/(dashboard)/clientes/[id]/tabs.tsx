@@ -347,11 +347,13 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
 
       {/* ── MAPA (lo más importante, arriba) ── */}
       <div className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-700">
-        <MapaEditable
-          lat={coords?.lat ?? 10.4806}
-          lng={coords?.lng ?? -66.9036}
-          onMove={handleMapMove}
-        />
+        <div className="h-72 w-full">
+          <MapaEditable
+            lat={coords?.lat ?? 10.4806}
+            lng={coords?.lng ?? -66.9036}
+            onMove={handleMapMove}
+          />
+        </div>
         <div className="flex items-center justify-between bg-zinc-50 px-3 py-2 text-xs text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
           <span className="inline-flex items-center gap-1">
             <MapPin size={12} />

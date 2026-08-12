@@ -57,7 +57,8 @@ export async function resolveMapLink(link: string): Promise<{ lat: number; lng: 
 
 /**
  * Extract coordinates from a Google Maps URL.
- * Supports: ?q=lat,lng, @lat,lng,zoom, ?center=lat,lng, geo:lat,lng
+ * Supports: ?q=lat,lng, @lat,lng,zoom, ?center=lat,lng, geo:lat,lng,
+ * and the Google Maps "place" format !3d{lat}!4d{lng} inside the data param.
  */
 function extractCoords(url: string): { lat: number; lng: number } | null {
   const patterns = [
@@ -66,6 +67,7 @@ function extractCoords(url: string): { lat: number; lng: number } | null {
     /[?&]center=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
     /[?&]destination=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
     /geo:(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+    /!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/,
   ];
   for (const pattern of patterns) {
     const m = url.match(pattern);

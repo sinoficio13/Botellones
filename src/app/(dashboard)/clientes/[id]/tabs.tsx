@@ -366,6 +366,11 @@ function DireccionTab({ clienteId }: { clienteId: string }) {
 
   // Apply a pasted/typed link: try direct parse, then server-side short-link resolution
   const applyLink = async (link: string) => {
+    // Empty link → clear coordinates
+    if (!link.trim()) {
+      setCoords(null);
+      return;
+    }
     const parsed = parseWhatsAppLocation(link);
     if (parsed) {
       setCoords(parsed);

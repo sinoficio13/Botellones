@@ -149,27 +149,46 @@ export async function getClientes(
       .order(orderBy, { ascending: orderDir === 'asc' })
       .range(from, to);
 
-    // Get recarga stats for each client
+    // Get recarga stats for all clients in batch (2 queries instead of N*2)
     const clientes: ClienteListRow[] = [];
-    if (data) {
+    if (data && data.length > 0) {
+      const ids = data.map((c: { id: string }) => c.id);
+
+      // Batch 1: get recarga counts for all clients at once
+      const { data: recargaCounts } = await supabase
+        .from('recargas')
+        .select('cliente_id')
+        .in('cliente_id', ids);
+
+      // Batch 2: get latest recarga date for all clients at once
+      const { data: ultimasRecargas } = await supabase
+        .from('recargas')
+        .select('cliente_id, fecha')
+        .in('cliente_id', ids)
+        .order('fecha', { ascending: false });
+
+      // Index results by cliente_id
+      const countMap = new Map<string, number>();
+      if (recargaCounts) {
+        for (const r of recargaCounts) {
+          countMap.set(r.cliente_id, (countMap.get(r.cliente_id) || 0) + 1);
+        }
+      }
+
+      const ultimaMap = new Map<string, string>();
+      if (ultimasRecargas) {
+        for (const r of ultimasRecargas) {
+          if (!ultimaMap.has(r.cliente_id)) {
+            ultimaMap.set(r.cliente_id, r.fecha);
+          }
+        }
+      }
+
       for (const c of data) {
-        const { count: total_recargas } = await supabase
-          .from('recargas')
-          .select('*', { count: 'exact', head: true })
-          .eq('cliente_id', c.id);
-
-        const { data: ultima } = await supabase
-          .from('recargas')
-          .select('fecha')
-          .eq('cliente_id', c.id)
-          .order('fecha', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
         clientes.push({
           ...c,
-          total_recargas: total_recargas || 0,
-          ultima_recarga: ultima?.fecha || null,
+          total_recargas: countMap.get(c.id) || 0,
+          ultima_recarga: ultimaMap.get(c.id) || null,
         });
       }
     }

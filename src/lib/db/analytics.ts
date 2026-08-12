@@ -301,7 +301,7 @@ export async function getAlertas(): Promise<AlertasPanel> {
     const fecha30 = since30.toISOString().slice(0, 10);
     const fecha60 = since60.toISOString().slice(0, 10);
 
-    // Get all clientes and their last recarga date
+    // Get all clientes and their last recarga date in batch
     const { data: clientes } = await supabase.from('clientes').select('id, nombre');
     if (!clientes) {
       return {
@@ -312,19 +312,30 @@ export async function getAlertas(): Promise<AlertasPanel> {
       };
     }
 
+    const clienteIds = clientes.map((c: { id: string }) => c.id);
+
+    // Batch: get latest recarga for ALL clients in one query
+    const { data: allRecargas } = await supabase
+      .from('recargas')
+      .select('cliente_id, fecha')
+      .in('cliente_id', clienteIds)
+      .order('fecha', { ascending: false });
+
+    // Index latest fecha per cliente_id (first occurrence is the latest due to DESC order)
+    const lastRecargaMap = new Map<string, string>();
+    if (allRecargas) {
+      for (const r of allRecargas) {
+        if (!lastRecargaMap.has(r.cliente_id)) {
+          lastRecargaMap.set(r.cliente_id, r.fecha);
+        }
+      }
+    }
+
     const inactivos30: AlertaItem[] = [];
     const inactivos60: AlertaItem[] = [];
 
     for (const c of clientes) {
-      const { data: lastRecarga } = await supabase
-        .from('recargas')
-        .select('fecha')
-        .eq('cliente_id', c.id)
-        .order('fecha', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const lastFecha = lastRecarga?.fecha ?? null;
+      const lastFecha = lastRecargaMap.get(c.id) ?? null;
 
       if (!lastFecha || lastFecha < fecha60) {
         inactivos60.push({

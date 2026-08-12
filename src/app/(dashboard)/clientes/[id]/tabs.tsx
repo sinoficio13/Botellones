@@ -7,7 +7,7 @@ import { saveDireccion, getDireccion } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { FidelidadTab } from './fidelidad-tab';
-import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award } from 'lucide-react';
+import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const MapaEditable = dynamic(() => import('./mapa-editable'), { ssr: false });
@@ -55,6 +55,7 @@ export function ClienteTabs({ cliente }: { cliente: ClienteRow }) {
 function ResumenTab({ cliente }: { cliente: ClienteRow }) {
   const [direccion, setDireccion] = useState<Record<string, string | null> | null>(null);
   const [botellones, setBotellones] = useState<Array<{ id: string; codigo: string; estado: string }>>([]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     getDireccion(cliente.id).then((d) => setDireccion(d as unknown as Record<string, string | null>));
@@ -78,6 +79,39 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
         .filter(Boolean)
         .join(', ')
     : '';
+
+  const mapsUrl = direccion?.link_mapa ||
+    (direccion?.latitud != null && direccion?.longitud != null
+      ? `https://www.google.com/maps?q=${Number(direccion.latitud)},${Number(direccion.longitud)}`
+      : '');
+
+  const handleShare = async () => {
+    const shareData = {
+      title: `Ubicación de ${cliente.nombre}`,
+      text: dirCompuesta ? `${cliente.nombre}: ${dirCompuesta}` : `Ubicación de ${cliente.nombre}`,
+      url: mapsUrl,
+    };
+
+    // Web Share API (mobile / modern browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err) {
+        // User cancelled — do nothing
+        if ((err as Error).name === 'AbortError') return;
+      }
+    }
+
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(mapsUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable — ignore
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -146,14 +180,26 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
             <span className="inline-flex items-center gap-1 font-medium text-zinc-700 dark:text-zinc-300">
               <MapPin size={12} /> Ubicación
             </span>
-            <a
-              href={direccion?.link_mapa || `https://www.google.com/maps?q=${Number(direccion.latitud)},${Number(direccion.longitud)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
-            >
-              Abrir en Maps <ExternalLink size={12} />
-            </a>
+            <div className="flex items-center gap-1.5">
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <ExternalLink size={12} /> Maps
+              </a>
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+              >
+                {copied ? (
+                  <>Copiado ✓</>
+                ) : (
+                  <><Share2 size={12} /> Compartir</>
+                )}
+              </button>
+            </div>
           </div>
           <div className="mt-2 h-52 w-full">
             <MapaLeaflet lat={Number(direccion.latitud)} lng={Number(direccion.longitud)} />

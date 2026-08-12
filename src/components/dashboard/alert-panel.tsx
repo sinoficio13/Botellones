@@ -23,18 +23,52 @@ type AlertasPanel = {
   botellonesDanados: AlertaItem[];
 };
 
+// Merged view: combines both inactive arrays into one sorted list
+type MergedAlerts = {
+  premiosPendientes: AlertaItem[];
+  clientesInactivos: AlertaItem[];
+  botellonesDanados: AlertaItem[];
+};
+
+function mergeInactivos(raw: AlertasPanel): MergedAlerts {
+  const merged = [...raw.clientesInactivos60, ...raw.clientesInactivos30];
+  // Sort by days inactive (descending): parse date from descripcion
+  merged.sort((a, b) => daysFromDesc(b.descripcion) - daysFromDesc(a.descripcion));
+  return {
+    premiosPendientes: raw.premiosPendientes,
+    clientesInactivos: merged,
+    botellonesDanados: raw.botellonesDanados,
+  };
+}
+
+function daysFromDesc(desc: string): number {
+  // Format: "Última recarga: 2024-01-15" or "Sin recargas registradas"
+  const match = desc.match(/(\d{4}-\d{2}-\d{2})/);
+  if (!match) return -1; // "Sin recargas" → put at end
+  const then = new Date(match[1]).getTime();
+  const now = Date.now();
+  return Math.floor((now - then) / 86400000);
+}
+
+function formatDays(desc: string): string {
+  const d = daysFromDesc(desc);
+  if (d < 0) return 'Sin recargas';
+  if (d === 0) return 'Hoy';
+  if (d === 1) return '1 día inactivo';
+  return `${d}d sin recarga`;
+}
+
 const PAGE_SIZE = 5;
 
 type Category = {
-  key: keyof AlertasPanel;
+  key: keyof MergedAlerts;
   label: string;
   icon: React.ReactNode;
 };
 
 const CATEGORIES: Category[] = [
   { key: 'premiosPendientes', label: 'Premios', icon: <Gift className="h-3.5 w-3.5" /> },
-  { key: 'clientesInactivos30', label: 'Inact. 30d', icon: <UserX className="h-3.5 w-3.5" /> },
-  { key: 'clientesInactivos60', label: 'Inact. 60d', icon: <UserX className="h-3.5 w-3.5" /> },
+  { key: 'clientesInactivos', label: 'Inactivos', icon: <UserX className="h-3.5 w-3.5" /> },
   { key: 'botellonesDanados', label: 'Dañados', icon: <Wrench className="h-3.5 w-3.5" /> },
 ];
 
@@ -43,13 +77,14 @@ const CATEGORIES: Category[] = [
  * Subscribes to Supabase Realtime for live updates.
  */
 export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
-  const [data, setData] = useState<AlertasPanel>(initialData);
-  const [active, setActive] = useState<keyof AlertasPanel>(firstNonEmpty(initialData));
+  const merged = mergeInactivos(initialData);
+  const [data, setData] = useState<MergedAlerts>(merged);
+  const [active, setActive] = useState<keyof MergedAlerts>(firstNonEmpty(merged));
   const [page, setPage] = useState(1);
   const supabase = createClient();
 
   // Reset page when switching categories
-  const setCategory = useCallback((key: keyof AlertasPanel) => {
+  const setCategory = useCallback((key: keyof MergedAlerts) => {
     setActive(key);
     setPage(1);
   }, []);
@@ -58,7 +93,9 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
   useEffect(() => {
     const refresh = () => fetch('/api/alertas', { credentials: 'include' })
       .then((r) => r.ok && r.json())
-      .then((d) => d && setData(d))
+      .then((d) => {
+        if (d) setData(mergeInactivos(d));
+      })
       .catch(() => {});
 
     const p = supabase
@@ -169,7 +206,9 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
               className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
             >
               <span className="font-medium text-foreground truncate mr-2">{a.titulo}</span>
-              <span className="text-muted-foreground text-xs shrink-0">{a.descripcion}</span>
+              <span className="text-muted-foreground text-xs shrink-0">
+                {active === 'clientesInactivos' ? formatDays(a.descripcion) : a.descripcion}
+              </span>
             </Link>
           ))}
         </div>
@@ -194,7 +233,7 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
-            <span className="tabular-nums">{total} {active.startsWith('clientes') ? 'inactivos' : active === 'premiosPendientes' ? 'premios' : 'dañados'}</span>
+            <span className="tabular-nums">{total} {active === 'clientesInactivos' ? 'inactivos' : active === 'premiosPendientes' ? 'premios' : 'dañados'}</span>
           </div>
         )}
       </CardContent>
@@ -202,7 +241,7 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
   );
 }
 
-function firstNonEmpty(data: AlertasPanel): keyof AlertasPanel {
+function firstNonEmpty(data: MergedAlerts): keyof MergedAlerts {
   for (const cat of CATEGORIES) {
     if (data[cat.key].length > 0) return cat.key;
   }

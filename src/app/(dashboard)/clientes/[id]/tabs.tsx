@@ -142,7 +142,20 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
       {/* Mapa de ubicación GPS (visible si hay coordenadas) */}
       {direccion?.latitud != null && direccion?.longitud != null && (
         <div className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-700">
-          <div className="h-52 w-full">
+          <div className="flex items-center justify-between px-4 pt-3 pb-0 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="inline-flex items-center gap-1 font-medium text-zinc-700 dark:text-zinc-300">
+              <MapPin size={12} /> Ubicación
+            </span>
+            <a
+              href={direccion?.link_mapa || `https://www.google.com/maps?q=${Number(direccion.latitud)},${Number(direccion.longitud)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+            >
+              Abrir en Maps <ExternalLink size={12} />
+            </a>
+          </div>
+          <div className="mt-2 h-52 w-full">
             <MapaLeaflet lat={Number(direccion.latitud)} lng={Number(direccion.longitud)} />
           </div>
         </div>

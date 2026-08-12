@@ -1,23 +1,26 @@
+'use client';
+
+import { useActionState } from 'react';
 import { createBotellon } from '@/lib/db/botellones';
-import { redirect } from 'next/navigation';
 
 export default function NuevoBotellonPage() {
-  async function handleCreate() {
-    'use server';
-    await createBotellon(null, new FormData());
-    // createBotellon already redirects
-  }
+  const [state, formAction, pending] = useActionState(createBotellon, null);
 
   return (
     <div className="mx-auto max-w-md px-4 py-8 text-center">
       <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Nuevo Botellón</h1>
       <p className="mt-2 text-sm text-zinc-500">El código BOT-XXXXX se asigna automáticamente.</p>
-      <form action={handleCreate} className="mt-6">
-        <button type="submit"
-          className="rounded-md bg-zinc-900 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200">
-          Crear botellón
+      <form action={formAction} className="mt-6">
+        <button type="submit" disabled={pending}
+          className="rounded-md bg-zinc-900 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200">
+          {pending ? 'Creando…' : 'Crear botellón'}
         </button>
       </form>
+      {state?.error && (
+        <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-300">
+          {state.error}
+        </div>
+      )}
     </div>
   );
 }

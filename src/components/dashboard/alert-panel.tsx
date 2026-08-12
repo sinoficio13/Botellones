@@ -32,8 +32,8 @@ type MergedAlerts = {
 
 function mergeInactivos(raw: AlertasPanel): MergedAlerts {
   const merged = [...raw.clientesInactivos60, ...raw.clientesInactivos30];
-  // Sort by days inactive (descending): parse date from descripcion
-  merged.sort((a, b) => daysFromDesc(b.descripcion) - daysFromDesc(a.descripcion));
+  // Sort by days inactive (descending): extract number from "945d inactivo" format
+  merged.sort((a, b) => daysFromText(b.descripcion) - daysFromText(a.descripcion));
   return {
     premiosPendientes: raw.premiosPendientes,
     clientesInactivos: merged,
@@ -41,21 +41,12 @@ function mergeInactivos(raw: AlertasPanel): MergedAlerts {
   };
 }
 
-function daysFromDesc(desc: string): number {
-  // Format: "Última recarga: 2024-01-15" or "Sin recargas registradas"
-  const match = desc.match(/(\d{4}-\d{2}-\d{2})/);
-  if (!match) return -1; // "Sin recargas" → put at end
-  const then = new Date(match[1]).getTime();
-  const now = Date.now();
-  return Math.floor((now - then) / 86400000);
-}
-
-function formatDays(desc: string): string {
-  const d = daysFromDesc(desc);
-  if (d < 0) return 'Sin recargas';
-  if (d === 0) return 'Hoy';
-  if (d === 1) return '1 día inactivo';
-  return `${d}d sin recarga`;
+function daysFromText(text: string): number {
+  const match = text.match(/^(\d+)d/);
+  if (match) return parseInt(match[1], 10);
+  if (text === 'Hoy') return 0;
+  if (text === '1d inactivo') return 1;
+  return -1; // "Sin recargas" → end of list
 }
 
 const PAGE_SIZE = 5;
@@ -206,9 +197,7 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
               className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
             >
               <span className="font-medium text-foreground truncate mr-2">{a.titulo}</span>
-              <span className="text-muted-foreground text-xs shrink-0">
-                {active === 'clientesInactivos' ? formatDays(a.descripcion) : a.descripcion}
-              </span>
+              <span className="text-muted-foreground text-xs shrink-0">{a.descripcion}</span>
             </Link>
           ))}
         </div>

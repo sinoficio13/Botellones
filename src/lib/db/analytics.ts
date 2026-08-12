@@ -333,18 +333,26 @@ export async function getAlertas(): Promise<AlertasPanel> {
 
     const inactivos30: AlertaItem[] = [];
     const inactivos60: AlertaItem[] = [];
+    const ahora = new Date();
 
     for (const c of clientes) {
       const lastFecha = lastRecargaMap.get(c.id) ?? null;
+
+      // Compute days inactive from last recarga date
+      let daysText: string;
+      if (!lastFecha) {
+        daysText = 'Sin recargas';
+      } else {
+        const dias = Math.floor((ahora.getTime() - new Date(lastFecha).getTime()) / 86400000);
+        daysText = dias === 0 ? 'Hoy' : dias === 1 ? '1d inactivo' : `${dias}d inactivo`;
+      }
 
       if (!lastFecha || lastFecha < fecha60) {
         inactivos60.push({
           id: c.id,
           tipo: 'inactivo_60',
           titulo: c.nombre,
-          descripcion: lastFecha
-            ? `Última recarga: ${lastFecha}`
-            : 'Sin recargas registradas',
+          descripcion: daysText,
           href: `/clientes/${c.id}`,
           entidadId: c.id,
         });
@@ -353,7 +361,7 @@ export async function getAlertas(): Promise<AlertasPanel> {
           id: c.id,
           tipo: 'inactivo_30',
           titulo: c.nombre,
-          descripcion: `Última recarga: ${lastFecha}`,
+          descripcion: daysText,
           href: `/clientes/${c.id}`,
           entidadId: c.id,
         });

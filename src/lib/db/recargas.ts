@@ -55,7 +55,7 @@ export async function getBotellonesDelCliente(clienteId: string) {
       .from('botellones')
       .select('id, codigo, estado')
       .eq('cliente_id', clienteId)
-      .in('estado', ['asignado', 'en_recarga'])
+      .in('estado', ['entregado'])
       .order('codigo');
     return data || [];
   } catch {
@@ -105,12 +105,12 @@ export async function registrarRecarga(
 
     if (error) return { error: error.message };
 
-    // Update botellon estado to 'en_recarga' if it was 'asignado'
+    // Update botellon estado to 'recarga' if it was 'entregado'
     await supabase
       .from('botellones')
-      .update({ estado: 'en_recarga' })
+      .update({ estado: 'recarga' })
       .eq('id', botellon_id)
-      .eq('estado', 'asignado');
+      .eq('estado', 'entregado');
 
     // ── Loyalty detection ──
 

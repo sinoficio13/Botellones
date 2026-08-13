@@ -116,7 +116,7 @@ test.describe('Botellones', () => {
     await login(page);
     await page.goto('/botellones');
     await expect(page.getByText('BOT-').first()).toBeVisible();
-    await expect(page.getByText('disponible').first()).toBeVisible();
+    await expect(page.getByText('planta').first()).toBeVisible();
   });
 
   test('change state', async ({ page }) => {

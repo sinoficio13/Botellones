@@ -104,16 +104,16 @@ export async function updateBotellon(_prev: BotellonState | null, formData: Form
   try {
     const supabase = await getSupabase();
 
-    // If assigning a client, set estado to 'asignado'
+    // If assigning a client, set estado to 'entregado'
     const update: Record<string, string | null> = {};
     if (estado) update.estado = estado;
     if (cliente_id !== undefined) {
       update.cliente_id = cliente_id || null;
-      if (cliente_id && (!estado || estado === 'disponible')) {
-        update.estado = 'asignado';
+      if (cliente_id && (!estado || estado === 'planta')) {
+        update.estado = 'entregado';
       }
-      if (!cliente_id && estado === 'asignado') {
-        update.estado = 'disponible';
+      if (!cliente_id && estado === 'entregado') {
+        update.estado = 'planta';
       }
     }
 
@@ -122,7 +122,7 @@ export async function updateBotellon(_prev: BotellonState | null, formData: Form
 
     // ── Damage/loss notification: alert admins when botellón breaks ──
     const newEstado = update.estado;
-    if (newEstado === 'dañado' || newEstado === 'perdido') {
+    if (newEstado === 'danado' || newEstado === 'perdido') {
       const { data: botellon } = await supabase
         .from('botellones')
         .select('codigo')
@@ -166,5 +166,70 @@ export async function getClientesForSelect(search?: string) {
     return data || [];
   } catch {
     return [];
+  }
+}
+
+export type BotellonOperativo = {
+  id: string;
+  codigo: string;
+  estado: string;
+  cliente_id: string | null;
+  fecha_entrega: string | null;
+  clientes: { nombre: string } | null;
+};
+
+/**
+ * Operaciones dashboard: all botellones with client join, plus today's recarga count.
+ */
+export async function getOperaciones(): Promise<{ botellones: BotellonOperativo[]; recargasHoy: number }> {
+  try {
+    const supabase = await getSupabase();
+    const { data } = await supabase
+      .from('botellones')
+      .select('id, codigo, estado, cliente_id, fecha_entrega, clientes(nombre)')
+      .order('codigo');
+    const hoy = new Date().toISOString().slice(0, 10);
+    const { count } = await supabase
+      .from('recargas')
+      .select('*', { count: 'exact', head: true })
+      .eq('fecha', hoy);
+    return { botellones: (data as unknown as BotellonOperativo[]) || [], recargasHoy: count || 0 };
+  } catch {
+    return { botellones: [], recargasHoy: 0 };
+  }
+}
+
+/**
+ * Move a botellón to a new estado (kanban). If moving to "entregado",
+ * a cliente_id must be provided. Returns success or error.
+ */
+export async function moverBotellon(
+  id: string,
+  nuevoEstado: string,
+  clienteId: string | null = null
+): Promise<BotellonState> {
+  if (!id) return { error: 'ID requerido' };
+  try {
+    const supabase = await getSupabase();
+    const update: Record<string, string | null> = { estado: nuevoEstado };
+
+    if (nuevoEstado === 'entregado') {
+      if (!clienteId) return { error: 'Cliente requerido para entregar' };
+      update.cliente_id = clienteId;
+      update.fecha_entrega = new Date().toISOString();
+    }
+    if (nuevoEstado === 'planta' || nuevoEstado === 'recibido') {
+      update.cliente_id = null;
+      update.fecha_entrega = null;
+    }
+
+    const { error } = await supabase.from('botellones').update(update).eq('id', id);
+    if (error) return { error: error.message };
+
+    revalidatePath('/dashboard');
+    revalidatePath('/botellones');
+    return { success: true, id };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Error al mover botellón' };
   }
 }

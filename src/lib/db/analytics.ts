@@ -125,11 +125,11 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
       supabase
         .from('botellones')
         .select('*', { count: 'exact', head: true })
-        .in('estado', ['asignado', 'en_recarga']),
+        .in('estado', ['entregado']),
       supabase
         .from('botellones')
         .select('*', { count: 'exact', head: true })
-        .eq('estado', 'disponible'),
+        .eq('estado', 'planta'),
       supabase
         .from('recargas')
         .select('*', { count: 'exact', head: true })
@@ -289,7 +289,7 @@ export async function getAlertas(): Promise<AlertasPanel> {
     const { data: danados } = await supabase
       .from('botellones')
       .select('id, codigo, estado, cliente_id, clientes(nombre)')
-      .in('estado', ['dañado', 'perdido'])
+      .in('estado', ['danado', 'perdido'])
       .order('fecha_creacion', { ascending: false })
       .limit(20);
 
@@ -509,7 +509,7 @@ export async function getRepartidorDashboard(
     const { data: botellones } = await supabase
       .from('botellones')
       .select('cliente_id, clientes(id, nombre, negocio)')
-      .in('estado', ['asignado', 'en_recarga']);
+      .in('estado', ['entregado']);
 
     const seen = new Set<string>();
     const clientesAsignados: { id: string; nombre: string; negocio: string | null }[] = [];

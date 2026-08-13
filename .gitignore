@@ -58,3 +58,6 @@ supabase/dev/
 # Playwright
 test-results/
 .playwright-mcp/
+
+# Temporary mockups
+/Mockup/

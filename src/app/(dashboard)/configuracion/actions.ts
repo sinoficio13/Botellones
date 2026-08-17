@@ -1,64 +1,18 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+import { getConfiguracion, saveConfiguracion } from '@/lib/db/configuracion';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export type ConfigState = {
   success?: boolean;
   error?: string;
 };
 
-export type BusinessConfig = {
-  nombre_negocio: string;
-  telefono: string;
-  direccion: string;
-  email: string;
-  logo_url: string | null;
-};
-
 /**
- * Read business configuration.
- * Dev mode: reads from cookie.
- * Production: reads from configuracion table.
- */
-export async function getConfig(): Promise<BusinessConfig | null> {
-  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'dev') {
-    const cookieStore = await cookies();
-    const raw = cookieStore.get('botellon_config')?.value;
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  try {
-    const { createAdminClient } = await import('@/lib/supabase/admin');
-    const supabase = createAdminClient();
-    const { data } = await supabase
-      .from('configuracion')
-      .select('*')
-      .eq('id', 1)
-      .single();
-    return data
-      ? {
-          nombre_negocio: data.nombre_negocio,
-          telefono: data.telefono || '',
-          direccion: data.direccion || '',
-          email: data.email || '',
-          logo_url: data.logo_url || null,
-        }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Save business configuration to configuracion table (single row, id=1).
- * Dev mode: saves to cookie.
- * Production: upserts to configuracion via admin client.
+ * Save business configuration to the configuracion table (single row, id=1).
+ * Logo is uploaded to Supabase Storage (public `logos` bucket) and its public
+ * URL is stored in the `logo_url` column.
  */
 export async function saveConfig(
   _prevState: ConfigState | null,
@@ -68,54 +22,59 @@ export async function saveConfig(
   const telefono = (formData.get('telefono') as string)?.trim() || '';
   const direccion = (formData.get('direccion') as string)?.trim() || '';
   const email = (formData.get('email') as string)?.trim() || '';
-  const logo_data_url = (formData.get('logo_data_url') as string) || undefined;
+  const logoFile = formData.get('logo_file') as File | null;
+  const remove_logo = formData.get('remove_logo') === 'true';
 
   if (!nombre_negocio) {
     return { error: 'El nombre del negocio es requerido' };
   }
 
-  // ── Dev mode: store in cookie ──
-  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'dev') {
-    const cookieStore = await cookies();
+  // Logo precedence: explicit removal > new upload > keep existing
+  let logo_url: string | null;
+  if (remove_logo) {
+    logo_url = null;
+  } else if (logoFile && logoFile.size > 0) {
+    const ext =
+      logoFile.type === 'image/png'
+        ? 'png'
+        : logoFile.type === 'image/svg+xml'
+          ? 'svg'
+          : 'png';
 
-    // Use new logo if provided, otherwise keep existing
-    let logo_url = logo_data_url;
-    if (!logo_url) {
-      const existing = cookieStore.get('botellon_config')?.value;
-      if (existing) {
-        try { logo_url = JSON.parse(existing).logo_url; } catch { /* keep undefined */ }
-      }
-    }
-
-    cookieStore.set(
-      'botellon_config',
-      JSON.stringify({ nombre_negocio, telefono, direccion, email, logo_url }),
-      { httpOnly: true, secure: false, sameSite: 'lax', path: '/' }
-    );
-
-    revalidatePath('/', 'layout');
-    return { success: true };
-  }
-
-  // ── Production: Supabase ──
-  try {
-    const { createAdminClient } = await import('@/lib/supabase/admin');
     const supabase = createAdminClient();
 
-    const { error } = await supabase.from('configuracion').upsert(
-      { id: 1, nombre_negocio, telefono, direccion, email },
-      { onConflict: 'id' }
-    );
+    const { error } = await supabase.storage
+      .from('logos')
+      .upload(`logo/logo.${ext}`, logoFile, {
+        upsert: true,
+        contentType: logoFile.type,
+      });
 
     if (error) {
-      return { error: `Error al guardar: ${error.message}` };
+      return { error: 'Error al subir el logo: ' + error.message };
     }
 
-    revalidatePath('/', 'layout');
-    return { success: true };
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : 'Error desconocido al guardar',
-    };
+    const { data } = supabase.storage
+      .from('logos')
+      .getPublicUrl(`logo/logo.${ext}`);
+    logo_url = data.publicUrl;
+  } else {
+    const existing = await getConfiguracion();
+    logo_url = existing.logo_url;
   }
+
+  const result = await saveConfiguracion({
+    nombre_negocio,
+    telefono,
+    direccion,
+    email,
+    logo_url,
+  });
+
+  if (result.error) {
+    return { error: result.error };
+  }
+
+  revalidatePath('/', 'layout');
+  return { success: true };
 }

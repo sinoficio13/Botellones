@@ -1,4 +1,5 @@
 import { getBotellon, getClientesForSelect } from '@/lib/db/botellones';
+import { getConfiguracion } from '@/lib/db/configuracion';
 import { getTransiciones, type Estado } from '@/lib/utils/estados';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
@@ -19,6 +20,7 @@ export default async function BotellonDetailPage({ params }: Props) {
 
   const transiciones = getTransiciones(botellon.estado as Estado);
   const clientes = await getClientesForSelect();
+  const config = await getConfiguracion();
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -47,7 +49,7 @@ export default async function BotellonDetailPage({ params }: Props) {
       {/* QR Code */}
       <div className="mt-6 flex flex-col items-center gap-6 sm:flex-row">
         <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800">
-          <QrCodeDisplay codigo={botellon.codigo} />
+          <QrCodeDisplay codigo={botellon.codigo} logoUrl={config.logo_url} />
         </div>
         <div className="text-sm">
           <p className="font-medium text-zinc-900 dark:text-zinc-50">Código QR</p>

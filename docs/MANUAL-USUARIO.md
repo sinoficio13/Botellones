@@ -170,12 +170,12 @@ En la esquina superior derecha del header hay un ícono de campana 🔔. Muestra
 **Clic en la campana**: ves las últimas 5 notificaciones. Clic en **Ver todas** para ir al centro completo.
 
 ### Tipos de notificaciones
-| Evento | ¿Cuándo? | ¿Quién la ve? |
-|---|---|---|
-| 🎁 Premio alcanzado | Cliente llega a 100, 200, 300... recargas | Admin + Repartidor |
-| ⭐ A 5 del premio | Cliente llega a 95, 195, 295... recargas | Admin |
-| 🔧 Botellón dañado | Se cambia el estado a "dañado" o "perdido" | Admin |
-| ⚠️ Cliente inactivo | 30 días sin recargas | Admin |
+| Evento              | ¿Cuándo?                                   | ¿Quién la ve?      |
+| ------------------- | ------------------------------------------ | ------------------ |
+| 🎁 Premio alcanzado | Cliente llega a 100, 200, 300... recargas  | Admin + Repartidor |
+| ⭐ A 5 del premio    | Cliente llega a 95, 195, 295... recargas   | Admin              |
+| 🔧 Botellón dañado  | Se cambia el estado a "dañado" o "perdido" | Admin              |
+| ⚠️ Cliente inactivo | 30 días sin recargas                       | Admin              |
 
 ### Marcar como leída
 - **Una por una**: clic en el botón ✓ al lado de cada notificación.

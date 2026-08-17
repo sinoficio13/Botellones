@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { MapPin, Store } from 'lucide-react';
 import { BellNotification } from '@/components/notificaciones/bell';
 import GlobalSearch from '@/components/search/global-search';
+import { getConfiguracion } from '@/lib/db/configuracion';
 
 /**
  * Header component: shows business logo (or fallback text) and name.
  * Visible on all authenticated pages inside the dashboard layout.
  */
 export async function Header() {
-  const config = await getConfig();
+  const config = await getConfiguracion();
   const role = await getUserRole();
 
   const nombre = config?.nombre_negocio || 'Botellón';
@@ -28,6 +29,7 @@ export async function Header() {
                 alt={nombre}
                 width={160}
                 height={40}
+                unoptimized
                 className="h-8 w-auto max-w-[160px] object-contain"
               />
             ) : (
@@ -133,40 +135,6 @@ async function getUserRole(): Promise<'admin' | 'repartidor' | null> {
     // In production, role is read via createServerClient with cookies
     // For now fall back to admin client pattern
     return 'admin';
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Read business config for the header.
- * Dev mode: reads from cookie.
- * Production: reads from configuracion table.
- */
-async function getConfig(): Promise<{
-  nombre_negocio: string;
-  logo_url: string | null;
-} | null> {
-  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'dev') {
-    const cookieStore = await cookies();
-    const raw = cookieStore.get('botellon_config')?.value;
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  try {
-    const { createAdminClient } = await import('@/lib/supabase/admin');
-    const supabase = createAdminClient();
-    const { data } = await supabase
-      .from('configuracion')
-      .select('nombre_negocio, logo_url')
-      .eq('id', 1)
-      .single();
-    return data ?? null;
   } catch {
     return null;
   }

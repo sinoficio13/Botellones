@@ -6,9 +6,10 @@ import { useSyncExternalStore } from 'react';
 interface Props {
   codigo: string;
   size?: number;
+  logoUrl?: string | null;
 }
 
-export function QrCodeDisplay({ codigo, size = 180 }: Props) {
+export function QrCodeDisplay({ codigo, size = 180, logoUrl }: Props) {
   // React 19 hydration guard — no extra render, no ESLint violation
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -21,6 +22,15 @@ export function QrCodeDisplay({ codigo, size = 180 }: Props) {
   }
 
   const url = `${window.location.origin}/b/${codigo}`;
+
+  const imageSettings = logoUrl
+    ? {
+        src: logoUrl,
+        height: size * 0.22,
+        width: size * 0.22,
+        excavate: true,
+      }
+    : undefined;
 
   const handleDownloadSvg = () => {
     const svg = document.querySelector('.qr-svg');
@@ -39,7 +49,7 @@ export function QrCodeDisplay({ codigo, size = 180 }: Props) {
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="qr-svg">
-        <QRCodeSVG value={url} size={size} level="M" />
+        <QRCodeSVG value={url} size={size} level="H" imageSettings={imageSettings} />
       </div>
       <button
         type="button"
@@ -53,7 +63,7 @@ export function QrCodeDisplay({ codigo, size = 180 }: Props) {
 }
 
 /** Inline version for print labels */
-export function QrCodeInline({ codigo, size = 100 }: Props) {
+export function QrCodeInline({ codigo, size = 100, logoUrl }: Props) {
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -65,9 +75,19 @@ export function QrCodeInline({ codigo, size = 100 }: Props) {
   }
 
   const url = `${window.location.origin}/b/${codigo}`;
+
+  const imageSettings = logoUrl
+    ? {
+        src: logoUrl,
+        height: size * 0.22,
+        width: size * 0.22,
+        excavate: true,
+      }
+    : undefined;
+
   return (
     <div className="qr-svg">
-      <QRCodeSVG value={url} size={size} level="M" />
+      <QRCodeSVG value={url} size={size} level="H" imageSettings={imageSettings} />
     </div>
   );
 }

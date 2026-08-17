@@ -111,6 +111,31 @@ test.describe('Public QR', () => {
   });
 });
 
+test.describe('Public QR redesign', () => {
+  test('shows gradient header, business identity and botellón summary', async ({ page }) => {
+    await page.goto('/b/BOT-00001');
+    // Gradient header (Agua palette) renders
+    await expect(page.locator('header.bg-gradient-to-br')).toBeVisible({ timeout: 15000 });
+    // Business name (heading) + slogan (italic)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByText('Agua pura, directo a tu puerta')).toBeVisible();
+    // Botellón summary: estado badge (color-mapped; value varies by DB state), stats
+    await expect(page.locator('span.rounded-full')).toBeVisible();
+    await expect(page.getByText('Total recargas')).toBeVisible();
+    await expect(page.getByText('Última recarga')).toBeVisible();
+    // No personal client data exposed
+    await expect(page.getByText('María Rodríguez')).not.toBeVisible();
+  });
+
+  test('shows WhatsApp contact pill linking to wa.me/58', async ({ page }) => {
+    await page.goto('/b/BOT-00001');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15000 });
+    const whatsapp = page.locator('a[href^="https://wa.me/58"]');
+    await expect(whatsapp).toBeVisible();
+    await expect(whatsapp).toHaveAttribute('href', /^https:\/\/wa\.me\/58\d+$/);
+  });
+});
+
 test.describe('Botellones', () => {
   test('list with states', async ({ page }) => {
     await login(page);

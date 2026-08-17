@@ -36,3 +36,9 @@ VALUES (
   '2024-01-10'
 )
 ON CONFLICT (codigo) DO NOTHING;
+
+-- Business configuration: WhatsApp phone for the public QR page (idempotent).
+-- DO UPDATE keeps the test deterministic even if a previous run left an empty telefono.
+INSERT INTO configuracion (id, nombre_negocio, telefono)
+VALUES (1, 'Botellón', '04121234567')
+ON CONFLICT (id) DO UPDATE SET telefono = EXCLUDED.telefono;

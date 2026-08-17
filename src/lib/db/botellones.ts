@@ -55,10 +55,19 @@ export async function getBotellon(id: string): Promise<BotellonDetail | null> {
   }
 }
 
-export async function getBotellonByCodigo(codigo: string): Promise<{ codigo: string; estado: string; total_recargas: number; ultima_recarga: string | null } | null> {
+export type BotellonPublico = {
+  id: string;
+  codigo: string;
+  estado: string;
+  cliente_id: string | null;
+  total_recargas: number;
+  ultima_recarga: string | null;
+};
+
+export async function getBotellonByCodigo(codigo: string): Promise<BotellonPublico | null> {
   try {
     const supabase = await getSupabase();
-    const { data } = await supabase.from('botellones').select('id, codigo, estado').eq('codigo', codigo).single();
+    const { data } = await supabase.from('botellones').select('id, codigo, estado, cliente_id').eq('codigo', codigo).single();
     if (!data) return null;
 
     // If id is available (service_role or authenticated), fetch recarga stats
@@ -71,7 +80,14 @@ export async function getBotellonByCodigo(codigo: string): Promise<{ codigo: str
       ultima_recarga = ultima?.fecha || null;
     }
 
-    return { codigo: data.codigo, estado: data.estado, total_recargas, ultima_recarga };
+    return {
+      id: data.id,
+      codigo: data.codigo,
+      estado: data.estado,
+      cliente_id: data.cliente_id ?? null,
+      total_recargas,
+      ultima_recarga,
+    };
   } catch {
     return null;
   }

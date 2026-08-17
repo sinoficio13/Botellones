@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useDebounce } from '@/hooks/use-debounce';
 import { getClientesForSearch, getBotellonesDelCliente, registrarRecarga } from '@/lib/db/recargas';
 import { getCliente } from '@/lib/db/clientes';
+import { getBotellon } from '@/lib/db/botellones';
 import { PremioAlertCard } from '@/components/fidelidad/premio-alert-card';
 
 type Step = 'cliente' | 'botellon' | 'confirmar';
@@ -17,6 +18,7 @@ interface Botellon { id: string; codigo: string; estado: string }
 export default function NuevaRecargaPage() {
   const sp = useSearchParams();
   const preselectCliente = sp.get('cliente_id');
+  const preselectBotellon = sp.get('botellon_id');
 
   const [step, setStep] = useState<Step>(preselectCliente ? 'botellon' : 'cliente');
   const [search, setSearch] = useState('');
@@ -47,6 +49,26 @@ export default function NuevaRecargaPage() {
       });
     }
   }, [preselectCliente]);
+
+  // Pre-select botellón if coming from the QR page — jump straight to confirm.
+  // Falls back to the client step when the botellón is missing or has no client.
+  useEffect(() => {
+    if (!preselectBotellon) return;
+    getBotellon(preselectBotellon).then(async (b) => {
+      if (!b || !b.cliente_id) {
+        setStep('cliente');
+        return;
+      }
+      const c = await getCliente(b.cliente_id);
+      if (!c) {
+        setStep('cliente');
+        return;
+      }
+      setSelectedCliente({ id: c.id, nombre: c.nombre, codigo: c.codigo, telefono_1: c.telefono_1 });
+      setSelectedBotellon({ id: b.id, codigo: b.codigo, estado: b.estado });
+      setStep('confirmar');
+    });
+  }, [preselectBotellon]);
 
   useEffect(() => {
     if (selectedCliente) {

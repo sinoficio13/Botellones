@@ -21,7 +21,8 @@ export async function saveConfig(
   const nombre_negocio = (formData.get('nombre_negocio') as string)?.trim();
   const telefono = (formData.get('telefono') as string)?.trim() || '';
   const direccion = (formData.get('direccion') as string)?.trim() || '';
-  const email = (formData.get('email') as string)?.trim() || '';
+  const eslogan = (formData.get('eslogan') as string)?.trim() || '';
+  const cta_qr = (formData.get('cta_qr') as string)?.trim() || '';
   const logoFile = formData.get('logo_file') as File | null;
   const remove_logo = formData.get('remove_logo') === 'true';
 
@@ -67,7 +68,8 @@ export async function saveConfig(
     nombre_negocio,
     telefono,
     direccion,
-    email,
+    eslogan,
+    cta_qr,
     logo_url,
   });
 

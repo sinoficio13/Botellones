@@ -105,8 +105,9 @@ export type Database = {
       }
       configuracion: {
         Row: {
+          cta_qr: string | null
           direccion: string | null
-          email: string | null
+          eslogan: string | null
           id: number
           logo_url: string | null
           nombre_negocio: string
@@ -114,8 +115,9 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cta_qr?: string | null
           direccion?: string | null
-          email?: string | null
+          eslogan?: string | null
           id?: number
           logo_url?: string | null
           nombre_negocio: string
@@ -123,8 +125,9 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cta_qr?: string | null
           direccion?: string | null
-          email?: string | null
+          eslogan?: string | null
           id?: number
           logo_url?: string | null
           nombre_negocio?: string

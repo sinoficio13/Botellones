@@ -20,8 +20,9 @@ export function ConfigForm({ initialConfig }: Props) {
 
   const [nombre, setNombre] = useState(initialConfig.nombre_negocio);
   const [telefono, setTelefono] = useState(initialConfig.telefono);
-  const [email, setEmail] = useState(initialConfig.email);
   const [direccion, setDireccion] = useState(initialConfig.direccion);
+  const [eslogan, setEslogan] = useState(initialConfig.eslogan);
+  const [ctaQr, setCtaQr] = useState(initialConfig.cta_qr);
 
   // Toast is a side-effect driven by useActionState result — legitimate pattern per design
   useEffect(() => {
@@ -68,40 +69,63 @@ export function ConfigForm({ initialConfig }: Props) {
           />
         </div>
 
-        {/* Teléfono + Email en grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="telefono"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Teléfono
-            </label>
-            <input
-              id="telefono"
-              name="telefono"
-              type="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-            />
-          </div>
+        {/* Eslogan */}
+        <div>
+          <label
+            htmlFor="eslogan"
+            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            Eslogan
+          </label>
+          <input
+            id="eslogan"
+            name="eslogan"
+            type="text"
+            value={eslogan}
+            onChange={(e) => setEslogan(e.target.value)}
+            placeholder="Agua pura, directo a tu puerta"
+            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          />
+          <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+            Aparece en la etiqueta de los botellones.
+          </p>
+        </div>
+
+        {/* CTA del QR */}
+        <div>
+          <label
+            htmlFor="cta_qr"
+            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            Texto bajo el QR (call-to-action)
+          </label>
+          <input
+            id="cta_qr"
+            name="cta_qr"
+            type="text"
+            value={ctaQr}
+            onChange={(e) => setCtaQr(e.target.value)}
+            placeholder="Escaneá para recargar"
+            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          />
+        </div>
+
+        {/* Teléfono */}
+        <div>
+          <label
+            htmlFor="telefono"
+            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            Teléfono / WhatsApp
+          </label>
+          <input
+            id="telefono"
+            name="telefono"
+            type="tel"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          />
         </div>
 
         {/* Dirección */}

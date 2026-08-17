@@ -8,8 +8,9 @@ export type BusinessConfig = {
   nombre_negocio: string;
   telefono: string;
   direccion: string;
-  email: string;
   logo_url: string | null;
+  eslogan: string;
+  cta_qr: string;
 };
 
 // ── Defaults ──
@@ -27,7 +28,7 @@ export async function getConfiguracion(): Promise<BusinessConfig> {
     const supabase = createAdminClient();
     const { data } = await supabase
       .from('configuracion')
-      .select('nombre_negocio, telefono, direccion, email, logo_url')
+      .select('nombre_negocio, telefono, direccion, logo_url, eslogan, cta_qr')
       .eq('id', 1)
       .maybeSingle();
 
@@ -35,16 +36,18 @@ export async function getConfiguracion(): Promise<BusinessConfig> {
       nombre_negocio: data?.nombre_negocio || DEFAULT_BUSINESS_NAME,
       telefono: data?.telefono || '',
       direccion: data?.direccion || '',
-      email: data?.email || '',
       logo_url: data?.logo_url || null,
+      eslogan: data?.eslogan || '',
+      cta_qr: data?.cta_qr || '',
     };
   } catch {
     return {
       nombre_negocio: DEFAULT_BUSINESS_NAME,
       telefono: '',
       direccion: '',
-      email: '',
       logo_url: null,
+      eslogan: '',
+      cta_qr: '',
     };
   }
 }

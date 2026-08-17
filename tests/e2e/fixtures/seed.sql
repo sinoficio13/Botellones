@@ -37,6 +37,17 @@ VALUES (
 )
 ON CONFLICT (codigo) DO NOTHING;
 
+-- BOT-00003 (unassigned — exercises the "sin cliente asignado" fallback)
+INSERT INTO botellones (id, codigo, estado, cliente_id, fecha_creacion)
+VALUES (
+  '438ce808-53e4-4bab-a979-3a276b2afd23',
+  'BOT-00003',
+  'recibido',
+  NULL,
+  '2024-01-12'
+)
+ON CONFLICT (codigo) DO NOTHING;
+
 -- Business configuration: WhatsApp phone for the public QR page (idempotent).
 -- DO UPDATE keeps the test deterministic even if a previous run left an empty telefono.
 INSERT INTO configuracion (id, nombre_negocio, telefono)

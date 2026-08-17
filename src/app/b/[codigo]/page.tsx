@@ -1,8 +1,10 @@
 import { getBotellonByCodigo } from '@/lib/db/botellones';
 import { getConfiguracion } from '@/lib/db/configuracion';
+import { getSessionRole } from '@/lib/auth/session';
 import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
 import { QrCodeDisplay } from '@/app/(dashboard)/botellones/[id]/qr-code';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { Droplets } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +53,9 @@ export default async function BotellonPublicPage({ params }: Props) {
   const botellon = await getBotellonByCodigo(codigo);
 
   if (!botellon) notFound();
+
+  const role = await getSessionRole();
+  const isStaff = role === 'admin' || role === 'repartidor';
 
   const config = await getConfiguracion();
 
@@ -112,6 +117,29 @@ export default async function BotellonPublicPage({ params }: Props) {
               </p>
             </div>
           </div>
+
+          {botellon.cliente_id == null ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <p className="font-semibold">Sin cliente asignado</p>
+              {isStaff && (
+                <Link
+                  href={`/botellones/${botellon.id}`}
+                  className="mt-1 inline-block font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                >
+                  Asignar cliente
+                </Link>
+              )}
+            </div>
+          ) : (
+            isStaff && (
+              <Link
+                href={`/recargas/nueva?botellon_id=${botellon.id}`}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e7490] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0c4a6e]"
+              >
+                Registrar recarga
+              </Link>
+            )
+          )}
 
           {whatsappHref && (
             <a

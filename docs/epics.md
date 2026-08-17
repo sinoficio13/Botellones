@@ -21,6 +21,9 @@
 | EPIC-9  | Búsqueda y Mapa General    | 3         | EPIC-3                                 |
 | EPIC-10 | PDF y Excel                | 3         | EPIC-8                                 |
 | EPIC-11 | Pulido PWA y Seguridad     | 3         | Todos                                  |
+| EPIC-12 | QR Público Rediseñado      | 4         | EPIC-4                                 |
+| EPIC-13 | Recarga Rápida desde QR    | 4         | EPIC-12                                |
+| EPIC-14 | Scanner Interno con Cámara  | 2         | EPIC-13 (opcional)                     |
 
 ---
 
@@ -767,6 +770,105 @@ src/
 
 ---
 
+## EPIC-12 — QR Público Rediseñado
+
+> La página pública del QR (`/b/[codigo]`) se rediseña con la paleta "Agua" y muestra la identidad completa del negocio + resumen del botellón + WhatsApp de contacto. El QR NO cambia.
+
+**Depende de:** EPIC-4
+**Responsable:** Desarrollador
+
+### HIST-12.1 — Rediseñar con paleta "Agua"
+
+**Descripción:** Aplicar gradiente `#0c4a6e → #06b6d4`, colores cyan y tipografía al estilo de la etiqueta.
+
+**Acceptance Criteria:**
+- [ ] Header con gradiente cyan
+- [ ] Tarjeta principal con borde/sombra consistente
+- [ ] Responsive mobile-first
+
+### HIST-12.2 — Identidad del negocio
+
+**Descripción:** Mostrar logo, nombre y eslogan desde `configuracion`.
+
+**Acceptance Criteria:**
+- [ ] Logo (si hay), nombre y eslogan visibles
+- [ ] Fallback sin logo
+
+### HIST-12.3 — Resumen del botellón
+
+**Descripción:** Estado (badge), total y última recarga. Sin datos personales del cliente.
+
+**Acceptance Criteria:**
+- [ ] Código, estado con badge, total recargas, última recarga
+- [ ] NO muestra nombre/teléfono/dirección del cliente
+
+### HIST-12.4 — WhatsApp de contacto
+
+**Descripción:** Botón verde WhatsApp con el teléfono del negocio.
+
+**Acceptance Criteria:**
+- [ ] `https://wa.me/CODIGO+NUMERO`, visible solo si `telefono` configurado
+
+---
+
+## EPIC-13 — Recarga Rápida desde QR
+
+> El mismo QR detecta la sesión: anónimo ve el resumen; admin/repartidor logueado ve "Registrar recarga" en 1 tap.
+
+**Depende de:** EPIC-12
+**Responsable:** Desarrollador
+
+### HIST-13.1 — Página session-aware
+
+**Descripción:** Detectar sesión (dev cookie / Supabase auth) y renderizar acciones según rol.
+
+**Acceptance Criteria:**
+- [ ] Logueado → acción de recarga; anónimo → solo resumen
+- [ ] Funciona en dev y prod
+
+### HIST-13.2 — getBotellonByCodigo ampliado
+
+**Descripción:** Devolver `id` y `cliente_id` para la recarga.
+
+**Acceptance Criteria:**
+- [ ] Devuelve id + cliente_id sin exponer datos del cliente
+
+### HIST-13.3 — Botón "Registrar recarga" (1 tap)
+
+**Descripción:** Botón prominente → `/recargas/nueva?botellon_id=X` (preselección nueva).
+
+**Acceptance Criteria:**
+- [ ] Preselección por botellón; confirmación en 1 tap
+
+### HIST-13.4 — Botellón sin cliente
+
+**Descripción:** Aviso "sin cliente asignado" + link para asignar.
+
+**Acceptance Criteria:**
+- [ ] Aviso claro y link a asignar cliente
+
+---
+
+## EPIC-14 — Scanner Interno con Cámara (opcional)
+
+> Scanner con cámara dentro del dashboard para escanear QR y saltar a la recarga rápida sin salir del sistema.
+
+**Depende de:** EPIC-13
+**Responsable:** Desarrollador
+
+### HIST-14.1 — Botón "Escanear QR" con cámara
+
+**Acceptance Criteria:**
+- [ ] Acceso a cámara (`getUserMedia`, requiere HTTPS) + decode con `jsqr`/`html5-qrcode`
+- [ ] Valida QR de botellón (`/b/BOT-XXXXX`)
+
+### HIST-14.2 — Decode → recarga rápida
+
+**Acceptance Criteria:**
+- [ ] Extrae `BOT-XXXXX` y redirige a `/recargas/nueva?botellon_id=X`
+
+---
+
 ## Orden de ejecución
 
 ```
@@ -780,3 +882,15 @@ EPIC-0 → EPIC-1 → EPIC-2 ─┬─→ EPIC-3 ─┬─→ EPIC-5 → EPIC-6
 ```
 
 EPIC-7 puede ejecutarse en paralelo con EPIC-3/4/5.
+
+---
+
+## Fase 2 — QR inteligente (post-EPIC-11)
+
+```
+EPIC-12 → EPIC-13 → EPIC-14 (opcional)
+```
+
+- **EPIC-12** rediseña la página pública del QR (paleta "Agua").
+- **EPIC-13** agrega la recarga rápida en 1 tap para admin/repartidor.
+- **EPIC-14** (opcional) agrega el scanner con cámara dentro del dashboard.

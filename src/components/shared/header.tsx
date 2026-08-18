@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MapPin, Store } from 'lucide-react';
 import { BellNotification } from '@/components/notificaciones/bell';
+import { ScannerIsland } from '@/components/scanner/scanner-island';
 import GlobalSearch from '@/components/search/global-search';
 import { getConfiguracion } from '@/lib/db/configuracion';
 
@@ -105,8 +106,11 @@ export async function Header() {
           </Link>
         </nav>
 
-        {/* Bell notification island */}
-        <BellNotification />
+        {/* Bell notification + QR scanner islands */}
+        <div className="flex items-center gap-2">
+          <ScannerIsland />
+          <BellNotification />
+        </div>
       </div>
     </header>
   );

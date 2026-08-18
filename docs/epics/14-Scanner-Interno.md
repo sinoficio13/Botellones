@@ -42,3 +42,4 @@ Al leer un codigo valido, ir directo al flujo de recarga rapida (EPIC-13).
 - Requiere HTTPS (o localhost) para acceso a camara en el navegador.
 - En iOS/Safari, `getUserMedia` solo funciona en contexto seguro.
 - Se puede instalar como PWA para que la camara funcione como app nativa.
+- Para desarrollo local con camara (por fuera de `localhost`), usar `next dev --experimental-https`, que genera un certificado autofirmado y sirve la app sobre HTTPS.

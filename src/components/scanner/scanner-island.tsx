@@ -5,7 +5,10 @@ import { useCallback, useState } from 'react';
 import { ScanLine } from 'lucide-react';
 
 // Modal (and the jsqr chunk it imports) is fetched only when the scanner opens.
-const ScannerModal = dynamic(() => import('./scanner-modal'), { ssr: false });
+const ScannerModal = dynamic(
+  () => import('./scanner-modal').then((m) => m.ScannerModal),
+  { ssr: false }
+);
 
 /**
  * Header island: one-tap camera scanner entry point. No role check here —

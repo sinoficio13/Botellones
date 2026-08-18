@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { ScannerIsland } from '@/components/scanner/scanner-island';
 
 // Stub the lazily-imported modal so the island test never pulls camera code.
+// Mirrors the real module shape: a named `ScannerModal` export.
 vi.mock('@/components/scanner/scanner-modal', () => ({
-  default: () => <div data-testid="scanner-modal" />,
+  ScannerModal: () => <div data-testid="scanner-modal" />,
 }));
 
 describe('ScannerIsland', () => {

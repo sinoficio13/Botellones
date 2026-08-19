@@ -46,7 +46,7 @@ export async function Header() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="hidden items-center gap-4 text-sm md:flex">
           <Link
             href="/dashboard"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
@@ -108,7 +108,9 @@ export async function Header() {
 
         {/* Bell notification + QR scanner islands */}
         <div className="flex items-center gap-2">
-          <ScannerIsland />
+          <div className="hidden md:inline-flex">
+            <ScannerIsland />
+          </div>
           <BellNotification />
         </div>
       </div>

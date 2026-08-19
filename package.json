@@ -46,6 +46,7 @@
     "@types/leaflet": "^1.9.22",
     "@types/leaflet.markercluster": "^1.5.6",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/xlsx": "^0.0.35",
@@ -54,6 +55,7 @@
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

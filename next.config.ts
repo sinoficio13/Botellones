@@ -1,3 +1,4 @@
+import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -33,4 +34,17 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Serwist PWA wrapper. `register: false` keeps registration manual via
+// update-prompt.tsx (avoids the dev-mode /sw.js 404 breaking the page).
+// Applied to production only: serwist injects a webpack config, which
+// Next 16.3 rejects under Turbopack (the dev default). Production builds
+// run with `next build --webpack` so the worker compiles to public/sw.js.
+const withSerwist = withSerwistInit({
+  swSrc: "src/app/sw.ts",
+  swDest: "public/sw.js",
+  register: false,
+});
+
+export default process.env.NODE_ENV === "production"
+  ? withSerwist(nextConfig)
+  : nextConfig;

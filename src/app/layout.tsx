@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { SkipLink } from '@/components/a11y/skip-link';
@@ -13,6 +13,11 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 });
+
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+  themeColor: '#0a0a0a',
+};
 
 export const metadata: Metadata = {
   title: 'Botellón',

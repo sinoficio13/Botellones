@@ -19,7 +19,7 @@ interface Props {
 /** Barquisimeto, Lara — local business area */
 const BARQUISIMETO_CENTER: [number, number] = [10.0678, -69.3473];
 
-/** String fields of ClienteMapa (excludes latitud/longitud/botellones). */
+/** String fields of ClienteMapa (excludes latitud/longitud). */
 type SearchableField = {
   [K in keyof ClienteMapa]: ClienteMapa[K] extends string | null ? K : never;
 }[keyof ClienteMapa];
@@ -36,6 +36,19 @@ const SEARCH_FIELDS: SearchableField[] = [
   'calle',
   'avenida',
 ];
+
+/**
+ * Pure filter used by the map: true when the trimmed lowercase `query`
+ * matches any of the searchable string fields, or when query is empty.
+ */
+export function matchesFilter(m: ClienteMapa, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return SEARCH_FIELDS.some((field) => {
+    const v = m[field];
+    return v != null && String(v).toLowerCase().includes(q);
+  });
+}
 
 /** Fields used to build the autocomplete suggestions. */
 const ADDRESS_FIELDS: SearchableField[] = [
@@ -83,18 +96,12 @@ function MarkerClusterLayer({ markers }: { markers: ClienteMapa[] }) {
       // WhatsApp to contact the client directly (no prefilled text).
       const whatsappContactLink = phone ? `https://wa.me/${phone}` : '';
 
-      const botellonesLabel =
-        m.botellones.length > 0
-          ? `${m.botellones.length} botellón${m.botellones.length > 1 ? 'es' : ''}`
-          : '';
-
       const popupContent = `
         <div style="min-width:200px;font-family:system-ui,sans-serif;">
           ${m.codigo ? `<div style="font-size:11px;color:#71717a;margin-bottom:2px;">${escapeHtml(m.codigo)}</div>` : ''}
           <strong style="font-size:14px;">${escapeHtml(m.nombre)}</strong>
           ${m.negocio ? `<p style="margin:2px 0;font-size:12px;color:#666;">${escapeHtml(m.negocio)}</p>` : ''}
           ${dirTexto ? `<p style="margin:4px 0 0;font-size:12px;color:#333;">📍 ${escapeHtml(dirTexto)}</p>` : ''}
-          ${botellonesLabel ? `<p style="margin:2px 0 0;font-size:12px;color:#333;">🗄 ${botellonesLabel}</p>` : ''}
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
             ${
               whatsappContactLink
@@ -209,16 +216,7 @@ function MapaInner({ markers: allMarkers }: Props) {
   const [inputFocused, setInputFocused] = useState(false);
 
   const visibleMarkers = useMemo(() => {
-    const q = filterQuery.trim().toLowerCase();
-    return allMarkers.filter((m) => {
-      if (q) {
-        return SEARCH_FIELDS.some((field) => {
-          const v = m[field];
-          return v != null && String(v).toLowerCase().includes(q);
-        });
-      }
-      return true;
-    });
+    return allMarkers.filter((m) => matchesFilter(m, filterQuery));
   }, [allMarkers, filterQuery]);
 
   const filterActive = filterQuery.trim().length > 0;

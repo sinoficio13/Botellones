@@ -14,7 +14,6 @@ export type ClienteMapa = {
   estado: string | null;
   calle: string | null;
   avenida: string | null;
-  botellones: string[];
 };
 
 /**
@@ -41,19 +40,6 @@ export async function getClientesConCoordenadas(): Promise<ClienteMapa[]> {
 
     if (!data) return [];
 
-    // Fetch the botellón estado per client to power the estado filter.
-    const { data: botellonesData } = await supabase
-      .from('botellones')
-      .select('cliente_id, estado');
-
-    const botellonesByClient = new Map<string, string[]>();
-    botellonesData?.forEach((b) => {
-      if (!b.cliente_id) return;
-      const list = botellonesByClient.get(b.cliente_id) ?? [];
-      list.push(b.estado);
-      botellonesByClient.set(b.cliente_id, list);
-    });
-
     // Flatten the JOIN result: each direccion row → one ClienteMapa row
     return data
       .filter((d) => d.clientes !== null && d.latitud !== null && d.longitud !== null)
@@ -79,7 +65,6 @@ export async function getClientesConCoordenadas(): Promise<ClienteMapa[]> {
           estado: d.estado ?? null,
           calle: d.calle ?? null,
           avenida: d.avenida ?? null,
-          botellones: botellonesByClient.get(c.id) ?? [],
         };
       });
   } catch {

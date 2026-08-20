@@ -1,27 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ScanLine, X } from 'lucide-react';
-import jsQR from 'jsqr';
 import { getBotellonByCodigo } from '@/lib/db/botellones';
 import { parseQrCode } from '@/lib/scanner/parse-qr';
+import {
+  useQrScanner,
+  type QrDecodeOutcome,
+} from '@/lib/scanner/use-qr-scanner';
+import { cn } from '@/lib/utils';
 
 type ScanError =
-  | { type: 'permission-denied' }
-  | { type: 'camera-unavailable' }
-  | { type: 'invalid-code' }
-  | { type: 'not-found' }
-  | { type: 'no-client' };
+  | 'permission-denied'
+  | 'camera-unavailable'
+  | 'invalid-code'
+  | 'not-found'
+  | 'no-client';
 
-// ≥66ms between frames ≈ ≤15fps decode rate.
-const DECODE_INTERVAL_MS = 66;
-// Downscale the capture surface so jsQR stays fast on phones.
-const MAX_CANVAS_SIZE = 640;
-// Ignore repeat decodes of the same code for 1s (no double redirect).
-const DECODE_LOCKOUT_MS = 1000;
+type ScanMode = 'recarga' | 'carga';
 
-const ERROR_COPY: Record<ScanError['type'], { title: string; hint: string }> = {
+const ERROR_COPY: Record<ScanError, { title: string; hint: string }> = {
   'permission-denied': {
     title: 'Permiso de cámara denegado',
     hint: 'Habilita el acceso a la cámara en los ajustes del navegador y vuelve a intentarlo.',
@@ -45,139 +44,66 @@ const ERROR_COPY: Record<ScanError['type'], { title: string; hint: string }> = {
 };
 
 /**
- * Camera scanner modal. One effect owns the stream and the decode loop;
- * cleanup cancels the rAF loop and stops every track (StrictMode-safe).
+ * Camera scanner modal. Hosts a `Recarga` | `Carga` mode toggle; in `Carga`
+ * mode it hands off to the batch page (`/recargas/carga`) with no decode
+ * processing, while `Recarga` (default) keeps the single-flow behavior:
+ * decode via `useQrScanner`, then redirect to the recarga confirm step.
  *
- * Camera errors (denied/unavailable) replace the video — there is no stream.
- * Decode errors (invalid/not-found/no-client) overlay the video so scanning
- * can continue, per the spec scenarios.
+ * The camera/decode lifecycle lives in `useQrScanner`; this component only
+ * selects the destination flow. The `no-client` outcome is caller-side (the
+ * hook's error type does not include it), so it is tracked locally.
  */
 export function ScannerModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  // Lockout uses performance.now(): same monotonic clock as the throttle.
-  const lastDecodeRef = useRef(-DECODE_LOCKOUT_MS);
-  const [cameraError, setCameraError] = useState<ScanError | null>(null);
-  const [decodeError, setDecodeError] = useState<ScanError | null>(null);
+  const [mode, setMode] = useState<ScanMode>('recarga');
+  const [noClient, setNoClient] = useState(false);
+
+  // The hook keeps `onDecode` in a ref updated every render, so we forward a
+  // stable wrapper and point it at the latest handler. The handler reads
+  // `stop`/`setDecodeError` from the hook, which creates a circular
+  // dependency; storing it in a ref (updated in an effect, per react-hooks)
+  // breaks that cycle without restarting the camera on re-render.
+  const handleDecodeRef = useRef<
+    (raw: string) => Promise<QrDecodeOutcome> | void
+  >(async () => ({ outcome: 'failure' }));
+
+  const { videoRef, cameraError, decodeError, setDecodeError, stop } =
+    useQrScanner({ onDecode: (raw) => handleDecodeRef.current(raw) });
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
-    let rafId = 0;
-    let lastFrame = 0;
-    // Per-effect-instance flag: survives StrictMode double-mount, where a
-    // shared ref would let the first mount's late resolution slip through.
-    let disposed = false;
+    handleDecodeRef.current = async (raw: string): Promise<QrDecodeOutcome> => {
+      // Carga mode performs no decode processing — handoff is button-driven.
+      if (mode !== 'recarga') return { outcome: 'failure' };
 
-    const stopStream = () => {
-      stream?.getTracks().forEach((track) => track.stop());
-    };
-
-    const handleDecoded = async (raw: string) => {
       const parsed = parseQrCode(raw);
-      if (!parsed) {
-        setDecodeError({ type: 'invalid-code' });
-        return;
-      }
+      if (!parsed) return { outcome: 'failure' };
 
-      const now = performance.now();
-      if (now - lastDecodeRef.current < DECODE_LOCKOUT_MS) return;
-      lastDecodeRef.current = now;
-
-      // Pause the loop while resolving so duplicate frames don't double-fire.
-      cancelAnimationFrame(rafId);
       const botellon = await getBotellonByCodigo(parsed.codigo);
-      if (disposed) return;
-
       if (!botellon) {
-        setDecodeError({ type: 'not-found' });
-      } else if (!botellon.cliente_id) {
-        setDecodeError({ type: 'no-client' });
-      } else {
-        stopStream();
-        onClose();
-        router.push(`/recargas/nueva?botellon_id=${botellon.id}`);
-        return;
+        setDecodeError('not-found');
+        return { outcome: 'failure' };
+      }
+      if (!botellon.cliente_id) {
+        setNoClient(true);
+        return { outcome: 'failure' };
       }
 
-      // Failure paths keep scanning (spec scenarios).
-      rafId = requestAnimationFrame(loop);
+      stop();
+      onClose();
+      router.push(`/recargas/nueva?botellon_id=${botellon.id}`);
+      return { outcome: 'ok' };
     };
+  });
 
-    const decodeFrame = () => {
-      const video = videoRef.current;
-      if (!video || video.videoWidth === 0 || video.videoHeight === 0) return;
+  const handleCargaHandoff = useCallback(() => {
+    stop();
+    onClose();
+    router.push('/recargas/carga');
+  }, [stop, onClose, router]);
 
-      const scale = Math.min(
-        1,
-        MAX_CANVAS_SIZE / Math.max(video.videoWidth, video.videoHeight)
-      );
-      const width = Math.max(1, Math.round(video.videoWidth * scale));
-      const height = Math.max(1, Math.round(video.videoHeight * scale));
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (!ctx) return;
-
-      ctx.drawImage(video, 0, 0, width, height);
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const qr = jsQR(imageData.data, imageData.width, imageData.height);
-      if (qr?.data) void handleDecoded(qr.data);
-    };
-
-    const loop = () => {
-      if (disposed) return;
-      rafId = requestAnimationFrame(loop);
-      const now = performance.now();
-      if (now - lastFrame < DECODE_INTERVAL_MS) return;
-      lastFrame = now;
-      decodeFrame();
-    };
-
-    const start = async () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError({ type: 'camera-unavailable' });
-        return;
-      }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        });
-        // Guard late resolution after unmount (no srcObject on a detached video).
-        if (disposed) {
-          stopStream();
-          return;
-        }
-        const video = videoRef.current;
-        if (!video) {
-          stopStream();
-          return;
-        }
-        video.srcObject = stream;
-        void video.play().catch(() => {});
-        rafId = requestAnimationFrame(loop);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'NotAllowedError') {
-          setCameraError({ type: 'permission-denied' });
-        } else {
-          setCameraError({ type: 'camera-unavailable' });
-        }
-      }
-    };
-
-    void start();
-
-    return () => {
-      disposed = true;
-      cancelAnimationFrame(rafId);
-      stopStream();
-    };
-  }, [onClose, router]);
-
-  const activeCameraError = cameraError ? ERROR_COPY[cameraError.type] : null;
-  const activeDecodeError = decodeError ? ERROR_COPY[decodeError.type] : null;
+  const activeCameraError = cameraError ? ERROR_COPY[cameraError] : null;
+  const activeDecodeError =
+    decodeError || noClient ? ERROR_COPY[decodeError ?? 'no-client'] : null;
 
   return (
     <div
@@ -202,6 +128,41 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
             className="rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Mode toggle: only selects the destination flow; does not touch the
+            camera/decode lifecycle owned by useQrScanner. */}
+        <div
+          role="group"
+          aria-label="Modo de escaneo"
+          className="flex gap-1 border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800"
+        >
+          <button
+            type="button"
+            aria-pressed={mode === 'recarga'}
+            onClick={() => setMode('recarga')}
+            className={cn(
+              'flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              mode === 'recarga'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            )}
+          >
+            Recarga
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'carga'}
+            onClick={() => setMode('carga')}
+            className={cn(
+              'flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              mode === 'carga'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            )}
+          >
+            Carga
           </button>
         </div>
 
@@ -245,9 +206,26 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
               </div>
             ) : (
               <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-white/80">
-                Apunta la cámara al código QR del botellón
+                {mode === 'carga'
+                  ? "Selecciona 'Iniciar carga' para el escaneo por lotes."
+                  : 'Apunta la cámara al código QR del botellón'}
               </p>
             )}
+          </div>
+        )}
+
+        {mode === 'carga' && (
+          <div className="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+            <p className="mb-3 text-center text-sm text-zinc-500 dark:text-zinc-400">
+              Escaneo por lotes para cargar botellones.
+            </p>
+            <button
+              type="button"
+              onClick={handleCargaHandoff}
+              className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            >
+              Iniciar carga
+            </button>
           </div>
         )}
       </div>

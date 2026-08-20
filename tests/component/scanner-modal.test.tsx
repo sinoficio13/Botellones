@@ -307,3 +307,114 @@ describe('ScannerModal — close behavior', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ScannerModal — mode toggle (Recarga | Carga)', () => {
+  it('opens in Recarga mode by default', async () => {
+    const { stream } = makeStream();
+    getUserMediaMock.mockResolvedValue(stream);
+
+    await renderWithCamera();
+
+    expect(screen.getByRole('button', { name: 'Recarga' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Carga' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+
+  it('switches to Carga mode when Carga is selected', async () => {
+    const { stream } = makeStream();
+    getUserMediaMock.mockResolvedValue(stream);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    await renderWithCamera();
+    await user.click(screen.getByRole('button', { name: 'Carga' }));
+
+    expect(screen.getByRole('button', { name: 'Carga' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Recarga' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+
+  it('hands off to the batch page when the Carga action is initiated', async () => {
+    const onClose = vi.fn();
+    const { stream } = makeStream();
+    getUserMediaMock.mockResolvedValue(stream);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    await renderWithCamera(<ScannerModal onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: 'Carga' }));
+    await user.click(screen.getByRole('button', { name: 'Iniciar carga' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith('/recargas/carga');
+  });
+
+  it('does not redirect to /recargas/nueva on the Carga handoff', async () => {
+    const onClose = vi.fn();
+    const { stream } = makeStream();
+    getUserMediaMock.mockResolvedValue(stream);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    await renderWithCamera(<ScannerModal onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: 'Carga' }));
+    await user.click(screen.getByRole('button', { name: 'Iniciar carga' }));
+
+    expect(pushMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/recargas/nueva')
+    );
+  });
+
+  it('shows button-driven copy in Carga mode instead of the misleading live-scan hint', async () => {
+    const { stream } = makeStream();
+    getUserMediaMock.mockResolvedValue(stream);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    await renderWithCamera(<ScannerModal onClose={vi.fn()} />);
+    expect(
+      screen.getByText('Apunta la cámara al código QR del botellón')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Carga' }));
+
+    // The camera hint is misleading in Carga mode: scanning is button-driven.
+    expect(
+      screen.queryByText('Apunta la cámara al código QR del botellón')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Selecciona 'Iniciar carga' para el escaneo por lotes.")
+    ).toBeInTheDocument();
+  });
+
+  it('preserves single-flow redirect after switching back to Recarga', async () => {
+    const { stream, track } = makeStream();
+    getUserMediaMock.mockResolvedValue(stream);
+    jsQrMock.mockReturnValue({ data: VALID_QR });
+    getBotellonByCodigoMock.mockResolvedValue({
+      id: 'b1',
+      codigo: 'BOT-00001',
+      estado: 'entregado',
+      cliente_id: 'c1',
+      total_recargas: 1,
+      ultima_recarga: null,
+    });
+    const onClose = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    await renderWithCamera(<ScannerModal onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: 'Carga' }));
+    await user.click(screen.getByRole('button', { name: 'Recarga' }));
+    await decodeFrame();
+
+    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(track.stop).toHaveBeenCalledTimes(1);
+  });
+});

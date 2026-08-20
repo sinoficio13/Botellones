@@ -3,7 +3,8 @@
 > **Estado**: Completado  
 > **Historias**: 4  
 > **Depende de**: [[05-Recargas|EPIC-5 — Recargas]]  
-> **Siguiente**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]
+> **Siguiente**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]  
+> **Archivado**: 11/08/2026 — cambio SDD `sdd/EPIC-6-fidelidad`
 
 ---
 

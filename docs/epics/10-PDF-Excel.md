@@ -3,7 +3,8 @@
 > **Estado**: Completado  
 > **Historias**: 3  
 > **Depende de**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]], [[09-Busqueda-Mapa|EPIC-9 — Busqueda y Mapa]]  
-> **Siguiente**: [[11-Pulido-PWA|EPIC-11 — Pulido PWA y Seguridad]]
+> **Siguiente**: [[11-Pulido-PWA|EPIC-11 — Pulido PWA y Seguridad]]  
+> **Archivado**: 11/08/2026 — cambio SDD `sdd/EPIC-10-pdf-excel`
 
 ---
 

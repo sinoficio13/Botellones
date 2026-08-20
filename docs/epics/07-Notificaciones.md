@@ -3,7 +3,8 @@
 > **Estado**: Completado  
 > **Historias**: 4  
 > **Depende de**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
-> **Siguiente**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]
+> **Siguiente**: [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]  
+> **Archivado**: 11/08/2026 — cambio SDD `sdd/EPIC-7-notificaciones`
 
 ---
 

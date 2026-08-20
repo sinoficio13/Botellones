@@ -3,7 +3,8 @@
 > **Estado**: 🟢 Completado  
 > **Historias**: 5  
 > **Depende de**: [[03-Clientes|EPIC-3 — Clientes]], [[04-Botellones-QR|EPIC-4 — Botellones + QR]]  
-> **Siguiente**: [[06-Fidelidad|EPIC-6 — Fidelidad]], [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]
+> **Siguiente**: [[06-Fidelidad|EPIC-6 — Fidelidad]], [[08-Panel-Reportes|EPIC-8 — Panel y Reportes]]  
+> **Archivado**: 11/08/2026 — implementado directo a `main` (sin cambio SDD dedicado)
 
 ---
 

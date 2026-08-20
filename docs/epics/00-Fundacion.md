@@ -3,7 +3,8 @@
 > **Estado**: ✅ Completado  
 > **Historias**: 5 | **Tasks**: 17/18  
 > **Depende de**: —  
-> **Siguiente**: [[01-DB-Auth|EPIC-1 — DB + Auth]]
+> **Siguiente**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
+> **Archivado**: 10/08/2026 — implementado directo a `main` (sin cambio SDD dedicado)
 
 ---
 

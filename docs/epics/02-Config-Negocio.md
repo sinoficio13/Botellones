@@ -3,7 +3,8 @@
 > **Estado**: 🟢 Completado  
 > **Historias**: 3  
 > **Depende de**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
-> **Siguiente**: [[03-Clientes|EPIC-3 — Clientes]]
+> **Siguiente**: [[03-Clientes|EPIC-3 — Clientes]]  
+> **Archivado**: 11/08/2026 — implementado directo a `main` (sin cambio SDD dedicado)
 
 ---
 

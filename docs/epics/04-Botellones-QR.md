@@ -3,7 +3,8 @@
 > **Estado**: 🟢 Completado  
 > **Historias**: 6  
 > **Depende de**: [[01-DB-Auth|EPIC-1 — DB + Auth]]  
-> **Siguiente**: [[05-Recargas|EPIC-5 — Recargas]]
+> **Siguiente**: [[05-Recargas|EPIC-5 — Recargas]]  
+> **Archivado**: 11/08/2026 — implementado directo a `main` (sin cambio SDD dedicado)
 
 ---
 

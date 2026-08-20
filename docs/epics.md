@@ -7,23 +7,57 @@
 
 ## Resumen de Epics
 
-| Epic    | Nombre                     | Historias | Depende de                             |
-| ------- | -------------------------- | --------- | -------------------------------------- |
-| EPIC-0  | Fundación                  | 5         | —                                      |
-| EPIC-1  | Base de Datos y Auth       | 7         | EPIC-0                                 |
-| EPIC-2  | Configuración del Negocio  | 3         | EPIC-1                                 |
-| EPIC-3  | Gestión de Clientes        | 8         | EPIC-1, EPIC-2                         |
-| EPIC-4  | Gestión de Botellones + QR | 6         | EPIC-1                                 |
-| EPIC-5  | Recargas                   | 5         | EPIC-3, EPIC-4                         |
-| EPIC-6  | Sistema de Fidelidad       | 4         | EPIC-5                                 |
-| EPIC-7  | Notificaciones             | 4         | EPIC-1                                 |
-| EPIC-8  | Panel y Reportes           | 6         | EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 |
-| EPIC-9  | Búsqueda y Mapa General    | 3         | EPIC-3                                 |
-| EPIC-10 | PDF y Excel                | 3         | EPIC-8                                 |
-| EPIC-11 | Pulido PWA y Seguridad     | 3         | Todos                                  |
-| EPIC-12 | QR Público Rediseñado      | 4         | EPIC-4                                 |
-| EPIC-13 | Recarga Rápida desde QR    | 4         | EPIC-12                                |
-| EPIC-14 | Scanner Interno con Cámara  | 2         | EPIC-13 (opcional)                     |
+| Epic    | Nombre                     | Historias | Depende de                             | Estado     |
+| ------- | -------------------------- | --------- | -------------------------------------- | ---------- |
+| EPIC-0  | Fundación                  | 5         | —                                      | Completado |
+| EPIC-1  | Base de Datos y Auth       | 7         | EPIC-0                                 | Completado |
+| EPIC-2  | Configuración del Negocio  | 3         | EPIC-1                                 | Completado |
+| EPIC-3  | Gestión de Clientes        | 8         | EPIC-1, EPIC-2                         | Completado |
+| EPIC-4  | Gestión de Botellones + QR | 6         | EPIC-1                                 | Completado |
+| EPIC-5  | Recargas                   | 5         | EPIC-3, EPIC-4                         | Completado |
+| EPIC-6  | Sistema de Fidelidad       | 4         | EPIC-5                                 | Completado |
+| EPIC-7  | Notificaciones             | 4         | EPIC-1                                 | Completado |
+| EPIC-8  | Panel y Reportes           | 6         | EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | Completado |
+| EPIC-9  | Búsqueda y Mapa General    | 3         | EPIC-3                                 | Completado |
+| EPIC-10 | PDF y Excel                | 3         | EPIC-8, EPIC-9                         | Completado |
+| EPIC-11 | Pulido PWA y Seguridad     | 3         | Todos                                  | Completado |
+| EPIC-12 | QR Público Rediseñado      | 4         | EPIC-4                                 | Completado |
+| EPIC-13 | Recarga Rápida desde QR    | 4         | EPIC-12                                | Completado |
+| EPIC-14 | Scanner Interno con Cámara  | 2         | EPIC-13 (opcional)                     | Completado |
+
+---
+
+## Estado de ejecución
+
+Los 15 epics están implementados en código y archivados como cambios SDD en Engram (los de Fase 1, EPIC-0..11, se completaron directo a `main`; los de Fase 2, EPIC-12..14, como cambios SDD dedicados). El detalle completo de cada historias/AC sigue en las secciones de cada epic, que son la referencia de especificación.
+
+| Epic | Archivado | Cambio SDD (Engram) |
+|---|---|---|
+| EPIC-0 Fundación | 10/08/2026 | — |
+| EPIC-1 DB + Auth | 10/08/2026 | — |
+| EPIC-2 Config Negocio | 11/08/2026 | — |
+| EPIC-3 Clientes | 11/08/2026 | — |
+| EPIC-4 Botellones + QR | 11/08/2026 | — |
+| EPIC-5 Recargas | 11/08/2026 | — |
+| EPIC-6 Fidelidad | 11/08/2026 | `sdd/EPIC-6-fidelidad` |
+| EPIC-7 Notificaciones | 11/08/2026 | `sdd/EPIC-7-notificaciones` |
+| EPIC-8 Panel y Reportes | 11/08/2026 | `sdd/EPIC-8-panel-reportes` |
+| EPIC-9 Búsqueda y Mapa | 11/08/2026 | `sdd/EPIC-9-busqueda-mapa` |
+| EPIC-10 PDF y Excel | 11/08/2026 | `sdd/EPIC-10-pdf-excel` |
+| EPIC-11 Pulido PWA | 11/08/2026 | `sdd/EPIC-11-pulido-pwa` |
+| EPIC-12 QR Público Rediseñado | 17/08/2026 | `sdd/qr-publico-rediseno` |
+| EPIC-13 Recarga Rápida desde QR | 18/08/2026 | `sdd/qr-recarga-rapida` |
+| EPIC-14 Scanner Interno | 19/08/2026 | `sdd/scanner-interno` |
+
+> Nota: EPIC-14 estaba marcado como "opcional" en el plan, pero se implementó igualmente.
+
+### Cambios SDD adicionales (más allá de los 15 epics)
+
+| Cambio | Estado | Descripción |
+|---|---|---|
+| `navegacion-movil` | Completado | Barra de navegación inferior móvil + FAB de scanner + PWA instalable |
+| `qa-code-cleanup` | Completado | Limpieza de código y convenciones QA (archivado en `openspec/changes/archive/2026-08-18-qa-code-cleanup/`) |
+| `carga-botellones` | En curso | Carga por lote de botellones vía QR (backend listo, frontend pendiente) |
 
 ---
 

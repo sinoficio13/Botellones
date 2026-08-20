@@ -3,7 +3,8 @@
 > **Estado**: Completado  
 > **Historias**: 3  
 > **Depende de**: Todos los epics anteriores  
-> **Siguiente**: —
+> **Siguiente**: —  
+> **Archivado**: 11/08/2026 — cambio SDD `sdd/EPIC-11-pulido-pwa`
 
 ---
 

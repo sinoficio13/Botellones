@@ -1,9 +1,10 @@
 # EPIC-14 — Scanner Interno con Camara
 
-> **Estado**: ⏳ Pendiente (opcional — segundo momento)
-> **Historias**: 2
-> **Depende de**: [[13-Recarga-Rapida-QR|EPIC-13 — Recarga Rapida desde QR]]
-> **Siguiente**: —
+> **Estado**: Completado  
+> **Historias**: 2  
+> **Depende de**: [[13-Recarga-Rapida-QR|EPIC-13 — Recarga Rapida desde QR]]  
+> **Siguiente**: —  
+> **Archivado**: 19/08/2026 — cambio SDD `sdd/scanner-interno` (commit 8470725, e4a889f, e364d9e)
 
 ---
 

@@ -1,9 +1,10 @@
 # EPIC-13 — Recarga Rapida desde QR
 
-> **Estado**: ⏳ Pendiente
-> **Historias**: 4
-> **Depende de**: [[12-QR-Publico-Rediseno|EPIC-12 — QR Publico Rediseñado]]
-> **Siguiente**: [[14-Scanner-Interno|EPIC-14 — Scanner Interno]]
+> **Estado**: Completado  
+> **Historias**: 4  
+> **Depende de**: [[12-QR-Publico-Rediseno|EPIC-12 — QR Publico Rediseñado]]  
+> **Siguiente**: [[14-Scanner-Interno|EPIC-14 — Scanner Interno]]  
+> **Archivado**: 18/08/2026 — cambio SDD `sdd/qr-recarga-rapida` (commits 30b3f9c, dceab59, 37b679c)
 
 ---
 

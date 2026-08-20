@@ -3,7 +3,8 @@
 > **Estado**: 🟢 Completado  
 > **Historias**: 7  
 > **Depende de**: [[00-Fundacion|EPIC-0 — Fundación]]  
-> **Siguiente**: [[02-Config-Negocio|EPIC-2]], [[03-Clientes|EPIC-3]], [[04-Botellones-QR|EPIC-4]], [[07-Notificaciones|EPIC-7]]
+> **Siguiente**: [[02-Config-Negocio|EPIC-2]], [[03-Clientes|EPIC-3]], [[04-Botellones-QR|EPIC-4]], [[07-Notificaciones|EPIC-7]]  
+> **Archivado**: 10/08/2026 — implementado directo a `main` (sin cambio SDD dedicado)
 
 ---
 

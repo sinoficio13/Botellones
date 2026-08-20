@@ -3,7 +3,8 @@
 > **Estado**: Completado  
 > **Historias**: 3  
 > **Depende de**: [[03-Clientes|EPIC-3 — Clientes]]  
-> **Siguiente**: [[10-PDF-Excel|EPIC-10 — PDF + Excel]]
+> **Siguiente**: [[10-PDF-Excel|EPIC-10 — PDF + Excel]]  
+> **Archivado**: 11/08/2026 — cambio SDD `sdd/EPIC-9-busqueda-mapa`
 
 ---
 

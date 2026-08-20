@@ -1,9 +1,10 @@
 # EPIC-12 — QR Publico Rediseñado
 
-> **Estado**: ⏳ Pendiente
-> **Historias**: 4
-> **Depende de**: [[04-Botellones-QR|EPIC-4 — Botellones + QR]]
-> **Siguiente**: [[13-Recarga-Rapida-QR|EPIC-13 — Recarga Rapida desde QR]]
+> **Estado**: Completado  
+> **Historias**: 4  
+> **Depende de**: [[04-Botellones-QR|EPIC-4 — Botellones + QR]]  
+> **Siguiente**: [[13-Recarga-Rapida-QR|EPIC-13 — Recarga Rapida desde QR]]  
+> **Archivado**: 17/08/2026 — cambio SDD `sdd/qr-publico-rediseno` (commit db3a535, 1e5f644)
 
 ---
 

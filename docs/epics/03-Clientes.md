@@ -3,7 +3,8 @@
 > **Estado**: 🟢 Completado  
 > **Historias**: 8  
 > **Depende de**: [[01-DB-Auth|EPIC-1]], [[02-Config-Negocio|EPIC-2]]  
-> **Siguiente**: [[05-Recargas|EPIC-5]], [[08-Panel-Reportes|EPIC-8]], [[09-Busqueda-Mapa|EPIC-9]]
+> **Siguiente**: [[05-Recargas|EPIC-5]], [[08-Panel-Reportes|EPIC-8]], [[09-Busqueda-Mapa|EPIC-9]]  
+> **Archivado**: 11/08/2026 — implementado directo a `main` (sin cambio SDD dedicado)
 
 ---
 

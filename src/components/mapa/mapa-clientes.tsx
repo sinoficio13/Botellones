@@ -302,8 +302,10 @@ function MapaInner({ markers: allMarkers }: Props) {
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
+                      // Keep inputFocused true: onMouseDown preventDefault
+                      // keeps focus on the input, so the dropdown stays open
+                      // and re-filters as the user keeps typing.
                       setFilterQuery(s);
-                      setInputFocused(false);
                     }}
                     className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                   >

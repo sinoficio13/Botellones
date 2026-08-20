@@ -13,8 +13,8 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <Header />
-      {/* pb-28 clears the fixed bottom bar on mobile (112px >= bar + safe-area) */}
-      <main id="main-content" className="pb-28 md:pb-0">
+      {/* pb-28 clears the fixed bottom bar on mobile/tablet (112px >= bar + safe-area) */}
+      <main id="main-content" className="pb-28 lg:pb-0">
         {children}
       </main>
       <MobileNav />

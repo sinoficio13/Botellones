@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { login } from './actions';
+import { login, quickLogin } from './actions';
 import type { LoginState } from './actions';
 
 /**
@@ -18,6 +18,7 @@ import type { LoginState } from './actions';
  */
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(loginWithValidation, null);
+  const isDevMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'dev';
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
@@ -82,6 +83,36 @@ export default function LoginPage() {
             {pending ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {isDevMode && (
+          <section className="space-y-3" aria-label="Dev quick access">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                Dev quick access
+              </span>
+              <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <form action={() => quickLogin('admin')}>
+                <button
+                  type="submit"
+                  className="w-full rounded-md border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Enter as Admin
+                </button>
+              </form>
+              <form action={() => quickLogin('repartidor')}>
+                <button
+                  type="submit"
+                  className="w-full rounded-md border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Enter as Repartidor
+                </button>
+              </form>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

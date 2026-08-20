@@ -7,7 +7,7 @@ export default async function MapaPage() {
   const markers = await getClientesConCoordenadas();
 
   return (
-    <div className="h-[calc(100vh-3.5rem)]">
+    <div className="relative h-[calc(100dvh-3.5rem)] -mb-28 lg:mb-0">
       <MapaClientesWrapper markers={markers} />
     </div>
   );

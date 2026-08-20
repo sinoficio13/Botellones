@@ -16,8 +16,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import QRCode from 'qrcode';
 
-// Mobile viewport regardless of the project: the bottom bar is md:hidden,
-// so the FAB only exists below 768px.
+// Mobile viewport regardless of the project: the bottom bar is lg:hidden,
+// so the FAB exists below 1024px.
 test.use({
   viewport: { width: 390, height: 844 },
   isMobile: true,

@@ -20,7 +20,7 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-black/80">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
+      <div className="flex h-14 items-center justify-between gap-4 px-4">
         {/* Logo + search */}
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
@@ -46,7 +46,7 @@ export async function Header() {
         </div>
 
         {/* Navigation */}
-        <nav className="hidden items-center gap-4 text-sm md:flex">
+        <nav className="hidden items-center gap-4 text-sm lg:flex">
           <Link
             href="/dashboard"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
@@ -108,7 +108,7 @@ export async function Header() {
 
         {/* Bell notification + QR scanner islands */}
         <div className="flex items-center gap-2">
-          <div className="hidden md:inline-flex">
+          <div className="hidden lg:inline-flex">
             <ScannerIsland />
           </div>
           <BellNotification />

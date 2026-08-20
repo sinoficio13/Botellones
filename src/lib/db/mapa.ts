@@ -5,9 +5,16 @@ export type ClienteMapa = {
   nombre: string;
   negocio: string | null;
   telefono_1: string | null;
+  codigo: string | null;
   latitud: number;
   longitud: number;
   sector: string | null;
+  urbanizacion: string | null;
+  ciudad: string | null;
+  estado: string | null;
+  calle: string | null;
+  avenida: string | null;
+  botellones: string[];
 };
 
 /**
@@ -27,12 +34,25 @@ export async function getClientesConCoordenadas(): Promise<ClienteMapa[]> {
     const { data } = await supabase
       .from('direcciones')
       .select(
-        'latitud, longitud, sector, clientes!inner(id, nombre, negocio, telefono_1)'
+        'latitud, longitud, sector, urbanizacion, ciudad, estado, calle, avenida, clientes!inner(id, nombre, negocio, telefono_1, codigo)'
       )
       .not('latitud', 'is', null)
       .not('longitud', 'is', null);
 
     if (!data) return [];
+
+    // Fetch the botellón estado per client to power the estado filter.
+    const { data: botellonesData } = await supabase
+      .from('botellones')
+      .select('cliente_id, estado');
+
+    const botellonesByClient = new Map<string, string[]>();
+    botellonesData?.forEach((b) => {
+      if (!b.cliente_id) return;
+      const list = botellonesByClient.get(b.cliente_id) ?? [];
+      list.push(b.estado);
+      botellonesByClient.set(b.cliente_id, list);
+    });
 
     // Flatten the JOIN result: each direccion row → one ClienteMapa row
     return data
@@ -43,15 +63,23 @@ export async function getClientesConCoordenadas(): Promise<ClienteMapa[]> {
           nombre: string;
           negocio: string | null;
           telefono_1: string | null;
+          codigo: string | null;
         };
         return {
           id: c.id,
           nombre: c.nombre,
           negocio: c.negocio,
           telefono_1: c.telefono_1,
+          codigo: c.codigo ?? null,
           latitud: d.latitud as number,
           longitud: d.longitud as number,
           sector: d.sector ?? null,
+          urbanizacion: d.urbanizacion ?? null,
+          ciudad: d.ciudad ?? null,
+          estado: d.estado ?? null,
+          calle: d.calle ?? null,
+          avenida: d.avenida ?? null,
+          botellones: botellonesByClient.get(c.id) ?? [],
         };
       });
   } catch {

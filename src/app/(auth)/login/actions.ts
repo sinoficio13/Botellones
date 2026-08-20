@@ -76,3 +76,35 @@ export async function login(
   revalidatePath('/', 'layout');
   redirect('/dashboard');
 }
+
+/**
+ * Dev-only server action: signs in as a hardcoded dev user with a single tap.
+ *
+ * Only available when NEXT_PUBLIC_AUTH_MODE=dev. In production it redirects
+ * back to /login and never exposes the dev credentials.
+ */
+export async function quickLogin(role: 'admin' | 'repartidor'): Promise<void> {
+  if (process.env.NEXT_PUBLIC_AUTH_MODE !== 'dev') {
+    redirect('/login');
+  }
+
+  const email = role === 'admin' ? 'admin@botellon.com' : 'repartidor@botellon.com';
+  const user = DEV_USERS[email];
+
+  const cookieStore = await cookies();
+
+  // Dev session cookie — read by middleware in dev mode
+  cookieStore.set('botellon_dev_session', JSON.stringify({
+    email,
+    role: user.role,
+    name: user.name,
+  }), {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    path: '/',
+  });
+
+  revalidatePath('/', 'layout');
+  redirect('/clientes');
+}

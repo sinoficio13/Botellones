@@ -25,11 +25,11 @@ describe('MobileNav', () => {
     scannerModalMock.mockClear();
   });
 
-  it('renders the 5 bottom-bar slots with the md:hidden bar class', () => {
+  it('renders the 5 bottom-bar slots with the lg:hidden bar class', () => {
     render(<MobileNav />);
 
     const bar = screen.getByRole('navigation', { name: 'Navegación móvil' });
-    expect(bar).toHaveClass('md:hidden');
+    expect(bar).toHaveClass('lg:hidden');
 
     // 3 primary tabs
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();

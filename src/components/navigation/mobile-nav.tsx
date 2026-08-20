@@ -50,9 +50,9 @@ const DRAWER_ITEMS = [
 ] as const;
 
 /**
- * Mobile bottom navigation bar: primary tabs, center scan FAB, and a "Más"
- * drawer with the remaining destinations. Hidden on md+ viewports, where the
- * desktop header takes over.
+ * Mobile/tablet bottom navigation bar: primary tabs, center scan FAB, and a
+ * "Más" drawer with the remaining destinations. Hidden on lg+ viewports,
+ * where the desktop header takes over.
  */
 export function MobileNav() {
   const pathname = usePathname();
@@ -74,7 +74,7 @@ export function MobileNav() {
     <>
       <nav
         aria-label="Navegación móvil"
-        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm dark:border-zinc-800 dark:bg-black/95 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm dark:border-zinc-800 dark:bg-black/95 lg:hidden"
       >
         {MOBILE_TABS.slice(0, 2).map((tab) => (
           <TabLink key={tab.href} tab={tab} active={isActive(tab.href)} />

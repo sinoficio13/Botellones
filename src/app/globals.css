@@ -128,3 +128,14 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Leaflet creates its own stacking context internally (panes z-400,
+ * controls z-1000). Without isolation those indexes escape the container
+ * and paint the map ABOVE app chrome (fixed bottom nav z-50, header
+ * search dropdown z-50). Isolate so the map always stays behind app UI.
+ */
+.leaflet-container {
+  isolation: isolate;
+  z-index: 0;
+}

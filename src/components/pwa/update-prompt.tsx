@@ -56,7 +56,7 @@ export function UpdatePrompt() {
     <div
       role="alert"
       aria-live="assertive"
-      className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-1/2 z-[100] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 md:bottom-4"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-1/2 z-[100] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 lg:bottom-4"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">

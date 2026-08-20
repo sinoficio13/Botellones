@@ -37,25 +37,35 @@ is chart HSL colors, not badge classes. They are not interchangeable with the
 canonical maps and are left unchanged (separate concern). Only the canonical
 badge maps are extracted.
 
-### Decision: Join name into `getBotellonByCodigo` (no extra round-trip)
+### Decision: Keep `getBotellonByCodigo` public-safe; resolve name via `getCliente`
 
 | Option | Tradeoff | Decision |
 |--------|----------|----------|
-| `getCliente(cliente_id)` per scan | Extra round-trip; two data paths | Reject |
-| Join `clientes(nombre)` in the one lookup | One lookup; mirrors `getBotellones`/`getOperaciones` | **Choose** |
+| Join `clientes(nombre)` in `getBotellonByCodigo` | Leaks owner PII into the anonymous `/b/[codigo]` RSC payload; one lookup | **Reject** (revised) |
+| `getCliente(cliente_id)` per scan on the authenticated page | One extra lookup only on the authenticated page; public endpoint stays PII-free | **Choose** (security-corrected) |
 
-**Rationale**: `estado` and `cliente_id` are already returned; only the name is
-missing. A single `clientes(nombre)` join returns everything in one call, and
-matches the established join pattern. `clienteNombre` is additive/optional, so
-the other consumers (`b/[codigo]`, `scanner-modal`) are unaffected.
+> **Revision note (security fix `1458c87`, review `review-e236765a4dee14d4` APPROVED):**
+> The original design chose the `clientes(nombre)` join in `getBotellonByCodigo`.
+> That was **reversed** during review: `getBotellonByCodigo` is consumed by the
+> anonymous `/b/[codigo]` QR page, whose force-dynamic RSC payload is reachable
+> by any browser and whose codes are sequentially enumerable. Serializing the
+> owner's name there would expose client PII without authentication. The fix
+> keeps `getBotellonByCodigo` public-safe (select only `id, codigo, estado,
+> cliente_id`, no `clienteNombre`) and resolves the display name via a separate
+> `getCliente(cliente_id)` call inside the authenticated `/recargas/carga` page's
+> `onDecode`. This is the option the original design rejected, adopted for
+> security reasons. `estado` and `cliente_id` are still returned by the single
+> public-safe lookup; only the name resolution moves to the authenticated side.
 
 ## Data Flow
 
 ```
 onDecode(parsed.codigo)
-  └─▶ getBotellonByCodigo(codigo)
-        select('id, codigo, estado, cliente_id, clientes(nombre)')
-        └─▶ { id, codigo, estado, cliente_id, clienteNombre, total_recargas, ultima_recarga }
+  └─▶ getBotellonByCodigo(codigo)            // public-safe: no client PII
+        select('id, codigo, estado, cliente_id')
+        └─▶ { id, codigo, estado, cliente_id, total_recargas, ultima_recarga }
+  └─▶ getCliente(botellon.cliente_id)        // authenticated page resolves name
+        └─▶ { id, ..., nombre } → cliente?.nombre ?? undefined
   └─▶ setItems → SessionItem { id, codigo, cliente: cliente_id, clienteNombre, estado }
         └─▶ render: codigo + clienteNombre (or cliente_id/—) + status badge
 ```
@@ -64,13 +74,13 @@ onDecode(parsed.codigo)
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/lib/db/botellones.ts` | Modify | `getBotellonByCodigo` select adds `clientes(nombre)`; `BotellonPublico` gains `clienteNombre: string \| null`; return sets `clienteNombre: data.clientes?.nombre ?? null` |
+| `src/lib/db/botellones.ts` | Modify | `getBotellonByCodigo` stays public-safe: select remains `id, codigo, estado, cliente_id`, NO `clientes(nombre)` join, NO `clienteNombre` in `BotellonPublico` (PII kept out of the anonymous `/b/[codigo]` payload) |
 | `src/lib/utils/estados.ts` | Modify | Add canonical `ESTADO_LABELS` + `ESTADO_COLORS` (moved from `form.tsx`) |
 | `src/app/(dashboard)/botellones/[id]/form.tsx` | Modify | Remove local maps; import from `estados.ts` |
 | `src/app/b/[codigo]/page.tsx` | Modify | Import `ESTADO_LABELS`/`ESTADO_COLORS` from `estados.ts`; drop local `ESTADO_LABELS`/`ESTADO_BADGE` |
-| `src/app/(dashboard)/recargas/carga/page.tsx` | Modify | `SessionItem` → `{ id, codigo, cliente, clienteNombre, estado }`; `onDecode` stores `clienteNombre` + `estado`; session list renders name + badge via shared maps |
-| `tests/unit/botellon-by-codigo.test.ts` | Modify | Mock row gains `clientes`; assert `clienteNombre` in result |
-| `tests/component/carga-page.test.tsx` | Modify | Mocks gain `clienteNombre`/`estado`; assert name + badge rendering, null-name fallback |
+| `src/app/(dashboard)/recargas/carga/page.tsx` | Modify | `SessionItem` → `{ id, codigo, cliente, clienteNombre, estado }`; `onDecode` resolves name via `getCliente(cliente_id)` and stores `clienteNombre` + `estado`; session list renders name + badge via shared maps |
+| `tests/unit/botellon-by-codigo.test.ts` | Modify | Assert `getBotellonByCodigo` does NOT expose `clienteNombre` and its select never contains `clientes` |
+| `tests/component/carga-page.test.tsx` | Modify | Mocks gain `getCliente` (returns name) + `estado`; assert name + badge rendering, null-name fallback |
 
 ## Interfaces / Contracts
 
@@ -80,7 +90,7 @@ export type BotellonPublico = {
   codigo: string;
   estado: string;
   cliente_id: string | null;
-  clienteNombre: string | null;   // ADDED — from clientes(nombre) join
+  // NOTE: no clienteNombre by design - public-safe, see Decision #2
   total_recargas: number;
   ultima_recarga: string | null;
 };
@@ -100,10 +110,10 @@ Badge render uses `ESTADO_LABELS[estado] ?? estado` and
 
 | Layer | What to Test | Approach |
 |-------|-------------|----------|
-| Unit | `getBotellonByCodigo` returns `clienteNombre` from join | Extend mock chain with `clientes`; assert `toEqual` includes `clienteNombre`; keep null-name case |
-| Component | Stored fields + rendered name/badge | Handler-driven: decode via captured `onDecode`, assert `getBotellonByCodigo` returns name+estado and list shows them; assert null-name falls back to id/—; assert unknown estado shows raw value. No setState-in-effect — enrichment asserted inside handler |
+| Unit | `getBotellonByCodigo` does NOT expose `clienteNombre` | Mock `getBotellonByCodigo`; assert result `not.toHaveProperty('clienteNombre')` and the select never contains `clientes` (public-safe) |
+| Component | Stored fields + rendered name/badge | Handler-driven: decode via captured `onDecode`, assert `getBotellonByCodigo` returns estado + cliente_id, `getCliente` returns the name, and the list shows name + badge; assert null-name falls back to id/—; assert unknown estado shows raw value. No setState-in-effect — enrichment asserted inside handler |
 
-RTL approach: mock `useQrScanner`/`getBotellonByCodigo`/`registrarCarga` as today;
+RTL approach: mock `useQrScanner`/`getBotellonByCodigo`/`getCliente`/`registrarCarga` as today;
 drive decode through the captured `onDecode` inside `act`. No `useEffect` body
 updates the session.
 
@@ -114,15 +124,18 @@ classification, or process-integration boundary.
 
 ## Migration / Rollout
 
-No migration required. Additive DB select + additive optional field. Reuse of
+No migration required. Additive UI + additive page-side `getCliente` call; the
+public `getBotellonByCodigo` contract is unchanged (already public-safe). Reuse of
 `estados.ts` exports is a pure refactor.
 
 ## Rollback
 
-Drop `clientes(nombre)` from the select, remove `clienteNombre` from
-`BotellonPublico`/`SessionItem`, restore session-list render to codigo-only, and
-revert `form.tsx`/`b/[codigo]` imports to local maps. No schema, backend, or
-state-model change, so no data migration.
+The security-corrected approach is additive and low-risk: revert the page's
+`getCliente` name resolution and restore the session-list render to codigo-only
+and remove `clienteNombre`/`estado` from `SessionItem`; revert `form.tsx`/
+`b/[codigo]` imports to local maps. `getBotellonByCodigo` requires no revert
+(no PII was ever added to it). No schema, backend, or state-model change, so no
+data migration.
 
 ## Open Questions
 

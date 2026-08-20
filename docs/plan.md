@@ -88,3 +88,4 @@ Todos los 15 epics están implementados en código y archivados como cambios SDD
 | `navegacion-movil` | Completado | Barra de navegación inferior móvil + FAB de scanner + PWA instalable |
 | `qa-code-cleanup` | Completado | Limpieza de código y convenciones QA (archivado en `openspec/changes/archive/`) |
 | `carga-botellones` | Completado | Carga por lote de botellones vía QR (archivado en `openspec/changes/archive/2026-08-20-carga-botellones/`) |
+| `carga-cliente-estatus` | Completado | Muestra cliente + estado del botellón en la lista de sesión de carga por lote (archivado en `openspec/changes/archive/2026-08-20-carga-cliente-estatus/`) |

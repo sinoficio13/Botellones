@@ -6,17 +6,17 @@ Delta extending the existing `batch-carga` specification with scan-time client +
 
 ### Requirement: Scan-time client name and botellon status on each session item
 
-When a botellon is decoded and accumulated, the page MUST store, on the corresponding `SessionItem`, the botellon's `clienteNombre` and its current `estado`. `getBotellonByCodigo` SHALL return `clienteNombre` via a `clientes(nombre)` join in a single lookup (no extra round-trip), alongside the already-returned `estado` and `cliente_id`. `onDecode` SHALL populate these fields from that single lookup result when building the item.
+When a botellon is decoded and accumulated, the page MUST store, on the corresponding `SessionItem`, the botellon's `clienteNombre` and its current `estado`. `getBotellonByCodigo` SHALL remain **public-safe**: it MUST return only `id, codigo, estado, cliente_id` and MUST NOT include any `clientes(nombre)` join or client PII, because it is consumed by the anonymous `/b/[codigo]` QR page whose force-dynamic RSC payload is reachable by any browser (codes are sequentially enumerable). The authenticated `/recargas/carga` page SHALL resolve the owner's display name via a separate `getCliente(cliente_id)` call inside `onDecode`, and SHALL populate `clienteNombre` and `estado` when building the item.
 
 #### Scenario: Valid scan carries client name and status
 
-- GIVEN a decoded botellon has `cliente_id`, a joined `clientes(nombre)`, and `estado`
-- WHEN the item is accumulated in `onDecode`
+- GIVEN a decoded botellon has `cliente_id` and `estado`, and `getBotellonByCodigo` returns no client PII
+- WHEN the item is accumulated in `onDecode` and the page calls `getCliente(cliente_id)`
 - THEN the `SessionItem` stores the resolved `clienteNombre` and `estado`
 
-#### Scenario: Client name join returns null
+#### Scenario: Client name lookup returns null
 
-- GIVEN a decoded botellon has `cliente_id` but the `clientes` join returns `null`
+- GIVEN a decoded botellon has `cliente_id` but `getCliente(cliente_id)` returns `null` (no client row)
 - WHEN the item is accumulated
 - THEN `clienteNombre` is stored as empty/undefined without failing the scan
 
@@ -76,4 +76,4 @@ The confirm flow MUST keep the botellon state transition `entregado -> recarga` 
 
 ## Testability
 
-The page MUST be covered by component tests (`tests/component/carga-page.test.tsx`) asserting the new stored fields and rendered client name/status, with `getBotellonByCodigo` mocked to return `clienteNombre` and `estado`. Unit tests (`tests/unit/botellon-by-codigo.test.ts`) MUST assert the additive `clienteNombre` field and join shape.
+The page MUST be covered by component tests (`tests/component/carga-page.test.tsx`) asserting the new stored fields and rendered client name/status, with `getBotellonByCodigo` mocked to return `estado`/`cliente_id` (no client PII) and `getCliente` mocked to return the client name. Unit tests (`tests/unit/botellon-by-codigo.test.ts`) MUST assert that `getBotellonByCodigo` does NOT expose `clienteNombre` and that its select never contains `clientes`.

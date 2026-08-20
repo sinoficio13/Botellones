@@ -2,31 +2,7 @@
 
 import { useActionState, useState, useEffect } from 'react';
 import { updateBotellon, type BotellonWithCliente } from '@/lib/db/botellones';
-import { type Estado } from '@/lib/utils/estados';
-
-const ESTADO_LABELS: Record<string, string> = {
-  recibido: 'Recibido',
-  planta: 'En planta',
-  recarga: 'En recarga',
-  listo: 'Listo',
-  delivery: 'En delivery',
-  entregado: 'Entregado',
-  danado: 'Dañado',
-  perdido: 'Perdido',
-  mantenimiento: 'Mantenimiento',
-};
-
-const ESTADO_COLORS: Record<string, string> = {
-  recibido: 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-400',
-  planta: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  recarga: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
-  listo: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  delivery: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  entregado: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  danado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  perdido: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  mantenimiento: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-};
+import { type Estado, ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 
 interface Props {
   botellon: BotellonWithCliente;

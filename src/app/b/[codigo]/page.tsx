@@ -2,39 +2,13 @@ import { getBotellonByCodigo } from '@/lib/db/botellones';
 import { getConfiguracion } from '@/lib/db/configuracion';
 import { getSessionRole } from '@/lib/auth/session';
 import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
+import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import { QrCodeDisplay } from '@/app/(dashboard)/botellones/[id]/qr-code';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Droplets } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
-
-// Local estado maps — a server component cannot import the 'use client' form module.
-const ESTADO_LABELS: Record<string, string> = {
-  recibido: 'Recibido',
-  planta: 'En planta',
-  recarga: 'En recarga',
-  listo: 'Listo',
-  delivery: 'En delivery',
-  entregado: 'Entregado',
-  danado: 'Dañado',
-  perdido: 'Perdido',
-  mantenimiento: 'Mantenimiento',
-};
-
-const ESTADO_BADGE: Record<string, string> = {
-  recibido: 'bg-slate-100 text-slate-800',
-  planta: 'bg-blue-100 text-blue-800',
-  recarga: 'bg-cyan-100 text-cyan-800',
-  listo: 'bg-green-100 text-green-800',
-  delivery: 'bg-amber-100 text-amber-800',
-  entregado: 'bg-purple-100 text-purple-800',
-  danado: 'bg-red-100 text-red-800',
-  perdido: 'bg-red-100 text-red-800',
-  mantenimiento: 'bg-gray-100 text-gray-800',
-};
-
-const ESTADO_BADGE_FALLBACK = 'bg-zinc-100 text-zinc-600';
 
 function WhatsAppIcon() {
   return (
@@ -60,7 +34,7 @@ export default async function BotellonPublicPage({ params }: Props) {
   const config = await getConfiguracion();
 
   const estadoLabel = ESTADO_LABELS[botellon.estado] ?? botellon.estado;
-  const estadoBadge = ESTADO_BADGE[botellon.estado] ?? ESTADO_BADGE_FALLBACK;
+  const estadoBadge = ESTADO_COLORS[botellon.estado] ?? '';
   const whatsappHref = config.telefono
     ? `https://wa.me/${normalizeWhatsAppPhone(config.telefono)}`
     : null;

@@ -6,13 +6,20 @@ import { CheckCircle2, ScanLine } from 'lucide-react';
 import { getBotellonByCodigo } from '@/lib/db/botellones';
 import { registrarCarga, type CargaState } from '@/lib/db/cargas';
 import { parseQrCode } from '@/lib/scanner/parse-qr';
+import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import {
   useQrScanner,
   type QrDecodeOutcome,
 } from '@/lib/scanner/use-qr-scanner';
 
 /** A botellon accumulated in the transient client-side session. */
-type SessionItem = { id: string; codigo: string; cliente: string };
+type SessionItem = {
+  id: string;
+  codigo: string;
+  cliente: string;
+  clienteNombre?: string;
+  estado?: string;
+};
 
 /** A decoded botellon that has no client assigned, for the overlay. */
 type NoClient = { id: string; codigo: string };
@@ -80,6 +87,8 @@ export default function CargaPage() {
           id: botellon.id,
           codigo: botellon.codigo,
           cliente: botellon.cliente_id as string,
+          clienteNombre: botellon.clienteNombre ?? undefined,
+          estado: botellon.estado,
         },
       ]);
       return { outcome: 'failure' };
@@ -245,7 +254,21 @@ export default function CargaPage() {
                 key={item.id}
                 className="flex items-center justify-between px-4 py-3"
               >
-                <span className="font-mono text-sm">{item.codigo}</span>
+                <div>
+                  <span className="font-mono text-sm">{item.codigo}</span>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {item.clienteNombre || item.cliente}
+                  </p>
+                </div>
+                {item.estado && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      ESTADO_COLORS[item.estado] ?? ''
+                    }`}
+                  >
+                    {ESTADO_LABELS[item.estado] ?? item.estado}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

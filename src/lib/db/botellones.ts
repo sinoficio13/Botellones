@@ -60,6 +60,7 @@ export type BotellonPublico = {
   codigo: string;
   estado: string;
   cliente_id: string | null;
+  clienteNombre: string | null;
   total_recargas: number;
   ultima_recarga: string | null;
 };
@@ -67,24 +68,41 @@ export type BotellonPublico = {
 export async function getBotellonByCodigo(codigo: string): Promise<BotellonPublico | null> {
   try {
     const supabase = await getSupabase();
-    const { data } = await supabase.from('botellones').select('id, codigo, estado, cliente_id').eq('codigo', codigo).single();
+    const { data } = await supabase
+      .from('botellones')
+      .select('id, codigo, estado, cliente_id, clientes(nombre)')
+      .eq('codigo', codigo)
+      .single();
     if (!data) return null;
+
+    // Supabase types a nested to-one join as an array; `.single()` returns a
+    // single object at runtime, so normalize both shapes before reading.
+    const row = data as {
+      id: string;
+      codigo: string;
+      estado: string;
+      cliente_id: string | null;
+      clientes?: { nombre: string } | { nombre: string }[] | null;
+    };
 
     // If id is available (service_role or authenticated), fetch recarga stats
     let total_recargas = 0;
     let ultima_recarga: string | null = null;
-    if (data.id) {
-      const { count } = await supabase.from('recargas').select('*', { count: 'exact', head: true }).eq('botellon_id', data.id);
+    if (row.id) {
+      const { count } = await supabase.from('recargas').select('*', { count: 'exact', head: true }).eq('botellon_id', row.id);
       total_recargas = count || 0;
-      const { data: ultima } = await supabase.from('recargas').select('fecha').eq('botellon_id', data.id).order('fecha', { ascending: false }).limit(1).maybeSingle();
+      const { data: ultima } = await supabase.from('recargas').select('fecha').eq('botellon_id', row.id).order('fecha', { ascending: false }).limit(1).maybeSingle();
       ultima_recarga = ultima?.fecha || null;
     }
 
+    const clientes = Array.isArray(row.clientes) ? row.clientes[0] : row.clientes;
+
     return {
-      id: data.id,
-      codigo: data.codigo,
-      estado: data.estado,
-      cliente_id: data.cliente_id ?? null,
+      id: row.id,
+      codigo: row.codigo,
+      estado: row.estado,
+      cliente_id: row.cliente_id ?? null,
+      clienteNombre: clientes?.nombre ?? null,
       total_recargas,
       ultima_recarga,
     };

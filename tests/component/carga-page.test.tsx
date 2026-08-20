@@ -22,8 +22,8 @@ vi.mock('@/lib/db/cargas', () => ({
 
 const QR1 = 'https://app.example.com/b/BOT-00001';
 const QR2 = 'https://app.example.com/b/BOT-00002';
-const BOT1 = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1' };
-const BOT2 = { id: 'b2', codigo: 'BOT-00002', cliente_id: 'c2' };
+const BOT1 = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1', clienteNombre: 'Juan Pérez', estado: 'entregado' };
+const BOT2 = { id: 'b2', codigo: 'BOT-00002', cliente_id: 'c2', clienteNombre: 'María Gómez', estado: 'recarga' };
 
 let onDecode: (raw: string) => Promise<unknown> | void;
 let currentDecodeError: string | null = null;
@@ -116,6 +116,81 @@ describe('CargaPage - session accumulation', () => {
     expect(screen.getByText(/Sesión \(2\)/)).toBeInTheDocument();
     expect(screen.getByText('BOT-00001')).toBeInTheDocument();
     expect(screen.getByText('BOT-00002')).toBeInTheDocument();
+  });
+});
+
+describe('CargaPage - client name and status badge rendering', () => {
+  it('renders the client name and a status badge for a scanned botellon', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    await renderPage();
+
+    await decode(QR1);
+
+    // Client display name from the join is shown alongside the codigo.
+    expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
+    // Status badge uses the canonical label for `entregado`.
+    expect(screen.getByText('Entregado')).toBeInTheDocument();
+  });
+
+  it('renders different client names and statuses for distinct scans', async () => {
+    getBotellonByCodigoMock.mockImplementation((codigo: string) =>
+      Promise.resolve(codigo === 'BOT-00001' ? BOT1 : BOT2)
+    );
+    await renderPage();
+
+    await decode(QR1);
+    await decode(QR2);
+
+    expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Entregado')).toBeInTheDocument();
+    expect(screen.getByText('María Gómez')).toBeInTheDocument();
+    expect(screen.getByText('En recarga')).toBeInTheDocument();
+  });
+
+  it('falls back to the raw client id when the client name join is null', async () => {
+    getBotellonByCodigoMock.mockResolvedValue({
+      id: 'b4',
+      codigo: 'BOT-00004',
+      cliente_id: 'c4',
+      clienteNombre: null,
+      estado: 'planta',
+    });
+    await renderPage();
+
+    await decode('https://app.example.com/b/BOT-00004');
+
+    // Name area degrades to the raw client id (no empty/crash).
+    expect(screen.getByText('c4')).toBeInTheDocument();
+    expect(screen.getByText('En planta')).toBeInTheDocument();
+  });
+
+  it('shows the raw estado value for an unknown estado without erroring', async () => {
+    getBotellonByCodigoMock.mockResolvedValue({
+      id: 'b5',
+      codigo: 'BOT-00005',
+      cliente_id: 'c5',
+      clienteNombre: 'Ana',
+      estado: 'estado-futuro',
+    });
+    await renderPage();
+
+    await decode('https://app.example.com/b/BOT-00005');
+
+    expect(screen.getByText('Ana')).toBeInTheDocument();
+    expect(screen.getByText('estado-futuro')).toBeInTheDocument();
+  });
+
+  it('enriches the item inside onDecode, not via a useEffect body', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    await renderPage();
+
+    await decode(QR1);
+
+    // The decoded client/status come from the handler-driven lookup and render
+    // from the accumulated session item — not from an effect-driven state.
+    expect(getBotellonByCodigoMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Entregado')).toBeInTheDocument();
   });
 });
 

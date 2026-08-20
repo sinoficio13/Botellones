@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ScanLine } from 'lucide-react';
 import { getBotellonByCodigo } from '@/lib/db/botellones';
@@ -25,6 +25,21 @@ type SessionItem = {
 /** A decoded botellon that has no client assigned, for the overlay. */
 type NoClient = { id: string; codigo: string };
 
+/** Format a Date as YYYY-MM-DD in local time (for <input type="date">). */
+function formatFecha(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Format a Date as HH:MM in local time (for <input type="time">). */
+function formatHora(d: Date): string {
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${min}`;
+}
+
 /**
  * Batch "carga" page: scan botellon QRs, accumulate them into a session,
  * then confirm ONE uniform recarga for the whole lot via `registrarCarga`.
@@ -36,8 +51,15 @@ type NoClient = { id: string; codigo: string };
  */
 export default function CargaPage() {
   const [items, setItems] = useState<SessionItem[]>([]);
-  const [fecha, setFecha] = useState('');
-  const [hora, setHora] = useState('');
+  // Authoritative in-session dedupe set, updated synchronously in onDecode so a
+  // repeated scan can never double-count even across stale closures.
+  const scannedIdsRef = useRef<Set<string>>(new Set());
+  const now = new Date();
+  const [fecha, setFecha] = useState(formatFecha(now));
+  const [hora, setHora] = useState(formatHora(now));
+  // Stop auto-refreshing a field once the staff manually edits it.
+  const fechaTouched = useRef(false);
+  const horaTouched = useRef(false);
   const [noClient, setNoClient] = useState<NoClient | null>(null);
 
   // `registrarCarga` takes a plain input object, but `useActionState` needs a
@@ -75,10 +97,13 @@ export default function CargaPage() {
         return { outcome: 'failure' };
       }
 
-      // In-session dedupe: ignore a code already accumulated.
-      if (items.some((i) => i.id === botellon.id)) {
+      // In-session dedupe: ignore a code already accumulated. The ref set is
+      // updated synchronously, so it is authoritative even when this closure is
+      // stale (rapid successive scans see the old `items` array).
+      if (scannedIdsRef.current.has(botellon.id)) {
         return { outcome: 'failure' };
       }
+      scannedIdsRef.current.add(botellon.id);
 
       // `getBotellonByCodigo` is public-safe and carries no client PII, so the
       // authenticated batch page resolves the owner name itself for display.
@@ -109,6 +134,17 @@ export default function CargaPage() {
   useEffect(() => {
     if (state?.success) stop();
   }, [state?.success, stop]);
+
+  // Live-update fecha/hora so they never go stale, but stop auto-refreshing a
+  // field once the staff manually edits it.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      if (!fechaTouched.current) setFecha(formatFecha(d));
+      if (!horaTouched.current) setHora(formatHora(d));
+    }, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const clientIdFor = (botellonId: string) =>
     items.find((i) => i.id === botellonId)?.cliente;
@@ -265,15 +301,23 @@ export default function CargaPage() {
                     {item.clienteNombre || item.cliente}
                   </p>
                 </div>
-                {item.estado && (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      ESTADO_COLORS[item.estado] ?? ''
-                    }`}
+                <div className="flex items-center gap-3">
+                  {item.estado && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        ESTADO_COLORS[item.estado] ?? ''
+                      }`}
+                    >
+                      {ESTADO_LABELS[item.estado] ?? item.estado}
+                    </span>
+                  )}
+                  <Link
+                    href={`/clientes/${item.cliente}`}
+                    className="text-sm text-zinc-600 hover:underline"
                   >
-                    {ESTADO_LABELS[item.estado] ?? item.estado}
-                  </span>
-                )}
+                    Ver ficha
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -294,7 +338,10 @@ export default function CargaPage() {
             name="fecha"
             type="date"
             value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
+            onChange={(e) => {
+              fechaTouched.current = true;
+              setFecha(e.target.value);
+            }}
             className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           />
         </div>
@@ -310,7 +357,10 @@ export default function CargaPage() {
             name="hora"
             type="time"
             value={hora}
-            onChange={(e) => setHora(e.target.value)}
+            onChange={(e) => {
+              horaTouched.current = true;
+              setHora(e.target.value);
+            }}
             className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           />
         </div>

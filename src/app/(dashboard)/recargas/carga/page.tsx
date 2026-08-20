@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ScanLine } from 'lucide-react';
 import { getBotellonByCodigo } from '@/lib/db/botellones';
+import { getCliente } from '@/lib/db/clientes';
 import { registrarCarga, type CargaState } from '@/lib/db/cargas';
 import { parseQrCode } from '@/lib/scanner/parse-qr';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
@@ -79,6 +80,10 @@ export default function CargaPage() {
         return { outcome: 'failure' };
       }
 
+      // `getBotellonByCodigo` is public-safe and carries no client PII, so the
+      // authenticated batch page resolves the owner name itself for display.
+      const cliente = await getCliente(botellon.cliente_id);
+
       // A valid decode clears any stale error overlay from a previous scan.
       setDecodeError(null);
       setItems((prev) => [
@@ -87,7 +92,7 @@ export default function CargaPage() {
           id: botellon.id,
           codigo: botellon.codigo,
           cliente: botellon.cliente_id as string,
-          clienteNombre: botellon.clienteNombre ?? undefined,
+          clienteNombre: cliente?.nombre ?? undefined,
           estado: botellon.estado,
         },
       ]);

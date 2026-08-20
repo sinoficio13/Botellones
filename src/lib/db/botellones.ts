@@ -60,29 +60,32 @@ export type BotellonPublico = {
   codigo: string;
   estado: string;
   cliente_id: string | null;
-  clienteNombre: string | null;
   total_recargas: number;
   ultima_recarga: string | null;
 };
 
+/**
+ * Public-safe lookup consumed by the anonymous QR page (`/b/[codigo]`).
+ * Deliberately excludes the `clientes` join: the owner's name is personal
+ * data that must never be serialized into a force-dynamic RSC payload
+ * reachable by any anonymous browser. Codes are sequentially enumerable, so
+ * this function carries NO client PII by design.
+ */
 export async function getBotellonByCodigo(codigo: string): Promise<BotellonPublico | null> {
   try {
     const supabase = await getSupabase();
     const { data } = await supabase
       .from('botellones')
-      .select('id, codigo, estado, cliente_id, clientes(nombre)')
+      .select('id, codigo, estado, cliente_id')
       .eq('codigo', codigo)
       .single();
     if (!data) return null;
 
-    // Supabase types a nested to-one join as an array; `.single()` returns a
-    // single object at runtime, so normalize both shapes before reading.
     const row = data as {
       id: string;
       codigo: string;
       estado: string;
       cliente_id: string | null;
-      clientes?: { nombre: string } | { nombre: string }[] | null;
     };
 
     // If id is available (service_role or authenticated), fetch recarga stats
@@ -95,14 +98,11 @@ export async function getBotellonByCodigo(codigo: string): Promise<BotellonPubli
       ultima_recarga = ultima?.fecha || null;
     }
 
-    const clientes = Array.isArray(row.clientes) ? row.clientes[0] : row.clientes;
-
     return {
       id: row.id,
       codigo: row.codigo,
       estado: row.estado,
       cliente_id: row.cliente_id ?? null,
-      clienteNombre: clientes?.nombre ?? null,
       total_recargas,
       ultima_recarga,
     };

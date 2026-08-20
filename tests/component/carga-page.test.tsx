@@ -6,6 +6,7 @@ import CargaPage from '@/app/(dashboard)/recargas/carga/page';
 
 const useQrScannerMock = vi.hoisted(() => vi.fn());
 const getBotellonByCodigoMock = vi.hoisted(() => vi.fn());
+const getClienteMock = vi.hoisted(() => vi.fn());
 const registrarCargaMock = vi.hoisted(() => vi.fn());
 const setDecodeErrorMock = vi.hoisted(() => vi.fn());
 const stopMock = vi.hoisted(() => vi.fn());
@@ -16,14 +17,17 @@ vi.mock('@/lib/scanner/use-qr-scanner', () => ({
 vi.mock('@/lib/db/botellones', () => ({
   getBotellonByCodigo: getBotellonByCodigoMock,
 }));
+vi.mock('@/lib/db/clientes', () => ({
+  getCliente: getClienteMock,
+}));
 vi.mock('@/lib/db/cargas', () => ({
   registrarCarga: registrarCargaMock,
 }));
 
 const QR1 = 'https://app.example.com/b/BOT-00001';
 const QR2 = 'https://app.example.com/b/BOT-00002';
-const BOT1 = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1', clienteNombre: 'Juan Pérez', estado: 'entregado' };
-const BOT2 = { id: 'b2', codigo: 'BOT-00002', cliente_id: 'c2', clienteNombre: 'María Gómez', estado: 'recarga' };
+const BOT1 = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1', estado: 'entregado' };
+const BOT2 = { id: 'b2', codigo: 'BOT-00002', cliente_id: 'c2', estado: 'recarga' };
 
 let onDecode: (raw: string) => Promise<unknown> | void;
 let currentDecodeError: string | null = null;
@@ -69,6 +73,7 @@ beforeEach(() => {
     };
   });
   getBotellonByCodigoMock.mockReset();
+  getClienteMock.mockReset();
   registrarCargaMock.mockReset();
   setDecodeErrorMock.mockReset();
   stopMock.mockReset();
@@ -120,13 +125,16 @@ describe('CargaPage - session accumulation', () => {
 });
 
 describe('CargaPage - client name and status badge rendering', () => {
-  it('renders the client name and a status badge for a scanned botellon', async () => {
+  it('resolves the client name via getCliente and renders it with a status badge', async () => {
     getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    getClienteMock.mockResolvedValue({ id: 'c1', nombre: 'Juan Pérez' });
     await renderPage();
 
     await decode(QR1);
 
-    // Client display name from the join is shown alongside the codigo.
+    // The authenticated page resolves the owner name itself (the public-safe
+    // botellon lookup no longer carries it) and shows it in the session list.
+    expect(getClienteMock).toHaveBeenCalledWith('c1');
     expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
     // Status badge uses the canonical label for `entregado`.
     expect(screen.getByText('Entregado')).toBeInTheDocument();
@@ -135,6 +143,9 @@ describe('CargaPage - client name and status badge rendering', () => {
   it('renders different client names and statuses for distinct scans', async () => {
     getBotellonByCodigoMock.mockImplementation((codigo: string) =>
       Promise.resolve(codigo === 'BOT-00001' ? BOT1 : BOT2)
+    );
+    getClienteMock.mockImplementation((id: string) =>
+      Promise.resolve(id === 'c1' ? { id: 'c1', nombre: 'Juan Pérez' } : { id: 'c2', nombre: 'María Gómez' })
     );
     await renderPage();
 
@@ -147,14 +158,14 @@ describe('CargaPage - client name and status badge rendering', () => {
     expect(screen.getByText('En recarga')).toBeInTheDocument();
   });
 
-  it('falls back to the raw client id when the client name join is null', async () => {
+  it('falls back to the raw client id when getCliente returns no name', async () => {
     getBotellonByCodigoMock.mockResolvedValue({
       id: 'b4',
       codigo: 'BOT-00004',
       cliente_id: 'c4',
-      clienteNombre: null,
       estado: 'planta',
     });
+    getClienteMock.mockResolvedValue(null);
     await renderPage();
 
     await decode('https://app.example.com/b/BOT-00004');
@@ -169,9 +180,9 @@ describe('CargaPage - client name and status badge rendering', () => {
       id: 'b5',
       codigo: 'BOT-00005',
       cliente_id: 'c5',
-      clienteNombre: 'Ana',
       estado: 'estado-futuro',
     });
+    getClienteMock.mockResolvedValue({ id: 'c5', nombre: 'Ana' });
     await renderPage();
 
     await decode('https://app.example.com/b/BOT-00005');
@@ -182,6 +193,7 @@ describe('CargaPage - client name and status badge rendering', () => {
 
   it('enriches the item inside onDecode, not via a useEffect body', async () => {
     getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    getClienteMock.mockResolvedValue({ id: 'c1', nombre: 'Juan Pérez' });
     await renderPage();
 
     await decode(QR1);
@@ -189,6 +201,7 @@ describe('CargaPage - client name and status badge rendering', () => {
     // The decoded client/status come from the handler-driven lookup and render
     // from the accumulated session item — not from an effect-driven state.
     expect(getBotellonByCodigoMock).toHaveBeenCalledTimes(1);
+    expect(getClienteMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
     expect(screen.getByText('Entregado')).toBeInTheDocument();
   });

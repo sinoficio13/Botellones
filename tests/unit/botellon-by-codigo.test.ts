@@ -61,7 +61,7 @@ describe('getBotellonByCodigo', () => {
     createClientMock.mockReset();
   });
 
-  it('returns id, cliente_id, and clienteNombre alongside the existing summary fields', async () => {
+  it('returns id, cliente_id, and the summary fields WITHOUT the client name join', async () => {
     createClientMock.mockResolvedValue(
       makeSupabase(
         { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1', clientes: { nombre: 'Juan Pérez' } },
@@ -72,26 +72,34 @@ describe('getBotellonByCodigo', () => {
 
     const result = await getBotellonByCodigo('BOT-00001');
 
+    // The public-safe result carries no client personal data: the owner name
+    // must never be serialized to the anonymous QR page.
     expect(result).toEqual({
       id: 'b1',
       codigo: 'BOT-00001',
       estado: 'entregado',
       cliente_id: 'c1',
-      clienteNombre: 'Juan Pérez',
       total_recargas: 7,
       ultima_recarga: '2024-01-15',
     });
+    expect(result).not.toHaveProperty('clienteNombre');
   });
 
-  it('returns clienteNombre null when the clientes join is null', async () => {
-    createClientMock.mockResolvedValue(
-      makeSupabase({ id: 'b2', codigo: 'BOT-00002', estado: 'planta', cliente_id: 'c2', clientes: null }, 3, null)
+  it('does not select the clientes join at all', async () => {
+    const supabase = makeSupabase(
+      { id: 'b2', codigo: 'BOT-00002', estado: 'planta', cliente_id: 'c2' },
+      3,
+      null
     );
+    createClientMock.mockResolvedValue(supabase);
 
-    const result = await getBotellonByCodigo('BOT-00002');
+    await getBotellonByCodigo('BOT-00002');
 
-    expect(result?.clienteNombre).toBeNull();
-    expect(result?.id).toBe('b2');
+    // The botellones chain is the first `from` result; assert its select
+    // projection never asks for the clientes relation.
+    const botellonesChain = supabase.from.mock.results[0]?.value;
+    const selectArg = botellonesChain.select.mock.calls[0][0] as string;
+    expect(selectArg).not.toContain('clientes');
   });
 
   it('returns cliente_id null for an unassigned botellón', async () => {

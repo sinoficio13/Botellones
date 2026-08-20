@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { procesarLoyalty, REALIZADA_POR_PLACEHOLDER } from '@/lib/db/loyalty';
+
 // ── Types ──
 
 export type RecargaState = {
@@ -77,11 +79,12 @@ export async function registrarRecarga(
   try {
     const supabase = await getSupabase();
 
-    // Get next registro number
+    // Get next registro number (created_at DESC, id DESC so ties break deterministically)
     const { data: lastRecarga } = await supabase
       .from('recargas')
       .select('numero_registro')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -91,7 +94,7 @@ export async function registrarRecarga(
     const numero_registro = `REC-${String(lastNum + 1).padStart(6, '0')}`;
 
     // dev placeholder — will be replaced with auth.uid() after EPIC-1 auth hardening
-    const realizada_por = '00000000-0000-0000-0000-000000000000';
+    const realizada_por = REALIZADA_POR_PLACEHOLDER;
 
     // Insert recarga
     const { error } = await supabase.from('recargas').insert({
@@ -113,85 +116,9 @@ export async function registrarRecarga(
       .eq('estado', 'entregado');
 
     // ── Loyalty detection ──
-
-    let premioGenerado: { nivel: number; id: string } | undefined;
-
-    const { count } = await supabase
-      .from('recargas')
-      .select('*', { count: 'exact', head: true })
-      .eq('cliente_id', cliente_id);
-
-    const totalRecargas = count ?? 0;
-
-    if (totalRecargas > 0 && totalRecargas % 100 === 0) {
-      const { data: premioData, error: premioError } = await supabase
-        .from('premios')
-        .insert({
-          cliente_id,
-          nivel_recargas: totalRecargas,
-          estado: 'pendiente',
-          fecha_alcanzado: new Date().toISOString().slice(0, 10),
-        })
-        .select('id')
-        .single();
-
-      if (premioError) {
-        if (premioError.code === '23505') {
-          // Duplicate — already handled in another request, do nothing
-        } else {
-          console.error('Error inserting premio:', premioError);
-        }
-      } else if (premioData) {
-        premioGenerado = { nivel: totalRecargas, id: premioData.id };
-
-        const { data: clienteData } = await supabase
-          .from('clientes')
-          .select('nombre')
-          .eq('id', cliente_id)
-          .single();
-
-        const clienteName = clienteData?.nombre || 'Cliente';
-
-        await supabase.from('notificaciones').insert({
-          tipo: 'premio',
-          titulo: `¡${clienteName} alcanzó ${totalRecargas} recargas!`,
-          mensaje: `Premio pendiente — nivel ${totalRecargas}`,
-          usuario_id: realizada_por,
-          cliente_id,
-        });
-      }
-    }
-
-    // ── premio_cerca: notify when client is 5 recargas away from next prize ──
-    // Triggered at 95, 195, 295, 395, etc. (not at exact multiples of 100)
-    if (totalRecargas > 0 && (totalRecargas + 5) % 100 === 0 && totalRecargas % 100 !== 0) {
-      const nextLevel = Math.ceil(totalRecargas / 100) * 100;
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('nombre')
-        .eq('id', cliente_id)
-        .single();
-
-      const clienteNombre = clienteData?.nombre || 'Cliente';
-
-      // Query all profiles — small user base (EPIC-1 will add role filtering)
-      const { data: perfiles } = await supabase
-        .from('perfiles')
-        .select('id');
-
-      if (perfiles?.length) {
-        const inserts = perfiles.map((p) =>
-          supabase.from('notificaciones').insert({
-            tipo: 'premio_cerca',
-            titulo: `¡${clienteNombre} está a 5 recargas del premio!`,
-            mensaje: `${clienteNombre} tiene ${totalRecargas} recargas. Le faltan 5 para el nivel ${nextLevel}.`,
-            usuario_id: p.id,
-            cliente_id,
-          })
-        );
-        await Promise.all(inserts);
-      }
-    }
+    // Shared helper: premio (every 100 recargas) + premio_cerca (5 before next level)
+    const { premios } = await procesarLoyalty([cliente_id], realizada_por);
+    const premioGenerado = premios[0];
 
     revalidatePath('/clientes');
     revalidatePath('/recargas');

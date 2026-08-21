@@ -8,7 +8,7 @@ The `/recargas/carga` dashboard page (`src/app/(dashboard)/recargas/carga/page.t
 
 ### Requirement: Operation selector with Recargar default
 
-The terminal MUST expose three operations — Recibir (`→recibido`, sources `{entregado}`), Recargar (`→recarga`, sources `{entregado, recibido}`), and Listo (`→listo`, sources `{recarga}`) — and MUST default the selection to Recargar. The selected operation MUST drive the confirm payload (`operacion`), the confirm button label, and the success screen content.
+The terminal MUST expose three operations — Recibir (`→recibido`, sources `{entregado}`), Recargar (`→recarga`, sources `{recibido}`), and Listo (`→listo`, sources `{recarga}`) — and MUST default the selection to Recargar. The selected operation MUST drive the confirm payload (`operacion`), the confirm button label, and the success screen content.
 
 #### Scenario: Default operation is Recargar
 
@@ -28,7 +28,7 @@ Each session item MUST render a transition badge derived live from `getTransicio
 
 #### Scenario: Valid source shows green target badge
 
-- GIVEN an item in estado `entregado` and operation `recargar`
+- GIVEN an item in estado `recibido` and operation `recargar`
 - WHEN the session list renders
 - THEN the item shows a green badge for the target `recarga`
 
@@ -40,9 +40,9 @@ Each session item MUST render a transition badge derived live from `getTransicio
 
 #### Scenario: Operation switch re-validates badges live
 
-- GIVEN an item in estado `entregado` with a green badge under `recargar`
-- WHEN the user switches the operation to `recibir`
-- THEN the badge re-derives and shows green for `recibido` without re-scanning
+- GIVEN an item in estado `recibido` with a green badge under `recargar`
+- WHEN the user switches the operation to `listo`
+- THEN the badge re-derives to red for `listo` without re-scanning
 
 ### Requirement: Duplicate scan beep and transient ring
 
@@ -61,15 +61,16 @@ When a code already in the session is decoded again, the terminal MUST emit a We
 - WHEN the decode loop continues
 - THEN the scanner remains active and no duplicate entry is added
 
-### Requirement: One-pass scan advance
+### Requirement: Per-operation single-scan advance
 
-A botellon MUST advance directly from its current estado to the selected operation's target on a single confirm — no intermediate estados. The lifecycle `entregado → recibido → recarga → listo` MUST be achievable across sequential single scans.
+A botellon MUST advance exactly one cycle edge per confirm — from its current estado to the selected operation's target — with no intermediate estados. The lifecycle `entregado → recibido → recarga → listo` MUST be achievable across sequential single scans, and MUST NOT skip `recibido`: the `entregado → recarga` one-pass is removed.
 
-#### Scenario: Entregado to recarga in one pass
+#### Scenario: Entregado to recarga requires two scans
 
 - GIVEN an item in estado `entregado` and operation `recargar`
 - WHEN the user confirms
-- THEN the botellon's estado becomes `recarga` without passing through any intermediate estado
+- THEN the transition is rejected and the badge stays red
+- AND confirming `recibir` first moves the item to `recibido`, after which `recargar` becomes valid
 
 #### Scenario: Recibido to recarga to listo in sequential scans
 
@@ -99,7 +100,7 @@ After a confirm with mixed results, the terminal MUST render per-item outcomes �
 
 #### Scenario: Mixed batch reports per-item outcomes
 
-- GIVEN a session with a valid `entregado` item and an invalid `recarga` item, operation `recargar`
+- GIVEN a session with a valid `recibido` item and an invalid `recarga` item, operation `recargar`
 - WHEN the confirm returns mixed results
 - THEN the valid item reports ok and the invalid item shows reason `estado-recarga`
 

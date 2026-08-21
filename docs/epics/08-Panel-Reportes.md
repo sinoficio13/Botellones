@@ -22,7 +22,6 @@ Pantalla principal del admin con tarjetas de indicadores clave.
 **AC:**
 - [x] Total clientes (+ variacion nuevos este mes)
 - [x] Botellones activos (asignados a clientes)
-- [x] Botellones en planta (disponibles)
 - [x] Recargas hoy
 - [x] Recargas este mes (con % vs mes anterior)
 - [x] Premios pendientes (badge rojo con cantidad)
@@ -46,7 +45,6 @@ Seccion de alertas y resumenes inteligentes.
 - [x] Premios pendientes de entrega (link a ficha de cada cliente)
 - [x] Clientes sin actividad en 30+ dias (en riesgo)
 - [x] Clientes sin actividad en 60+ dias (a reconquistar)
-- [x] Botellones en mantenimiento o danados
 - [x] Cada alerta tiene link directo a la ficha correspondiente
 
 ### HIST-8.4 — Dashboard repartidor
@@ -86,8 +84,7 @@ Indicadores de negocio calculados automaticamente.
 | KPI | Query |
 |---|---|
 | Total clientes | `SELECT COUNT(*) FROM clientes` |
-| Botellones activos | `SELECT COUNT(*) FROM botellones WHERE estado = 'asignado'` |
-| Botellones en planta | `SELECT COUNT(*) FROM botellones WHERE estado = 'disponible'` |
+| Botellones activos | `SELECT COUNT(*) FROM botellones WHERE estado = 'entregado'` |
 | Recargas hoy | `SELECT COUNT(*) FROM recargas WHERE fecha = CURRENT_DATE` |
 | Recargas mes | `SELECT COUNT(*) FROM recargas WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)` |
 | Premios pendientes | `SELECT COUNT(*) FROM premios WHERE estado = 'pendiente'` |

@@ -141,7 +141,8 @@ test.describe('Botellones', () => {
     await login(page);
     await page.goto('/botellones');
     await expect(page.getByText('BOT-').first()).toBeVisible();
-    await expect(page.getByText('planta').first()).toBeVisible();
+    // 5-estado cycle: any surviving estado label renders in the table badge.
+    await expect(page.getByText(/Recibido|Listo|Entregado/).first()).toBeVisible();
   });
 
   test('change state', async ({ page }) => {
@@ -151,7 +152,8 @@ test.describe('Botellones', () => {
     await expect(page).toHaveURL(/\/botellones\//);
     const sel = page.getByLabel('Cambiar estado');
     if (await sel.isVisible()) {
-      await sel.selectOption('mantenimiento');
+      // First option after the current estado is a valid transition of the 5-estado cycle.
+      await sel.selectOption({ index: 1 });
       await page.getByRole('button', { name: 'Guardar cambios' }).click();
       await expect(page.getByText('Cambios guardados')).toBeVisible({ timeout: 5000 });
     }

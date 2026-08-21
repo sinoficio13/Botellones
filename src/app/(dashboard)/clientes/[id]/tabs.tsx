@@ -6,6 +6,7 @@ import { updateCliente } from '@/lib/db/clientes';
 import { saveDireccion, getDireccion, resolveMapLink } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
+import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import { FidelidadTab } from './fidelidad-tab';
 import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -217,11 +218,9 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
               {botellones.map((b) => (
                 <div key={b.id} className="flex items-center gap-2">
                   <span className="font-mono text-xs">{b.codigo}</span>
-                  <span className={`rounded px-1 py-0.5 text-[10px] font-medium ${
-                    b.estado === 'asignado' ? 'bg-blue-100 text-blue-700' :
-                    b.estado === 'activo' ? 'bg-green-100 text-green-700' :
-                    'bg-zinc-100 text-zinc-600'
-                  }`}>{b.estado}</span>
+                  <span className={`rounded px-1 py-0.5 text-[10px] font-medium ${ESTADO_COLORS[b.estado] || 'bg-zinc-100 text-zinc-600'}`}>
+                    {ESTADO_LABELS[b.estado] ?? b.estado}
+                  </span>
                 </div>
               ))}
             </div>
@@ -534,13 +533,7 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
     });
   }, [clienteId]);
 
-  const estadoBadge: Record<string, string> = {
-    activo: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    asignado: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    mantenimiento: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    dañado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    perdido: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  };
+  const estadoBadge = ESTADO_COLORS;
 
   return (
     <div className="space-y-4">

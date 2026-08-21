@@ -10,7 +10,6 @@ import { parseQrCode } from '@/lib/scanner/parse-qr';
 import { playBeep } from '@/lib/scanner/beep';
 import {
   ESTADO_LABELS,
-  ESTADO_COLORS,
   OPERACIONES,
   esTransicionValida,
   type Estado,
@@ -54,6 +53,13 @@ const OPERACION_LABELS: Record<OperacionId, string> = {
   recargar: 'Recargar',
   listo: 'Listo',
 };
+
+/**
+ * Red badge classes for an invalid (rejected) transition. The removed
+ * `danado` key no longer exists in ESTADO_COLORS, so the fallback is an
+ * explicit constant instead of a silent empty string.
+ */
+const BADGE_INVALID = 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
 
 /**
  * Multi-state scanning terminal. Scan botellon QRs, pick an operation
@@ -390,7 +396,7 @@ export default function CargaPage() {
                         'rounded-full px-2 py-0.5 text-xs font-medium',
                         valid
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                          : ESTADO_COLORS['danado']
+                          : BADGE_INVALID
                       )}
                     >
                       {valid

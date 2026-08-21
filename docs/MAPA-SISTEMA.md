@@ -20,11 +20,11 @@
 ### `analytics.ts` — Dashboard KPIs y agregaciones
 | Función | Descripción |
 |---|---|
-| `getDashboardKpis()` → `DashboardKpis` | 8 KPIs en paralelo: total clientes, nuevos mes, botellones activos/planta, recargas hoy/mes, premios pendientes, variación % |
+| `getDashboardKpis()` → `DashboardKpis` | 7 KPIs en paralelo: total clientes, nuevos mes, botellones activos, recargas hoy/mes, premios pendientes, variación % |
 | `getRecargasPorDia(days?)` → `RecargaPorDia[]` | Recargas agregadas por día (últimos 30 por defecto) |
 | `getBotellonesPorEstado()` → `BotellonPorEstado[]` | Distribución de botellones por estado |
 | `getTopClientes(limit?)` → `TopCliente[]` | Top N clientes por total recargas |
-| `getAlertas()` → `AlertasPanel` | Premios pendientes, clientes inactivos 30/60d, botellones dañados |
+| `getAlertas()` → `AlertasPanel` | Premios pendientes, clientes inactivos 30/60d |
 | `getResumenesNegocio()` → `ResumenesNegocio` | Cliente del mes, tendencia 6 meses, zonas activas, tasa retorno |
 | `getRepartidorDashboard(userId)` → `RepartidorDashboard` | Recargas hoy + clientes asignados |
 
@@ -35,7 +35,7 @@
 | `getBotellon(id)` → `botellon` | Detalle con cliente asignado y total recargas |
 | `getBotellonByCodigo(codigo)` → `botellon` | Búsqueda por código único (página pública QR) |
 | `createBotellon(prev, formData)` → `BotellonState` | Crea botellón con código auto BOT-XXXXX |
-| `updateBotellon(prev, formData)` → `BotellonState` | Actualiza estado/cliente; genera notif si dañado/perdido |
+| `updateBotellon(prev, formData)` → `BotellonState` | Actualiza estado/cliente (asignar → entregado; desasignar mantiene estado) |
 | `getClientesForSelect(search?)` → `cliente[]` | Top 20 clientes para dropdown |
 
 ### `clientes.ts` — CRUD Clientes

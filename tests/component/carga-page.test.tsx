@@ -32,6 +32,7 @@ const QR1 = 'https://app.example.com/b/BOT-00001';
 const QR2 = 'https://app.example.com/b/BOT-00002';
 const BOT1 = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1', estado: 'entregado' };
 const BOT2 = { id: 'b2', codigo: 'BOT-00002', cliente_id: 'c2', estado: 'recarga' };
+const BOT_RECIBIDO = { id: 'b3', codigo: 'BOT-00003', cliente_id: 'c3', estado: 'recibido' };
 
 let onDecode: (raw: string) => Promise<unknown> | void;
 let currentDecodeError: string | null = null;
@@ -246,7 +247,7 @@ describe('CargaPage - client name rendering', () => {
       id: 'b4',
       codigo: 'BOT-00004',
       cliente_id: 'c4',
-      estado: 'planta',
+      estado: 'recibido',
     });
     getClienteMock.mockResolvedValue(null);
     await renderPage();
@@ -277,16 +278,29 @@ describe('CargaPage - client name rendering', () => {
 
 describe('CargaPage - per-item transition badges', () => {
   it('shows a valid (green) badge with the target estado for a valid source under the selected op', async () => {
-    // BOT1 is entregado — a valid source for the default recargar op (→ recarga).
+    // BOT_RECIBIDO is recibido — the ONLY valid source for the default recargar op (→ recarga).
+    getBotellonByCodigoMock.mockResolvedValue(BOT_RECIBIDO);
+    await renderPage();
+
+    await decode(QR1);
+
+    const badge = screen.getByTestId('transition-badge-b3');
+    expect(badge).toHaveAttribute('data-valid', 'true');
+    // Green badge shows the operation target label (recargar → "En recarga").
+    expect(badge).toHaveTextContent('En recarga');
+  });
+
+  it('rejects entregado under recargar with an invalid (red) badge showing the current estado', async () => {
+    // BOT1 is entregado — NOT a source of recargar (the cycle must not skip recibido).
     getBotellonByCodigoMock.mockResolvedValue(BOT1);
     await renderPage();
 
     await decode(QR1);
 
     const badge = screen.getByTestId('transition-badge-b1');
-    expect(badge).toHaveAttribute('data-valid', 'true');
-    // Green badge shows the operation target label (recargar → "En recarga").
-    expect(badge).toHaveTextContent('En recarga');
+    expect(badge).toHaveAttribute('data-valid', 'false');
+    // Red badge shows the current estado label.
+    expect(badge).toHaveTextContent('Entregado');
   });
 
   it('shows an invalid (red) badge with the current estado when the source is not valid', async () => {
@@ -309,12 +323,12 @@ describe('CargaPage - per-item transition badges', () => {
 
     await decode(QR1);
 
-    // Under recargar, entregado is valid → green badge for target recarga.
+    // Under recargar, entregado is NOT a valid source (pure cycle: recibir first) → red badge.
     let badge = screen.getByTestId('transition-badge-b1');
-    expect(badge).toHaveAttribute('data-valid', 'true');
-    expect(badge).toHaveTextContent('En recarga');
+    expect(badge).toHaveAttribute('data-valid', 'false');
+    expect(badge).toHaveTextContent('Entregado');
 
-    // Switch to recibir: entregado is still a source → green for target recibido.
+    // Switch to recibir: entregado IS a source → green for target recibido.
     await selectOperation(user, 'Recibir');
     badge = screen.getByTestId('transition-badge-b1');
     expect(badge).toHaveAttribute('data-valid', 'true');

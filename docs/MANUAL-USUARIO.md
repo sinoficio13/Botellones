@@ -22,11 +22,11 @@ Abrí el navegador en la URL del sistema. Vas a ver la pantalla de login.
 Al entrar ves el panel de control.
 
 ### Vista Administrador
-- **7 tarjetas de KPIs**: total de clientes, botellones activos, en planta, recargas de hoy, del mes, premios pendientes, y variación vs mes anterior.
+- **6 tarjetas de KPIs**: total de clientes, nuevos este mes, botellones activos, recargas de hoy, del mes, premios pendientes, y variación vs mes anterior.
 - **Gráfico de barras**: recargas por día en los últimos 30 días.
-- **Gráfico donut**: distribución de botellones por estado (disponible, asignado, en recarga, mantenimiento, dañado, perdido).
+- **Gráfico donut**: distribución de botellones por estado (entregado, recibido, en recarga, listo, en delivery).
 - **Top 10 clientes**: ranking de los que más recargas tienen.
-- **Panel de alertas**: premios sin entregar, clientes inactivos hace 30 o 60 días, botellones dañados. Cada alerta es un link directo a la ficha.
+- **Panel de alertas**: premios sin entregar, clientes inactivos hace 30 o 60 días. Cada alerta es un link directo a la ficha.
 
 ### Vista Repartidor
 - Contador de recargas del día.
@@ -75,12 +75,11 @@ Andá a **Clientes → Búsqueda avanzada**. Podés filtrar por:
 
 ### Ver todos los botellones
 Andá a **Botellones**. Ves tarjetas con código, estado, y cliente asignado. Cada estado tiene un color:
-- 🟢 **Disponible**: en planta, listo para entregar
-- 🔵 **Asignado**: entregado a un cliente
-- 🟡 **En recarga**: el repartidor lo está recargando
-- 🟠 **Mantenimiento**: en revisión
-- 🔴 **Dañado**: fuera de servicio
-- ⚫ **Perdido**: dado de baja
+- 🟣 **Entregado**: en manos del cliente
+- ⚪ **Recibido**: sucio, esperando lavado
+- 🩵 **En recarga**: el repartidor lo está recargando
+- 🟢 **Listo**: recargado, listo para despachar
+- 🟠 **En delivery**: en camino al cliente
 
 **Buscar**: Escribí el código del botellón (ej: BOT-0042) en la barra de búsqueda.
 
@@ -93,8 +92,8 @@ Clic en cualquier botellón para ver su detalle:
 - **Código QR**: escaneable desde cualquier celular. Lleva a una página pública con los datos del botellón.
 - **Descargar QR**: botón para bajar la imagen del QR.
 - **Imprimir etiqueta**: botón que abre una página optimizada para imprimir (código + QR + nombre del negocio).
-- **Estado actual**: con menú para cambiar de estado (ej: disponible → asignado → en recarga → disponible).
-- **Asignar a cliente**: cuando el estado es "disponible", podés elegir a qué cliente entregarlo.
+- **Estado actual**: con menú para cambiar de estado (ej: recibido → recarga → listo → entregado).
+- **Asignar a cliente**: cuando el botellón no tiene cliente, podés elegir a qué cliente entregarlo (pasa a "entregado").
 - **Historial de recargas**: todas las veces que se recargó este botellón.
 
 ### Escanear un QR
@@ -123,7 +122,7 @@ Revisá los datos y clic en **Confirmar recarga**.
 
 **¿Qué pasa después?**
 - Se registra la recarga con número automático (REC-0001, REC-0002...).
-- El botellón vuelve a estado "disponible".
+- El botellón pasa a "en recarga" y continúa el ciclo (listo → entregado).
 - **Si el cliente llegó a 100 recargas**: aparece una alerta de **¡Premio!** con botones para ver la ficha o mandar WhatsApp.
 - **Si el cliente está a 5 recargas del premio**: los admin reciben una notificación.
 
@@ -174,7 +173,6 @@ En la esquina superior derecha del header hay un ícono de campana 🔔. Muestra
 | ------------------- | ------------------------------------------ | ------------------ |
 | 🎁 Premio alcanzado | Cliente llega a 100, 200, 300... recargas  | Admin + Repartidor |
 | ⭐ A 5 del premio    | Cliente llega a 95, 195, 295... recargas   | Admin              |
-| 🔧 Botellón dañado  | Se cambia el estado a "dañado" o "perdido" | Admin              |
 | ⚠️ Cliente inactivo | 30 días sin recargas                       | Admin              |
 
 ### Marcar como leída
@@ -278,7 +276,7 @@ Tu día a día:
 4. **Recargas** → registrar las que hagas personalmente.
 5. **Premios** → revisar pendientes y entregar.
 6. **Reportes** → exportar PDF/Excel para análisis.
-7. **Notificaciones** → atender alertas de premios, inactividad, botellones dañados.
+7. **Notificaciones** → atender alertas de premios e inactividad.
 
 ### Si sos Repartidor
 Tu día a día:
@@ -298,8 +296,8 @@ Al registrar la recarga #100 (o #200, #300...) aparece una alerta en pantalla. T
 **¿Puedo cambiar el código de un cliente o botellón?**
 No. Los códigos (CL-XXXX, BOT-XXXXX, REC-XXXXXX) son automáticos y no se pueden modificar. Garantizan trazabilidad.
 
-**¿Qué pasa si cambio un botellón a "dañado"?**
-El sistema manda una notificación a todos los administradores. Si estaba asignado a un cliente, se desasigna automáticamente.
+**¿Cuáles son los estados de un botellón?**
+El ciclo es de 5 estados: entregado → recibido → en recarga → listo → entregado (o en delivery). Los botellones sin cliente en "recibido" o "listo" son stock disponible.
 
 **¿Los clientes pueden ver sus datos?**
 No. Solo el administrador y repartidor tienen acceso. La única página pública es la del código QR del botellón.

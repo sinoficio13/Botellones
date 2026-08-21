@@ -13,7 +13,6 @@ export function NotificationIcon({ tipo }: { tipo: string }) {
 const ICON_MAP: Record<string, string> = {
   premio: '\u{1F381}', // 🎁
   premio_cerca: '\u{2B50}', // ⭐
-  botellon_danado: '\u{1F527}', // 🔧
   inactividad: '\u26A0\uFE0F', // ⚠️
   default: '\u{1F514}', // 🔔
 };

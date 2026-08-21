@@ -80,7 +80,7 @@ function rejectItem(id: string, row: BotellonRow | undefined, operacion: Operaci
  *   the item's estado is outside the op's source estados.
  * - The recarga branch (createsRec): N sequential REC numbers from ONE max+1
  *   read, single array insert, one `.in('estado', sources)` update
- *   entregado/recibido → recarga, loyalty once per distinct client plus
+ *   recibido → recarga, loyalty once per distinct client plus
  *   milestone-crossing compensation, and a best-effort compensating delete of
  *   inserted rows when the estado update fails.
  * - Pure branches (recibir/listo): a single `.in('estado', sources)` estado

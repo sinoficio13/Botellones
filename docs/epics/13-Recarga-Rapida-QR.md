@@ -54,7 +54,7 @@ Si el botellon no tiene cliente asignado, no se puede recargar directamente.
 
 **AC:**
 - [ ] Aviso claro: "Este botellon no tiene cliente asignado"
-- [ ] Link para asignar cliente (botellon en planta)
+- [ ] Link para asignar cliente (botellon sin cliente asignado)
 
 ---
 

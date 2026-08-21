@@ -63,7 +63,7 @@ export function BotellonForm({ botellon, transiciones, clientes }: Props) {
         </label>
         <select id="cliente_id" name="cliente_id" defaultValue={botellon.cliente_id || ''}
           className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 sm:max-w-xs">
-          <option value="">Sin asignar (planta)</option>
+          <option value="">Sin asignar</option>
           {clientes.map((c) => (
             <option key={c.id} value={c.id} selected={c.id === botellon.cliente_id}>
               {c.nombre} ({c.codigo})

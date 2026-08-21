@@ -349,7 +349,7 @@ src/
 
 **Acceptance Criteria:**
 - [ ] Tabla: código, estado, fecha creación, total recargas
-- [ ] Badge de color según estado (verde=disponible, azul=asignado, amarillo=recarga, gris=mantenimiento, rojo=dañado/perdido)
+- [ ] Badge de color según estado (morado=entregado, gris=recibido, cian=en recarga, verde=listo, ámbar=en delivery)
 - [ ] Link a página del botellón
 
 ### HIST-3.7 — Ficha del cliente — Tab: Historial
@@ -388,35 +388,33 @@ src/
 **Descripción:** Crear, listar, editar y eliminar botellones (admin).
 
 **Acceptance Criteria:**
-- [ ] Formulario de creación: código auto (BOT-XXXXX), estado inicial (disponible)
+- [ ] Formulario de creación: código auto (BOT-XXXXX), estado inicial (recibido)
 - [ ] Lista paginada: código, estado, cliente asignado, fecha creación, total recargas
 - [ ] Edición: cambiar estado, reasignar cliente
 - [ ] Eliminación lógica (no borrar si tiene recargas)
 
 ### HIST-4.2 — Estados y transiciones
 
-**Descripción:** Sistema de estados del botellón con reglas de transición válidas.
+**Descripción:** Sistema de estados del botellón con reglas de transición válidas (ciclo puro de 5 estados).
 
 **Acceptance Criteria:**
-- [ ] Estados: disponible, asignado, en_recarga, mantenimiento, danado, perdido
+- [ ] Estados: entregado, recibido, recarga, listo, delivery
 - [ ] Transiciones válidas:
-  - disponible → asignado, mantenimiento, danado, perdido
-  - asignado → en_recarga, disponible, perdido
-  - en_recarga → asignado, disponible, mantenimiento
-  - mantenimiento → disponible, danado
-  - danado → (estado terminal)
-  - perdido → disponible (si se recupera)
+  - entregado → recibido
+  - recibido → recarga
+  - recarga → listo
+  - listo → entregado, delivery
+  - delivery → entregado
 - [ ] Dropdown con solo transiciones válidas
 
 ### HIST-4.3 — Asignar / desasignar a cliente
 
-**Descripción:** Vincular botellón a un cliente o liberarlo a planta.
+**Descripción:** Vincular botellón a un cliente o dejarlo sin cliente (queda como stock en su estado actual).
 
 **Acceptance Criteria:**
 - [ ] Select de cliente con búsqueda en formulario de botellón
-- [ ] Al asignar: estado cambia a "asignado"
-- [ ] Al desasignar: estado cambia a "disponible"
-- [ ] No se puede asignar un botellón dañado o perdido
+- [ ] Al asignar: estado cambia a "entregado"
+- [ ] Al desasignar: se limpia el cliente y el estado se mantiene
 
 ### HIST-4.4 — Generación de QR
 
@@ -574,7 +572,7 @@ src/
 - [ ] Ícono de campana 🔔 en header con badge numérico de no leídas
 - [ ] Click → dropdown con últimas 5 notificaciones
 - [ ] "Ver todas" → página `/notificaciones` con historial completo
-- [ ] Filtro por tipo (premio, inactividad, botellón)
+- [ ] Filtro por tipo (premio, inactividad)
 - [ ] Marcar individual o "Marcar todas como leídas"
 - [ ] Cada notificación es clickeable → lleva a la ficha correspondiente
 - [ ] Badge se actualiza en tiempo real (Supabase Realtime)
@@ -586,7 +584,6 @@ src/
 **Acceptance Criteria:**
 - [ ] 🎁 Cliente alcanza 100 recargas → notificación para admin + repartidor
 - [ ] ⚠️ Cliente 30 días sin recarga → notificación para admin (se ejecuta diariamente)
-- [ ] 🔧 Botellón cambia a "dañado" o "perdido" → notificación para admin
 - [ ] ⭐ Cliente a 5 recargas del premio (95, 195, 295...) → notificación para admin
 
 ### HIST-7.3 — Notificación con acción WhatsApp
@@ -623,7 +620,6 @@ src/
 **Acceptance Criteria:**
 - [ ] Total clientes (+ variación nuevos este mes)
 - [ ] Botellones activos (asignados a clientes)
-- [ ] Botellones en planta (disponibles)
 - [ ] Recargas hoy
 - [ ] Recargas este mes (con % vs mes anterior)
 - [ ] Premios pendientes (badge rojo con cantidad)
@@ -647,7 +643,6 @@ src/
 - [ ] Premios pendientes de entrega (link a ficha de cada cliente)
 - [ ] Clientes sin actividad en 30+ días (🔴 en riesgo)
 - [ ] Clientes sin actividad en 60+ días (🟡 a reconquistar)
-- [ ] Botellones en mantenimiento o dañados
 - [ ] Cada alerta tiene link directo a la ficha correspondiente
 
 ### HIST-8.4 — Dashboard repartidor

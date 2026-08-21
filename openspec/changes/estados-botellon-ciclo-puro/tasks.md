@@ -38,20 +38,20 @@ Chain strategy: stacked-to-main
 
 ## Commit 2 — Frontend + Docs (~195 lines)
 
-- [ ] 2.1 RED `tests/component/carga-page.test.tsx`: L249 `'planta'→'recibido'`; add `BOT_RECIBIDO` fixture; valid-green (L279-290)→recibido under recargar; re-validates-live (L305-328)→entregado red under recargar / green under recibir
-- [ ] 2.2 RED `tests/e2e/business-flows.spec.ts`: L144 `'planta'`→`getByText(/Recibido|Listo|Entregado/)`; L154 `selectOption('mantenimiento')`→`selectOption({index:1})` (guarded by `isVisible()`)
-- [ ] 2.3 GREEN `operaciones-dashboard.tsx`: drop `ESTADOS_EXCEPCION` import; −4 `ESTADO_META`; `TODOS_ESTADOS=[...ESTADOS_KANBAN,'entregado']`; remove enPlanta KPI + danados chip + Excepciones section ("↩ Restaurar a planta"); grid `lg:grid-cols-4`
-- [ ] 2.4 GREEN `admin-dashboard.tsx`: remove "En planta" KPI + `Package` import; grid `lg:grid-cols-7→6`
-- [ ] 2.5 GREEN `botellones-donut-chart.tsx`: 5-key map (entregado hsl(262,83%,58%), recibido hsl(215,20%,45%), recarga hsl(190,90%,50%), listo hsl(142,71%,45%), delivery hsl(38,92%,50%))
-- [ ] 2.6 GREEN `alert-panel.tsx`: remove `botellonesDanados` types/merge/CATEGORIES + `Wrench` import; ternary→`active==='clientesInactivos'?'inactivos':'premios'`
-- [ ] 2.7 GREEN `notification-icon.tsx` L16 + `notificaciones-list.tsx` L16: remove `botellon_danado` entries
-- [ ] 2.8 GREEN `botellones/[id]/form.tsx` L66: "Sin asignar (planta)"→"Sin asignar"
-- [ ] 2.9 GREEN `botellones/page.tsx`: delete stale local map → import shared `ESTADO_LABELS`/`ESTADO_COLORS`; render label + color
-- [ ] 2.10 GREEN `clientes/[id]/tabs.tsx`: L220-223 MiniCard ternary + L537-543 `estadoBadge` → shared `ESTADO_COLORS` (5 keys)
-- [ ] 2.11 GREEN `recargas/carga/page.tsx` L393: `BADGE_INVALID` red const; drop `ESTADO_COLORS` import
-- [ ] 2.12 Verify: component + e2e business-flows green; full `npm run build` green (R1 cleared)
-- [ ] 2.13 Docs: epics 04/07/08/13, `docs/epics.md` (6→5), `MAPA-SISTEMA.md`, `MANUAL-USUARIO.md`, `plan.md` (+change row), `03-Clientes.md` L78 badge colors
-- [ ] 2.14 Commit: `refactor(ui): drop exception/planta UI, fix badge maps, docs → 5-estado cycle`
+- [x] 2.1 RED `tests/component/carga-page.test.tsx`: L249 `'planta'→'recibido'`; add `BOT_RECIBIDO` fixture; valid-green (L279-290)→recibido under recargar; re-validates-live (L305-328)→entregado red under recargar / green under recibir
+- [x] 2.2 RED `tests/e2e/business-flows.spec.ts`: L144 `'planta'`→`getByText(/Recibido|Listo|Entregado/)`; L154 `selectOption('mantenimiento')`→`selectOption({index:1})` (guarded by `isVisible()`)
+- [x] 2.3 GREEN `operaciones-dashboard.tsx`: drop `ESTADOS_EXCEPCION` import; −4 `ESTADO_META`; `TODOS_ESTADOS=[...ESTADOS_KANBAN,'entregado']`; remove enPlanta KPI + danados chip + Excepciones section ("↩ Restaurar a planta"); grid `lg:grid-cols-4`
+- [x] 2.4 GREEN `admin-dashboard.tsx`: remove "En planta" KPI + `Package` import; grid `lg:grid-cols-7→6`
+- [x] 2.5 GREEN `botellones-donut-chart.tsx`: 5-key map (entregado hsl(262,83%,58%), recibido hsl(215,20%,45%), recarga hsl(190,90%,50%), listo hsl(142,71%,45%), delivery hsl(38,92%,50%))
+- [x] 2.6 GREEN `alert-panel.tsx`: remove `botellonesDanados` types/merge/CATEGORIES + `Wrench` import; ternary→`active==='clientesInactivos'?'inactivos':'premios'`
+- [x] 2.7 GREEN `notification-icon.tsx` L16 + `notificaciones-list.tsx` L16: remove `botellon_danado` entries
+- [x] 2.8 GREEN `botellones/[id]/form.tsx` L66: "Sin asignar (planta)"→"Sin asignar"
+- [x] 2.9 GREEN `botellones/page.tsx`: delete stale local map → import shared `ESTADO_LABELS`/`ESTADO_COLORS`; render label + color
+- [x] 2.10 GREEN `clientes/[id]/tabs.tsx`: L220-223 MiniCard ternary + L537-543 `estadoBadge` → shared `ESTADO_COLORS` (5 keys)
+- [x] 2.11 GREEN `recargas/carga/page.tsx` L393: `BADGE_INVALID` red const; drop `ESTADO_COLORS` import
+- [x] 2.12 Verify: component + e2e business-flows green; full `npm run build` green (R1 cleared)
+- [x] 2.13 Docs: epics 04/07/08/13, `docs/epics.md` (6→5), `MAPA-SISTEMA.md`, `MANUAL-USUARIO.md`, `plan.md` (+change row), `03-Clientes.md` L78 badge colors
+- [x] 2.14 Commit: `refactor(ui): drop exception/planta UI, fix badge maps, docs → 5-estado cycle`
 
 ## Dependencies
 

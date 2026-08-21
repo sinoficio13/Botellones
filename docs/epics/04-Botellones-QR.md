@@ -21,7 +21,7 @@ Cada botellon tiene codigo, estado, QR imprimible e historial publico via QR.
 Crear, listar, editar y eliminar botellones (admin).
 
 **AC:**
-- [x] Formulario de creacion: codigo auto (BOT-XXXXX), estado inicial (disponible)
+- [x] Formulario de creacion: codigo auto (BOT-XXXXX), estado inicial (recibido)
 - [x] Lista paginada: codigo, estado, cliente asignado, fecha creacion, total recargas
 - [x] Edicion: cambiar estado, reasignar cliente
 - [x] Eliminacion logica (no borrar si tiene recargas)
@@ -30,28 +30,26 @@ Crear, listar, editar y eliminar botellones (admin).
 
 Sistema de estados del botellon con reglas de transicion validas.
 
-**Estados**: disponible, asignado, en_recarga, mantenimiento, danado, perdido
+**Estados**: entregado, recibido, recarga, listo, delivery
 
-**Transiciones validas:**
-- disponible → asignado, mantenimiento, danado, perdido
-- asignado → en_recarga, disponible, perdido
-- en_recarga → asignado, disponible, mantenimiento
-- mantenimiento → disponible, danado
-- danado → (terminal)
-- perdido → disponible (si se recupera)
+**Transiciones validas (ciclo puro de 5 estados):**
+- entregado → recibido
+- recibido → recarga
+- recarga → listo
+- listo → entregado, delivery
+- delivery → entregado
 
 **AC:**
 - [x] Dropdown con solo transiciones validas
 
 ### HIST-4.3 — Asignar / desasignar a cliente
 
-Vincular botellon a un cliente o liberarlo a planta.
+Vincular botellon a un cliente o dejarlo sin cliente (queda como stock en su estado actual).
 
 **AC:**
 - [x] Select de cliente con busqueda en formulario de botellon
-- [x] Al asignar: estado cambia a "asignado"
-- [x] Al desasignar: estado cambia a "disponible"
-- [x] No se puede asignar un botellon danado o perdido
+- [x] Al asignar: estado cambia a "entregado"
+- [x] Al desasignar: se limpia el cliente y el estado se mantiene
 
 ### HIST-4.4 — Generacion de QR
 
@@ -88,15 +86,8 @@ Pagina con formato de impresion para etiquetas fisicas con QR.
 ## Estados del botellon
 
 ```
-disponible ──→ asignado ──→ en_recarga ──→ asignado
-    │              │              │
-    ├── mantenim.   ├── perdido    ├── mantenim.
-    ├── danado      └── disponible └── disponible
-    └── perdido
-
-mantenimiento ──→ disponible
-              └──→ danado
-
-danado → (terminal)
-perdido → disponible (recuperado)
+entregado ──→ recibido ──→ recarga ──→ listo ──→ entregado
+                              │           │
+                              │           └──→ delivery ──→ entregado
+                              └───────────┘ (loop del ciclo)
 ```

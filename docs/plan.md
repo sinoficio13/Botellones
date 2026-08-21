@@ -1,7 +1,7 @@
 # Plan — Sistema de Gestión de Botellones de Agua
 
 > Estado: **COMPLETADO (15/15 epics implementados; Fase 2 incluida)**
-> Última actualización: 20/08/2026
+> Última actualización: 21/08/2026
 
 ## Documentación del proyecto
 
@@ -89,3 +89,4 @@ Todos los 15 epics están implementados en código y archivados como cambios SDD
 | `qa-code-cleanup` | Completado | Limpieza de código y convenciones QA (archivado en `openspec/changes/archive/`) |
 | `carga-botellones` | Completado | Carga por lote de botellones vía QR (archivado en `openspec/changes/archive/2026-08-20-carga-botellones/`) |
 | `carga-cliente-estatus` | Completado | Muestra cliente + estado del botellón en la lista de sesión de carga por lote (archivado en `openspec/changes/archive/2026-08-20-carga-cliente-estatus/`) |
+| `estados-botellon-ciclo-puro` | Completado | Ciclo puro de 5 estados del botellón (entregado/recibido/recarga/listo/delivery) — se eliminan planta, dañado, perdido y mantenimiento del modelo, UI, alertas y docs (2 commits directos a main) |

@@ -1,4 +1,5 @@
 import { getBotellones, type BotellonWithCliente } from '@/lib/db/botellones';
+import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -6,15 +7,6 @@ export const dynamic = 'force-dynamic';
 interface Props {
   searchParams: Promise<{ page?: string; q?: string }>;
 }
-
-const ESTADO_COLORS: Record<string, string> = {
-  disponible: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  asignado: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  en_recarga: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  mantenimiento: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-  dañado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  perdido: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-};
 
 export default async function BotellonesPage({ searchParams }: Props) {
   const sp = await searchParams;
@@ -64,7 +56,7 @@ export default async function BotellonesPage({ searchParams }: Props) {
                 </td>
                 <td className="px-3 py-2.5">
                   <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${ESTADO_COLORS[b.estado] || ''}`}>
-                    {b.estado}
+                    {ESTADO_LABELS[b.estado] ?? b.estado}
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-zinc-600 dark:text-zinc-400">

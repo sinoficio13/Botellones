@@ -75,7 +75,7 @@ Lista de botellones asignados al cliente con sus estados.
 
 **AC:**
 - [x] Tabla: código, estado, fecha creación, total recargas
-- [x] Badge de color según estado (verde=disponible, azul=asignado, amarillo=recarga, gris=mantenimiento, rojo=dañado/perdido)
+- [x] Badge de color según estado (morado=entregado, gris=recibido, cian=en recarga, verde=listo, ámbar=en delivery)
 - [ ] Link a página del botellón (EPIC-4)
 
 ### HIST-3.7 — Ficha del cliente — Tab: Historial

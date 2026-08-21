@@ -3,7 +3,7 @@ import { RecargasBarChart } from '@/components/dashboard/recargas-bar-chart';
 import { BotellonesDonutChart } from '@/components/dashboard/botellones-donut-chart';
 import { TopClientesTable } from '@/components/dashboard/top-clientes-table';
 import { AlertPanel } from '@/components/dashboard/alert-panel';
-import { Users, Building2, Droplets, Gift, Truck, Package } from 'lucide-react';
+import { Users, Building2, Droplets, Truck, Gift } from 'lucide-react';
 import type {
   DashboardKpis,
   RecargaPorDia,
@@ -45,7 +45,7 @@ export function AdminDashboard({
       <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
         <KpiCard
           label="Total clientes"
           value={kpis.totalClientes}
@@ -60,11 +60,6 @@ export function AdminDashboard({
           label="Botellones activos"
           value={kpis.botellonesActivos}
           icon={<Droplets className="h-4 w-4" />}
-        />
-        <KpiCard
-          label="En planta"
-          value={kpis.botellonesEnPlanta}
-          icon={<Package className="h-4 w-4" />}
         />
         <KpiCard
           label="Recargas hoy"

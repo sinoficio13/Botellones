@@ -13,7 +13,6 @@ const FILTER_TABS = [
   { key: 'todas', label: 'Todas' },
   { key: 'premio', label: 'Premio' },
   { key: 'premio_cerca', label: 'Premio Cerca' },
-  { key: 'botellon_danado', label: 'Botellón' },
   { key: 'inactividad', label: 'Inactividad' },
 ] as const;
 

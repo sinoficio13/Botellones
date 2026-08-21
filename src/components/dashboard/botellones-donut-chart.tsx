@@ -8,19 +8,17 @@ type BotellonesDonutChartProps = {
 };
 
 const ESTADO_COLORS: Record<string, string> = {
-  disponible: 'hsl(142, 71%, 45%)',
-  asignado: 'hsl(221, 83%, 53%)',
-  en_recarga: 'hsl(38, 92%, 50%)',
-  dañado: 'hsl(0, 84%, 60%)',
-  perdido: 'hsl(0, 72%, 45%)',
-  en_planta: 'hsl(262, 83%, 58%)',
+  entregado: 'hsl(262, 83%, 58%)',
+  recibido: 'hsl(215, 20%, 45%)',
+  recarga: 'hsl(190, 90%, 50%)',
+  listo: 'hsl(142, 71%, 45%)',
+  delivery: 'hsl(38, 92%, 50%)',
 };
 
 const FALLBACK_COLORS = [
   'hsl(221, 83%, 53%)',
   'hsl(142, 71%, 45%)',
   'hsl(38, 92%, 50%)',
-  'hsl(0, 84%, 60%)',
   'hsl(262, 83%, 58%)',
   'hsl(199, 89%, 48%)',
 ];

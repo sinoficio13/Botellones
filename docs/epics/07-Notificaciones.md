@@ -24,7 +24,7 @@ Componente de campanita en header + panel desplegable con lista de notificacione
 - [x] Icono de campana en header con badge numerico de no leidas
 - [x] Click → dropdown con ultimas 5 notificaciones
 - [x] "Ver todas" → pagina `/notificaciones` con historial completo
-- [x] Filtro por tipo (premio, inactividad, botellon)
+- [x] Filtro por tipo (premio, inactividad)
 - [x] Marcar individual o "Marcar todas como leidas"
 - [x] Cada notificacion es clickeable → lleva a la ficha correspondiente
 - [x] Badge se actualiza en tiempo real (Supabase Realtime)
@@ -36,7 +36,6 @@ El sistema genera notificaciones automaticas para eventos clave.
 **AC:**
 - [x] Cliente alcanza 100 recargas → notificacion para admin + repartidor
 - [x] Cliente 30 dias sin recarga → notificacion para admin (se ejecuta diariamente)
-- [x] Botellon cambia a "danado" o "perdido" → notificacion para admin
 - [x] Cliente a 5 recargas del premio (95, 195, 295...) → notificacion para admin
 
 ### HIST-7.3 — Notificacion con accion WhatsApp
@@ -65,5 +64,4 @@ Las notificaciones se reciben en tiempo real sin refrescar la pagina.
 |---|---|---|
 | Premio alcanzado (100, 200, 300...) | 🎁 | Admin + Repartidor |
 | Inactividad 30 dias | ⚠️ | Admin |
-| Botellon danado/perdido | 🔧 | Admin |
 | A 5 recargas del premio | ⭐ | Admin |

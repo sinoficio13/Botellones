@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { AlertTriangle, Gift, UserX, Wrench, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Gift, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
@@ -20,14 +20,12 @@ type AlertasPanel = {
   premiosPendientes: AlertaItem[];
   clientesInactivos30: AlertaItem[];
   clientesInactivos60: AlertaItem[];
-  botellonesDanados: AlertaItem[];
 };
 
 // Merged view: combines both inactive arrays into one sorted list
 type MergedAlerts = {
   premiosPendientes: AlertaItem[];
   clientesInactivos: AlertaItem[];
-  botellonesDanados: AlertaItem[];
 };
 
 function mergeInactivos(raw: AlertasPanel): MergedAlerts {
@@ -37,7 +35,6 @@ function mergeInactivos(raw: AlertasPanel): MergedAlerts {
   return {
     premiosPendientes: raw.premiosPendientes,
     clientesInactivos: merged,
-    botellonesDanados: raw.botellonesDanados,
   };
 }
 
@@ -60,7 +57,6 @@ type Category = {
 const CATEGORIES: Category[] = [
   { key: 'premiosPendientes', label: 'Premios', icon: <Gift className="h-3.5 w-3.5" /> },
   { key: 'clientesInactivos', label: 'Inactivos', icon: <UserX className="h-3.5 w-3.5" /> },
-  { key: 'botellonesDanados', label: 'Dañados', icon: <Wrench className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -222,7 +218,7 @@ export function AlertPanel({ data: initialData }: { data: AlertasPanel }) {
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
-            <span className="tabular-nums">{total} {active === 'clientesInactivos' ? 'inactivos' : active === 'premiosPendientes' ? 'premios' : 'dañados'}</span>
+            <span className="tabular-nums">{total} {active === 'clientesInactivos' ? 'inactivos' : 'premios'}</span>
           </div>
         )}
       </CardContent>

@@ -7,22 +7,18 @@ import {
   moverBotellon,
   type BotellonOperativo,
 } from '@/lib/db/botellones';
-import { ESTADOS_KANBAN, ESTADOS_EXCEPCION } from '@/lib/utils/estados';
+import { ESTADOS_KANBAN } from '@/lib/utils/estados';
 
 // ── Colores y etiquetas por estado ──
 const ESTADO_META: Record<string, { label: string; sub: string; dot: string }> = {
   recibido: { label: 'Recibido', sub: 'Sucio · esperando lavado', dot: '#64748B' },
-  planta: { label: 'En planta', sub: 'Limpio · disponible', dot: '#2C63C7' },
   recarga: { label: 'En recarga', sub: 'Llenando ahora', dot: '#0C7C92' },
   listo: { label: 'Listo', sub: 'Recargado · listo p/ despacho', dot: '#1A9150' },
   delivery: { label: 'En delivery', sub: 'En camino al cliente', dot: '#DB9A2E' },
   entregado: { label: 'Entregado', sub: 'En manos del cliente', dot: '#6D42C7' },
-  danado: { label: 'Dañado', sub: 'Fuera de servicio', dot: '#D14343' },
-  perdido: { label: 'Perdido', sub: 'No localizable', dot: '#8A4B2E' },
-  mantenimiento: { label: 'Mantenimiento', sub: 'En reparación', dot: '#64748B' },
 };
 
-const TODOS_ESTADOS = [...ESTADOS_KANBAN, 'entregado', ...ESTADOS_EXCEPCION];
+const TODOS_ESTADOS = [...ESTADOS_KANBAN, 'entregado'];
 
 type Props = {
   botellones: BotellonOperativo[];
@@ -35,7 +31,6 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
   const [botellones, setBotellones] = useState(initial);
   const [recargasHoy, setRecargasHoy] = useState(initialHoy);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [exceptionOpen, setExceptionOpen] = useState<string | null>(null);
   const [assignId, setAssignId] = useState<string | null>(null);
   const [clientes, setClientes] = useState<Array<{ id: string; nombre: string; codigo: string }>>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -94,17 +89,14 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
 
   const kanban = ESTADOS_KANBAN.map((estado) => byEstado(estado));
   const entregados = byEstado('entregado');
-  const excepciones = ESTADOS_EXCEPCION.map((estado) => ({ estado, items: byEstado(estado) }));
 
   // KPIs
-  const enPlanta = byEstado('planta').length;
   const esperandoRecarga = byEstado('recibido').length + byEstado('recarga').length;
   const enRuta = byEstado('delivery').length;
   const enCirculacion = entregados.length;
   const listos = byEstado('listo').length;
 
   // Alertas
-  const danados = byEstado('danado').length + byEstado('perdido').length;
   const vencidos = entregados.filter((b) => {
     if (!b.fecha_entrega) return false;
     const dias = Math.round((now - new Date(b.fecha_entrega).getTime()) / 86400000);
@@ -117,13 +109,10 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">Necesita tu atención</h2>
         <div className="flex flex-wrap gap-2">
-          {danados > 0 && (
-            <AlertChip color="red" num={danados} label="botellones dañados/perdidos por revisar" />
-          )}
           {vencidos > 0 && (
             <AlertChip color="amber" num={vencidos} label="botellones con clientes hace >25 días — ofrecer recarga" />
           )}
-          {danados === 0 && vencidos === 0 && (
+          {vencidos === 0 && (
             <AlertChip color="green" num="✓" label="Todo al día. Sin pendientes urgentes." />
           )}
         </div>
@@ -134,7 +123,6 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">Estado del negocio, ahora mismo</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
           <KpiCard label="En circulación" value={enCirculacion} sub="Con clientes ahora" color="text-purple-600" />
-          <KpiCard label="En planta" value={enPlanta} sub="Limpios, listos" />
           <KpiCard label="Esperando recarga" value={esperandoRecarga} sub="Recibidos + llenando" color="text-cyan-600" />
           <KpiCard label="Listos" value={listos} sub="Para despachar" color="text-green-600" />
           <KpiCard label="En ruta" value={enRuta} sub="Saliendo a entrega" color="text-amber-600" />
@@ -148,7 +136,7 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Ciclo de vida de los botellones</h2>
           <p className="text-xs text-zinc-400">Arrastra o usa el selector para mover</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ESTADOS_KANBAN.map((estado, i) => {
             const meta = ESTADO_META[estado];
             const items = kanban[i];
@@ -192,45 +180,6 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
             );
           })}
         </div>
-      </section>
-
-      {/* ── Excepciones ── */}
-      <section>
-        <div className="flex flex-wrap gap-2">
-          {excepciones.map(({ estado, items }) => {
-            const meta = ESTADO_META[estado];
-            return (
-              <button
-                key={estado}
-                onClick={() => setExceptionOpen(exceptionOpen === estado ? null : estado)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
-                  exceptionOpen === estado
-                    ? 'border-zinc-400 bg-white dark:border-zinc-600 dark:bg-zinc-800'
-                    : 'border-zinc-200 dark:border-zinc-800'
-                }`}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ background: meta.dot }} />
-                {meta.label}
-                <b className="font-mono">{items.length}</b>
-              </button>
-            );
-          })}
-        </div>
-        {exceptionOpen && (
-          <div className="mt-2 rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-            {byEstado(exceptionOpen).map((b) => (
-              <div key={b.id} className="flex items-center gap-3 border-b border-zinc-100 px-4 py-2.5 text-sm last:border-0 dark:border-zinc-800">
-                <span className="font-mono text-xs">{b.codigo}</span>
-                <button
-                  onClick={() => move(b.id, 'planta')}
-                  className="ml-auto text-xs font-medium text-blue-600 hover:underline"
-                >
-                  ↩ Restaurar a planta
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
 
       {/* ── En circulación ── */}

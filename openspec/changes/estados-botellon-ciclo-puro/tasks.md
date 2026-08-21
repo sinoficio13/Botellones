@@ -53,6 +53,14 @@ Chain strategy: stacked-to-main
 - [x] 2.13 Docs: epics 04/07/08/13, `docs/epics.md` (6→5), `MAPA-SISTEMA.md`, `MANUAL-USUARIO.md`, `plan.md` (+change row), `03-Clientes.md` L78 badge colors
 - [x] 2.14 Commit: `refactor(ui): drop exception/planta UI, fix badge maps, docs → 5-estado cycle`
 
+## Commit 3 — Remediation: R4 runtime tests + constraint swap (verify obs 594)
+
+- [x] 3.1 RED `tests/unit/botellones-estado.test.ts` (new): `npx vitest run tests/unit/botellones-estado.test.ts` → `No test files found, exiting with code 1` (gap reproduced)
+- [x] 3.2 GREEN same file: R4 S1 stock (3), S2 assign→entregado (2), S3 unassign keeps estado (2), S4 create default (2), moverBotellon entregado path (2) → 11/11
+- [x] 3.3 Verify full gate: vitest 199/199 (17 files) · tsc 0 · `npm run build` exit 0
+- [x] 3.4 Constraint swap: live data verified read-only (14 rows, 0 outside 5-estado set) → DDL cannot run from this machine (no CLI/MCP/config.toml) → documented exact SQL (migration 0009) as applied-pending action item in apply-progress
+- [x] 3.5 Commit: `test(botellones): add R4 stock/assign/unassign/create coverage`
+
 ## Dependencies
 
 1.4 ← 1.1-1.3 (RED first); 1.5-1.7 ← 1.4; 1.8 independent (migration); 2.3-2.11 ← 1.4 (5-key maps / KANBAN, clears R1 type-red); 2.1/2.2 ← 1.4; 2.13 ← 2.3-2.11; Commit 2 ← Commit 1.

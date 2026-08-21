@@ -3,15 +3,15 @@
 import { revalidatePath } from 'next/cache';
 
 import {
-  procesarLoyalty,
+  procesarLoyaltyConCompensacion,
   REALIZADA_POR_PLACEHOLDER,
-  type PremioGenerado,
 } from '@/lib/db/loyalty';
+import { OPERACIONES, type Estado, type OperacionId } from '@/lib/utils/estados';
 
 // ── Types ──
 
 export type CargaItemResult =
-  | { botellonId: string; codigo: string; ok: true; recargaId: string; numeroRegistro: string }
+  | { botellonId: string; codigo: string; ok: true; recargaId?: string; numeroRegistro?: string }
   | { botellonId: string; codigo: string; ok: false; reason: 'sin-cliente' | `estado-${string}` | 'error' };
 
 export type CargaState = {
@@ -52,11 +52,18 @@ function esHoraValida(hora: string): boolean {
   return h >= 0 && h <= 23 && min >= 0 && min <= 59 && sec >= 0 && sec <= 59;
 }
 
-/** Per-item rejection: same reason resolution used on every failure path. */
-function rejectItem(id: string, row: BotellonRow | undefined): CargaItemResult {
+/**
+ * Per-item rejection, scoped to the operation: `sin-cliente` only when the op
+ * requires a client (recarga), `estado-<estado>` when the current estado is
+ * not one of the op's source estados (mirrors the `.in('estado', sources)`
+ * guard), `error` for unknown ids / fallback.
+ */
+function rejectItem(id: string, row: BotellonRow | undefined, operacion: OperacionId): CargaItemResult {
   if (!row) return { botellonId: id, codigo: id, ok: false, reason: 'error' };
-  if (!row.cliente_id) return { botellonId: id, codigo: row.codigo, ok: false, reason: 'sin-cliente' };
-  if (row.estado !== 'entregado')
+  const op = OPERACIONES[operacion];
+  if (op.requiresCliente && !row.cliente_id)
+    return { botellonId: id, codigo: row.codigo, ok: false, reason: 'sin-cliente' };
+  if (!op.sources.includes(row.estado as Estado))
     return { botellonId: id, codigo: row.codigo, ok: false, reason: `estado-${row.estado}` };
   return { botellonId: id, codigo: row.codigo, ok: false, reason: 'error' };
 }
@@ -64,29 +71,34 @@ function rejectItem(id: string, row: BotellonRow | undefined): CargaItemResult {
 // ── Batch action ──
 
 /**
- * Confirm a batch of scanned botellones as ONE uniform recarga.
+ * Confirm a batch of scanned botellones for ONE terminal operation
+ * (`recibir` | `recargar` | `listo`), driven by the OPERACIONES state machine.
  *
  * - Re-derives cliente_id per botellon server-side (never trusts the client).
- * - Dedupes the submitted botellonIds and rejects clientless / non-entregado
- *   items with per-item reasons.
- * - Computes N sequential REC numbers from ONE max+1 read, ordered
- *   deterministically (created_at DESC, id DESC) so batch rows sharing a
- *   created_at never tie-break arbitrarily.
- * - Inserts all rows in a single array insert (shared fecha/hora, placeholder actor).
- * - Updates entregado → recarga in one `.in()` statement.
- * - Runs loyalty once per distinct client; a loyalty failure is logged and the
- *   batch stays success:true because the data IS committed.
- * - Compensates for milestone overshoot: if the batch pushes a client past a
- *   multiple of 100 without landing exactly on it, the crossed premio is
- *   inserted idempotently (unique index uq_premios_cliente_nivel guards).
- * - On partial failure, compensates with a best-effort delete of inserted rows.
+ * - Dedupes the submitted botellonIds; per-item reasons are scoped to the op:
+ *   `sin-cliente` only when the op requires a client, `estado-<estado>` when
+ *   the item's estado is outside the op's source estados.
+ * - The recarga branch (createsRec): N sequential REC numbers from ONE max+1
+ *   read, single array insert, one `.in('estado', sources)` update
+ *   entregado/recibido → recarga, loyalty once per distinct client plus
+ *   milestone-crossing compensation, and a best-effort compensating delete of
+ *   inserted rows when the estado update fails.
+ * - Pure branches (recibir/listo): a single `.in('estado', sources)` estado
+ *   update with no `recargas` write and no loyalty.
  */
-export async function registrarCarga(input: {
+export async function registrarOperacion(input: {
   botellonIds: string[];
+  operacion: OperacionId;
   fecha: string;
   hora: string;
 }): Promise<CargaState> {
-  const { botellonIds, fecha, hora } = input;
+  const { botellonIds, operacion, fecha, hora } = input;
+  const op = OPERACIONES[operacion];
+
+  if (!op) {
+    return { success: false, items: [], error: 'Operación inválida' };
+  }
+
   const uniqueBotellonIds = [...new Set(botellonIds)];
 
   if (uniqueBotellonIds.length === 0) {
@@ -115,21 +127,65 @@ export async function registrarCarga(input: {
     if (selectError) {
       return {
         success: false,
-        items: uniqueBotellonIds.map((id) => rejectItem(id, undefined)),
+        items: uniqueBotellonIds.map((id) => rejectItem(id, undefined, operacion)),
         error: selectError.message,
       };
     }
 
     const rowsList = (rows || []) as BotellonRow[];
     const byId = new Map(rowsList.map((r) => [r.id, r]));
+    // Op-scoped validity: client required only when the op needs it, and the
+    // estado must be one of the op's declared sources.
     const valid = rowsList.filter(
-      (r): r is BotellonRow & { cliente_id: string } => Boolean(r.cliente_id) && r.estado === 'entregado'
+      (r): r is BotellonRow & { cliente_id: string } =>
+        (!op.requiresCliente || Boolean(r.cliente_id)) && op.sources.includes(r.estado as Estado)
     );
 
     if (valid.length === 0) {
       // Zero writes — surface the per-item rejection reasons
-      return { success: false, items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id))) };
+      return {
+        success: false,
+        items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id), operacion)),
+      };
     }
+
+    // ── Pure operations (recibir / listo): estado update only ──
+    if (!op.createsRec) {
+      const validIds = valid.map((r) => r.id);
+      const { error: updateError } = await supabase
+        .from('botellones')
+        .update({ estado: op.target })
+        .in('id', validIds)
+        .in('estado', op.sources);
+
+      if (updateError) {
+        return {
+          success: false,
+          items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id), operacion)),
+          error: updateError.message,
+        };
+      }
+
+      revalidatePath('/clientes');
+      revalidatePath('/recargas');
+      revalidatePath('/botellones');
+
+      const items: CargaItemResult[] = uniqueBotellonIds.map((id) => {
+        const row = byId.get(id);
+        if (
+          !row ||
+          (op.requiresCliente && !row.cliente_id) ||
+          !op.sources.includes(row.estado as Estado)
+        ) {
+          return rejectItem(id, row, operacion);
+        }
+        return { botellonId: id, codigo: row.codigo, ok: true };
+      });
+
+      return { success: true, items };
+    }
+
+    // ── Recarga branch: REC + insert + loyalty + compensation ──
 
     // Recargas added in THIS batch per distinct client (used for milestone-crossing)
     const addedByClient = new Map<string, number>();
@@ -170,18 +226,18 @@ export async function registrarCarga(input: {
     if (insertError || !inserted || inserted.length === 0) {
       return {
         success: false,
-        items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id))),
+        items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id), operacion)),
         error: insertError?.message ?? 'No se pudo insertar la carga',
       };
     }
 
-    // 4. Single .in() estado update: entregado → recarga
+    // 4. Single .in() estado update, guarded by the recarga sources
     const validIds = valid.map((r) => r.id);
     const { error: updateError } = await supabase
       .from('botellones')
       .update({ estado: 'recarga' })
       .in('id', validIds)
-      .eq('estado', 'entregado');
+      .in('estado', op.sources);
 
     if (updateError) {
       // 5. Compensating delete of the inserted rows (best-effort).
@@ -195,71 +251,21 @@ export async function registrarCarga(input: {
       }
       return {
         success: false,
-        items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id))),
+        items: uniqueBotellonIds.map((id) => rejectItem(id, byId.get(id), operacion)),
         error: updateError.message,
       };
     }
 
-    // 6. Loyalty once per distinct client.
+    // 6. Loyalty + milestone-crossing compensation once per distinct client.
     //    A loyalty failure must NOT fail the batch — the recargas are already
     //    committed. Log it and surface a loyaltyWarning instead.
     const distinctClientIds = [...new Set(valid.map((r) => r.cliente_id))];
 
-    let premios: PremioGenerado[] = [];
-    let loyaltyWarning: string | undefined;
-
-    try {
-      const loyalty = await procesarLoyalty(distinctClientIds, realizada_por);
-      premios = loyalty.premios;
-    } catch (err) {
-      loyaltyWarning = err instanceof Error ? err.message : 'Error al procesar fidelidad';
-      console.error('Loyalty processing failed after batch commit:', err);
-    }
-
-    // 7. Milestone-crossing compensation.
-    //    procesarLoyalty only fires when the post-batch total lands EXACTLY on
-    //    a multiple of 100. A batch that OVERSHOOTS a milestone (e.g. 98 + 5 =
-    //    103) would otherwise skip nivel-100. Detect every multiple of 100
-    //    crossed by this batch within (before, after] and insert it
-    //    idempotently (unique index uq_premios_cliente_nivel guards dupes).
-    try {
-      for (const clienteId of distinctClientIds) {
-        const added = addedByClient.get(clienteId) ?? 0;
-        const { count } = await supabase
-          .from('recargas')
-          .select('*', { count: 'exact', head: true })
-          .eq('cliente_id', clienteId);
-        const postCount = count ?? 0;
-        const beforeCount = postCount - added;
-
-        for (let nivel = 100; nivel <= postCount; nivel += 100) {
-          if (nivel <= beforeCount) continue;
-          const { data: premioData, error: premioError } = await supabase
-            .from('premios')
-            .insert({
-              cliente_id: clienteId,
-              nivel_recargas: nivel,
-              estado: 'pendiente',
-              fecha_alcanzado: new Date().toISOString().slice(0, 10),
-            })
-            .select('id')
-            .single();
-
-          if (premioError) {
-            if (premioError.code !== '23505') {
-              console.error('Error inserting crossed premio:', premioError);
-            }
-          } else if (premioData) {
-            premios.push({ nivel, id: premioData.id });
-          }
-        }
-      }
-    } catch (err) {
-      if (!loyaltyWarning) {
-        loyaltyWarning = err instanceof Error ? err.message : 'Error al verificar niveles';
-      }
-      console.error('Milestone compensation failed after batch commit:', err);
-    }
+    const { premios, loyaltyWarning } = await procesarLoyaltyConCompensacion(
+      distinctClientIds,
+      addedByClient,
+      realizada_por
+    );
 
     revalidatePath('/clientes');
     revalidatePath('/recargas');
@@ -270,11 +276,15 @@ export async function registrarCarga(input: {
 
     const items: CargaItemResult[] = uniqueBotellonIds.map((id) => {
       const row = byId.get(id);
-      if (!row || !row.cliente_id || row.estado !== 'entregado') {
-        return rejectItem(id, row);
+      if (
+        !row ||
+        (op.requiresCliente && !row.cliente_id) ||
+        !op.sources.includes(row.estado as Estado)
+      ) {
+        return rejectItem(id, row, operacion);
       }
       const recargaId = recargaIdByBotellon.get(id);
-      if (!recargaId) return rejectItem(id, row);
+      if (!recargaId) return rejectItem(id, row, operacion);
       return {
         botellonId: id,
         codigo: row.codigo,
@@ -291,8 +301,21 @@ export async function registrarCarga(input: {
   } catch (err: unknown) {
     return {
       success: false,
-      items: uniqueBotellonIds.map((id) => rejectItem(id, undefined)),
+      items: uniqueBotellonIds.map((id) => rejectItem(id, undefined, operacion)),
       error: err instanceof Error ? err.message : 'Error al registrar carga',
     };
   }
+}
+
+/**
+ * Backward-compatible thin wrapper: the previous batch recarga action now
+ * delegates to `registrarOperacion` with the fixed `recargar` operation.
+ * Dropped in commit 2 once the page points at `registrarOperacion`.
+ */
+export async function registrarCarga(input: {
+  botellonIds: string[];
+  fecha: string;
+  hora: string;
+}): Promise<CargaState> {
+  return registrarOperacion({ ...input, operacion: 'recargar' });
 }

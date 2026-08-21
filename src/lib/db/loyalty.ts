@@ -112,3 +112,85 @@ export async function procesarLoyalty(
 
   return { premios };
 }
+
+export type LoyaltyConCompensacionResult = {
+  premios: PremioGenerado[];
+  loyaltyWarning?: string;
+};
+
+/**
+ * Loyalty detection + milestone-crossing compensation for a batch.
+ *
+ * Combines `procesarLoyalty` (fires when the post-batch total lands EXACTLY
+ * on a multiple of 100) with the compensation pass that inserts every multiple
+ * of 100 crossed by this batch within (before, after]. A batch that OVERSHOOTS
+ * a milestone (e.g. 98 + 5 = 103) would otherwise skip nivel-100. Compensation
+ * inserts are idempotent — unique index uq_premios_cliente_nivel guards dupes.
+ *
+ * A loyalty failure is NOT fatal: the recargas are already committed, so the
+ * batch stays successful and the warning is surfaced instead.
+ */
+export async function procesarLoyaltyConCompensacion(
+  distinctClientIds: string[],
+  addedByClient: Map<string, number>,
+  realizadaPor: string = REALIZADA_POR_PLACEHOLDER
+): Promise<LoyaltyConCompensacionResult> {
+  const premios: PremioGenerado[] = [];
+  let loyaltyWarning: string | undefined;
+
+  if (distinctClientIds.length === 0) return { premios };
+
+  const supabase = await getSupabase();
+
+  // 1. Loyalty: premio at exact multiples of 100, premio_cerca 5 before.
+  try {
+    const loyalty = await procesarLoyalty(distinctClientIds, realizadaPor);
+    premios.push(...loyalty.premios);
+  } catch (err) {
+    loyaltyWarning = err instanceof Error ? err.message : 'Error al procesar fidelidad';
+    console.error('Loyalty processing failed after batch commit:', err);
+  }
+
+  // 2. Milestone-crossing compensation: every multiple of 100 crossed within
+  //    (before, after] that procesarLoyalty did not fire for.
+  try {
+    for (const clienteId of distinctClientIds) {
+      const added = addedByClient.get(clienteId) ?? 0;
+      const { count } = await supabase
+        .from('recargas')
+        .select('*', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId);
+      const postCount = count ?? 0;
+      const beforeCount = postCount - added;
+
+      for (let nivel = 100; nivel <= postCount; nivel += 100) {
+        if (nivel <= beforeCount) continue;
+        const { data: premioData, error: premioError } = await supabase
+          .from('premios')
+          .insert({
+            cliente_id: clienteId,
+            nivel_recargas: nivel,
+            estado: 'pendiente',
+            fecha_alcanzado: new Date().toISOString().slice(0, 10),
+          })
+          .select('id')
+          .single();
+
+        if (premioError) {
+          if (premioError.code !== '23505') {
+            console.error('Error inserting crossed premio:', premioError);
+          }
+        } else if (premioData) {
+          premios.push({ nivel, id: premioData.id });
+        }
+      }
+    }
+  } catch (err) {
+    if (!loyaltyWarning) {
+      loyaltyWarning = err instanceof Error ? err.message : 'Error al verificar niveles';
+    }
+    console.error('Milestone compensation failed after batch commit:', err);
+  }
+
+  return { premios, loyaltyWarning };
+}

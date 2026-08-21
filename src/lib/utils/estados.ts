@@ -21,12 +21,14 @@ export type Estado = (typeof ESTADOS)[number];
 
 const TRANSICIONES: Record<Estado, Estado[]> = {
   // Flujo lineal
-  recibido: ['planta', 'danado', 'perdido'],
+  recibido: ['planta', 'recarga', 'danado', 'perdido'],
   planta: ['recarga', 'mantenimiento', 'danado', 'perdido'],
   recarga: ['listo', 'danado', 'mantenimiento'],
   listo: ['delivery', 'danado'],
   delivery: ['entregado', 'perdido', 'danado'],
-  entregado: ['recibido', 'perdido'],
+  // Multi-source recarga: a returned botellon (entregado) or one already
+  // received (recibido) advances to recarga in one pass (terminal op).
+  entregado: ['recibido', 'recarga', 'perdido'],
   // Excepciones → restaurar a planta
   danado: ['planta'],
   perdido: ['planta'],
@@ -35,6 +37,34 @@ const TRANSICIONES: Record<Estado, Estado[]> = {
 
 export function getTransiciones(estado: Estado): Estado[] {
   return TRANSICIONES[estado] || [];
+}
+
+/**
+ * Terminal operations of the carga scanner. Each operation maps a set of
+ * source estados to a single target estado and declares whether it needs a
+ * cliente_id (only recarga writes `recargas` rows) and whether it creates a
+ * REC number. The server-side `.in('estado', sources)` guard in
+ * `registrarOperacion` is the source of truth; the UI mirrors it via
+ * `esTransicionValida` for live green/red badges.
+ */
+export type OperacionId = 'recibir' | 'recargar' | 'listo';
+
+export const OPERACIONES: Record<
+  OperacionId,
+  { target: Estado; requiresCliente: boolean; createsRec: boolean; sources: Estado[] }
+> = {
+  recibir: { target: 'recibido', requiresCliente: false, createsRec: false, sources: ['entregado'] },
+  recargar: { target: 'recarga', requiresCliente: true, createsRec: true, sources: ['entregado', 'recibido'] },
+  listo: { target: 'listo', requiresCliente: false, createsRec: false, sources: ['recarga'] },
+};
+
+/**
+ * Strict transition check: an operation is valid for a botellon only when its
+ * current estado is one of the operation's declared source estados. Mirrors
+ * the server-side `.in('estado', sources)` guard.
+ */
+export function esTransicionValida(estadoActual: Estado, op: OperacionId): boolean {
+  return OPERACIONES[op].sources.includes(estadoActual);
 }
 
 /** Estados operativos (los que van en el kanban, sin "entregado" que vive en circulación) */

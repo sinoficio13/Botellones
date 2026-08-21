@@ -21,9 +21,9 @@ vi.mock('@/lib/db/loyalty', async (importOriginal) => {
   return { ...actual, procesarLoyalty: procesarLoyaltyMock };
 });
 
-import { procesarLoyalty, REALIZADA_POR_PLACEHOLDER } from '@/lib/db/loyalty';
+import { procesarLoyalty, procesarLoyaltyConCompensacion, REALIZADA_POR_PLACEHOLDER } from '@/lib/db/loyalty';
 import { registrarRecarga } from '@/lib/db/recargas';
-import { registrarCarga } from '@/lib/db/cargas';
+import { registrarCarga, registrarOperacion } from '@/lib/db/cargas';
 import { revalidatePath } from 'next/cache';
 
 const PLACEHOLDER = REALIZADA_POR_PLACEHOLDER;
@@ -202,6 +202,90 @@ describe('procesarLoyalty', () => {
   });
 });
 
+// ── Task 1.3: procesarLoyaltyConCompensacion (loyalty + milestone compensation) ──
+
+describe('procesarLoyaltyConCompensacion', () => {
+  beforeEach(() => {
+    createClientMock.mockReset();
+    procesarLoyaltyMock.mockClear();
+  });
+
+  it('runs loyalty once per distinct client and compensates crossed milestones', async () => {
+    // loyalty count query (103 → no exact-multiple premio) + compensation count + crossed premio insert
+    const countLoyalty = makeChain(async () => ({ count: 103 }));
+    const countComp = makeChain(async () => ({ count: 103 }));
+    const premioInsert = makeChain(async () => ({ data: { id: 'p100' }, error: null }));
+    const { supabase, recorded } = makeSupabase([countLoyalty, countComp, premioInsert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await procesarLoyaltyConCompensacion(['c1'], new Map([['c1', 5]]), PLACEHOLDER);
+
+    // 98 + 5 = 103 → loyalty fires no premio, compensation crosses nivel 100
+    expect(result).toEqual({ premios: [{ nivel: 100, id: 'p100' }] });
+    // two recargas-count queries: one for loyalty, one for milestone compensation
+    expect(countQueries(recorded)).toHaveLength(2);
+    expect(countLoyalty.eq).toHaveBeenCalledWith('cliente_id', 'c1');
+    expect(premioInsert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ cliente_id: 'c1', nivel_recargas: 100, estado: 'pendiente' })
+    );
+  });
+
+  it('does not create a premio when the batch starts exactly at a milestone (100 + 5)', async () => {
+    const countLoyalty = makeChain(async () => ({ count: 105 }));
+    const countComp = makeChain(async () => ({ count: 105 }));
+    const { supabase } = makeSupabase([countLoyalty, countComp]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await procesarLoyaltyConCompensacion(['c1'], new Map([['c1', 5]]), PLACEHOLDER);
+
+    expect(result).toEqual({ premios: [] });
+    expect(supabase.from).toHaveBeenCalledTimes(2); // loyalty count + compensation count, no premio insert
+  });
+
+  it('surfaces a loyaltyWarning when loyalty throws but still compensates', async () => {
+    // loyalty's own count query rejects → procesarLoyalty throws → helper catches and warns
+    const countLoyalty = makeChain(async () => {
+      throw new Error('loyalty boom');
+    });
+    const countComp = makeChain(async () => ({ count: 103 }));
+    const premioInsert = makeChain(async () => ({ data: { id: 'p100' }, error: null }));
+    const { supabase } = makeSupabase([countLoyalty, countComp, premioInsert]);
+    createClientMock.mockResolvedValue(supabase);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await procesarLoyaltyConCompensacion(['c1'], new Map([['c1', 5]]), PLACEHOLDER);
+
+    expect(result.loyaltyWarning).toBe('loyalty boom');
+    expect(result.premios).toEqual([{ nivel: 100, id: 'p100' }]);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('is idempotent on duplicate crossed-premio insert (23505)', async () => {
+    // beforeCount 100 (added 103), postCount 203 → crosses nivel 200 → duplicate insert swallowed
+    const countLoyalty = makeChain(async () => ({ count: 203 }));
+    const countComp = makeChain(async () => ({ count: 203 }));
+    const premioDup = makeChain(async () => ({
+      data: null,
+      error: { code: '23505', message: 'duplicate key value' },
+    }));
+    const { supabase } = makeSupabase([countLoyalty, countComp, premioDup]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await procesarLoyaltyConCompensacion(['c1'], new Map([['c1', 103]]), PLACEHOLDER);
+
+    expect(result).toEqual({ premios: [] });
+    expect(premioDup.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not touch the database when given no clients', async () => {
+    const result = await procesarLoyaltyConCompensacion([], new Map(), PLACEHOLDER);
+
+    expect(result).toEqual({ premios: [] });
+    expect(createClientMock).not.toHaveBeenCalled();
+  });
+});
+
 // ── Task 1.2: registrarRecarga refactor (approval + delegation) ──
 
 describe('registrarRecarga', () => {
@@ -264,9 +348,9 @@ describe('registrarRecarga', () => {
   });
 });
 
-// ── Task 1.3: registrarCarga ──
+// ── Task 1.4/1.5: registrarOperacion — recarga branch (migrated from registrarCarga) ──
 
-describe('registrarCarga', () => {
+describe('registrarOperacion — recarga branch', () => {
   beforeEach(() => {
     createClientMock.mockReset();
     procesarLoyaltyMock.mockClear();
@@ -304,7 +388,7 @@ describe('registrarCarga', () => {
     ]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(true);
     expect(result.items).toEqual([
@@ -333,17 +417,14 @@ describe('registrarCarga', () => {
       realizada_por: PLACEHOLDER,
     });
 
-    // One .in() estado update entregado → recarga
+    // One .in() estado update entregado → recarga, guarded by recarga sources
     expect(update.update).toHaveBeenCalledTimes(1);
     expect(update.update).toHaveBeenCalledWith({ estado: 'recarga' });
     expect(update.in).toHaveBeenCalledWith('id', ['b1', 'b2']);
-    expect(update.eq).toHaveBeenCalledWith('estado', 'entregado');
+    expect(update.in).toHaveBeenCalledWith('estado', ['entregado', 'recibido']);
 
     // Loyalty ran once per distinct client (loyalty counts + milestone-compensation counts)
     expect(countQueries(recorded)).toHaveLength(4);
-    expect(procesarLoyaltyMock).toHaveBeenCalledTimes(1);
-    expect(procesarLoyaltyMock).toHaveBeenCalledWith(['c1', 'c2'], PLACEHOLDER);
-
     expect(revalidatePath).toHaveBeenCalledWith('/clientes');
     expect(revalidatePath).toHaveBeenCalledWith('/recargas');
     expect(revalidatePath).toHaveBeenCalledWith('/botellones');
@@ -369,11 +450,9 @@ describe('registrarCarga', () => {
     const { supabase, recorded } = makeSupabase([partition, last, insert, update, countC1, countC1Comp]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(true);
-    expect(procesarLoyaltyMock).toHaveBeenCalledTimes(1);
-    expect(procesarLoyaltyMock).toHaveBeenCalledWith(['c1'], PLACEHOLDER);
     expect(countQueries(recorded)).toHaveLength(2);
   });
 
@@ -391,7 +470,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition, last, insert, update, countC1, countC1Comp]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b3'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b3'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(true);
     expect(result.items).toEqual([
@@ -410,7 +489,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b3'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b3'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(result.items).toEqual([
@@ -431,7 +510,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b4', 'b5'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b4', 'b5'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(result.items).toEqual([
@@ -452,7 +531,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b3', 'b4'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b3', 'b4'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(result.items).toEqual([
@@ -478,7 +557,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition, last, insert, update, del]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('update exploded');
@@ -501,7 +580,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition, last, insert]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('insert exploded');
@@ -539,7 +618,7 @@ describe('registrarCarga', () => {
     ]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30:05' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30:05' });
 
     const rows = insert.insert.mock.calls[0][0] as Array<Record<string, unknown>>;
     expect(rows[0].hora).toBe('14:30:05');
@@ -560,7 +639,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition, last, insert, update, countC1, countC1Comp]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'ghost'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'ghost'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(true);
     expect(result.items).toEqual([
@@ -570,7 +649,7 @@ describe('registrarCarga', () => {
   });
 
   it('rejects an empty batch without touching the database', async () => {
-    const result = await registrarCarga({ botellonIds: [], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: [], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(result.items).toEqual([]);
@@ -579,7 +658,7 @@ describe('registrarCarga', () => {
 
   // ── R4-1/R2-2: loyalty throw after commit must not fail the committed batch ──
 
-  it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', async () => {
+it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', async () => {
     const partition = makeChain(async () => ({ data: entregados, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
@@ -590,15 +669,30 @@ describe('registrarCarga', () => {
       error: null,
     }));
     const update = makeChain(async () => ({ error: null }));
+    // loyalty's own count query rejects → helper catches and surfaces the warning
+    const countLoyalty = makeChain(async () => {
+      throw new Error('loyalty boom');
+    });
     const countC1Comp = makeChain(async () => ({ count: 2 }));
     const countC2Comp = makeChain(async () => ({ count: 2 }));
-    const { supabase } = makeSupabase([partition, last, insert, update, countC1Comp, countC2Comp]);
+    const { supabase } = makeSupabase([
+      partition,
+      last,
+      insert,
+      update,
+      countLoyalty,
+      countC1Comp,
+      countC2Comp,
+    ]);
     createClientMock.mockResolvedValue(supabase);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    procesarLoyaltyMock.mockRejectedValueOnce(new Error('loyalty boom'));
-
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({
+      botellonIds: ['b1', 'b2'],
+      operacion: 'recargar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
 
     expect(result.success).toBe(true);
     expect(result.items.every((i) => i.ok)).toBe(true);
@@ -639,8 +733,9 @@ describe('registrarCarga', () => {
     ]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({
+    const result = await registrarOperacion({
       botellonIds: ['b1', 'b2', 'b3', 'b4', 'b5'],
+      operacion: 'recargar',
       fecha: '2026-08-20',
       hora: '14:30',
     });
@@ -671,8 +766,9 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition, last, insert, update, countLoyalty, countComp]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({
+    const result = await registrarOperacion({
       botellonIds: ['b1', 'b2', 'b3', 'b4', 'b5'],
+      operacion: 'recargar',
       fecha: '2026-08-20',
       hora: '14:30',
     });
@@ -699,7 +795,7 @@ describe('registrarCarga', () => {
     const { supabase } = makeSupabase([partition, last, insert, update, countC1Comp, countC2Comp]);
     createClientMock.mockResolvedValue(supabase);
 
-    await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(last.order).toHaveBeenCalledWith('created_at', { ascending: false });
     expect(last.order).toHaveBeenCalledWith('id', { ascending: false });
@@ -723,7 +819,7 @@ describe('registrarCarga', () => {
     createClientMock.mockResolvedValue(supabase);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b2'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(false);
     expect(errorSpy).toHaveBeenCalled();
@@ -738,11 +834,12 @@ describe('registrarCarga', () => {
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({ data: [{ id: 'r1', botellon_id: 'b1' }], error: null }));
     const update = makeChain(async () => ({ error: null }));
+    const countC1 = makeChain(async () => ({ count: 1 }));
     const countC1Comp = makeChain(async () => ({ count: 1 }));
-    const { supabase } = makeSupabase([partition, last, insert, update, countC1Comp]);
+    const { supabase } = makeSupabase([partition, last, insert, update, countC1, countC1Comp]);
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await registrarCarga({ botellonIds: ['b1', 'b1'], fecha: '2026-08-20', hora: '14:30' });
+    const result = await registrarOperacion({ botellonIds: ['b1', 'b1'], operacion: 'recargar', fecha: '2026-08-20', hora: '14:30' });
 
     expect(result.success).toBe(true);
     expect(result.items).toHaveLength(1);
@@ -752,7 +849,7 @@ describe('registrarCarga', () => {
   });
 
   it('rejects an invalid hora (out-of-range) with a clear error and no writes', async () => {
-    const result = await registrarCarga({ botellonIds: ['b1'], fecha: '2026-08-20', hora: '99:99' });
+    const result = await registrarOperacion({ botellonIds: ['b1'], operacion: 'recargar', fecha: '2026-08-20', hora: '99:99' });
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/hora/i);
@@ -760,10 +857,302 @@ describe('registrarCarga', () => {
   });
 
   it('rejects a non-time hora string with a clear error and no writes', async () => {
-    const result = await registrarCarga({ botellonIds: ['b1'], fecha: '2026-08-20', hora: 'foo' });
+    const result = await registrarOperacion({ botellonIds: ['b1'], operacion: 'recargar', fecha: '2026-08-20', hora: 'foo' });
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/hora/i);
+    expect(createClientMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── Task 1.4/1.5: registrarOperacion — pure operations (recibir / listo) ──
+
+describe('registrarOperacion — pure operations', () => {
+  beforeEach(() => {
+    createClientMock.mockReset();
+    procesarLoyaltyMock.mockClear();
+  });
+
+  it('recibir performs a pure estado update with no recargas insert and no loyalty', async () => {
+    const partition = makeChain(async () => ({
+      data: [
+        { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' },
+        { id: 'b2', codigo: 'BOT-00002', estado: 'entregado', cliente_id: null },
+      ],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const { supabase, recorded } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b1', 'b2'],
+      operacion: 'recibir',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    // clientless item accepted in recibir, and ok items carry no recargaId/numeroRegistro
+    expect(result.items).toEqual([
+      { botellonId: 'b1', codigo: 'BOT-00001', ok: true },
+      { botellonId: 'b2', codigo: 'BOT-00002', ok: true },
+    ]);
+    expect(update.update).toHaveBeenCalledWith({ estado: 'recibido' });
+    expect(update.in).toHaveBeenCalledWith('id', ['b1', 'b2']);
+    expect(update.in).toHaveBeenCalledWith('estado', ['entregado']);
+    // no recargas table access at all, no loyalty count queries
+    expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
+    expect(countQueries(recorded)).toHaveLength(0);
+    expect(revalidatePath).toHaveBeenCalledWith('/botellones');
+  });
+
+  it('listo performs a pure estado update from recarga, accepting a clientless botellon', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b1', codigo: 'BOT-00001', estado: 'recarga', cliente_id: null }],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const { supabase } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b1'],
+      operacion: 'listo',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([{ botellonId: 'b1', codigo: 'BOT-00001', ok: true }]);
+    expect(update.update).toHaveBeenCalledWith({ estado: 'listo' });
+    expect(update.in).toHaveBeenCalledWith('estado', ['recarga']);
+    expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
+    expect(revalidatePath).toHaveBeenCalledWith('/botellones');
+  });
+
+  it('recibir zero-write when every item is outside its sources', async () => {
+    const partition = makeChain(async () => ({
+      data: [
+        { id: 'b4', codigo: 'BOT-00004', estado: 'recarga', cliente_id: 'c1' },
+        { id: 'b5', codigo: 'BOT-00005', estado: 'listo', cliente_id: 'c1' },
+      ],
+      error: null,
+    }));
+    const { supabase } = makeSupabase([partition]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b4', 'b5'],
+      operacion: 'recibir',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.items).toEqual([
+      { botellonId: 'b4', codigo: 'BOT-00004', ok: false, reason: 'estado-recarga' },
+      { botellonId: 'b5', codigo: 'BOT-00005', ok: false, reason: 'estado-listo' },
+    ]);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a pure-operation update failure with per-item error reasons and no compensation', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' }],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: { message: 'update exploded' } }));
+    const { supabase } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b1'],
+      operacion: 'recibir',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('update exploded');
+    expect(result.items).toEqual([
+      { botellonId: 'b1', codigo: 'BOT-00001', ok: false, reason: 'error' },
+    ]);
+    // pure branch: no recargas insert to compensate, no loyalty, no revalidate
+    expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+// ── Task 1.4/1.5: registrarOperacion — multi-source recarga + op-scoped no-client ──
+
+describe('registrarOperacion — multi-source recarga', () => {
+  beforeEach(() => {
+    createClientMock.mockReset();
+    procesarLoyaltyMock.mockClear();
+  });
+
+  it('accepts a recibido source for recargar in one pass', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b6', codigo: 'BOT-00006', estado: 'recibido', cliente_id: 'c1' }],
+      error: null,
+    }));
+    const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
+    const insert = makeChain(async () => ({ data: [{ id: 'r6', botellon_id: 'b6' }], error: null }));
+    const update = makeChain(async () => ({ error: null }));
+    const countC1 = makeChain(async () => ({ count: 1 }));
+    const countC1Comp = makeChain(async () => ({ count: 1 }));
+    const { supabase } = makeSupabase([partition, last, insert, update, countC1, countC1Comp]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b6'],
+      operacion: 'recargar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([
+      { botellonId: 'b6', codigo: 'BOT-00006', ok: true, recargaId: 'r6', numeroRegistro: 'REC-000043' },
+    ]);
+    expect(update.update).toHaveBeenCalledWith({ estado: 'recarga' });
+    expect(update.in).toHaveBeenCalledWith('estado', ['entregado', 'recibido']);
+  });
+
+  it('rejects a raced item whose estado left the recarga sources with estado-<estado>', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b7', codigo: 'BOT-00007', estado: 'recarga', cliente_id: 'c1' }],
+      error: null,
+    }));
+    const { supabase } = makeSupabase([partition]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b7'],
+      operacion: 'recargar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.items).toEqual([
+      { botellonId: 'b7', codigo: 'BOT-00007', ok: false, reason: 'estado-recarga' },
+    ]);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('registrarOperacion — op-scoped no-client gate', () => {
+  beforeEach(() => {
+    createClientMock.mockReset();
+    procesarLoyaltyMock.mockClear();
+  });
+
+  it('recargar rejects a clientless botellon with sin-cliente', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b8', codigo: 'BOT-00008', estado: 'entregado', cliente_id: null }],
+      error: null,
+    }));
+    const { supabase } = makeSupabase([partition]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b8'],
+      operacion: 'recargar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.items).toEqual([
+      { botellonId: 'b8', codigo: 'BOT-00008', ok: false, reason: 'sin-cliente' },
+    ]);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(procesarLoyaltyMock).not.toHaveBeenCalled();
+  });
+
+  it('the same clientless botellon is accepted under recibir', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b8', codigo: 'BOT-00008', estado: 'entregado', cliente_id: null }],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const { supabase } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b8'],
+      operacion: 'recibir',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([{ botellonId: 'b8', codigo: 'BOT-00008', ok: true }]);
+    expect(update.in).toHaveBeenCalledWith('id', ['b8']);
+  });
+});
+
+// ── Task 1.5: registrarCarga thin wrapper (delegates with operacion recargar) ──
+
+describe('registrarCarga wrapper', () => {
+  beforeEach(() => {
+    createClientMock.mockReset();
+    procesarLoyaltyMock.mockClear();
+  });
+
+  const entregados = [
+    { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' },
+    { id: 'b2', codigo: 'BOT-00002', estado: 'entregado', cliente_id: 'c2' },
+  ];
+
+  it('delegates to registrarOperacion with operacion recargar (REC numbers produced)', async () => {
+    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
+    const insert = makeChain(async () => ({
+      data: [
+        { id: 'r1', botellon_id: 'b1' },
+        { id: 'r2', botellon_id: 'b2' },
+      ],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const countC1 = makeChain(async () => ({ count: 1 }));
+    const countC2 = makeChain(async () => ({ count: 1 }));
+    const countC1Comp = makeChain(async () => ({ count: 1 }));
+    const countC2Comp = makeChain(async () => ({ count: 1 }));
+    const { supabase } = makeSupabase([
+      partition,
+      last,
+      insert,
+      update,
+      countC1,
+      countC2,
+      countC1Comp,
+      countC2Comp,
+    ]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([
+      { botellonId: 'b1', codigo: 'BOT-00001', ok: true, recargaId: 'r1', numeroRegistro: 'REC-000043' },
+      { botellonId: 'b2', codigo: 'BOT-00002', ok: true, recargaId: 'r2', numeroRegistro: 'REC-000044' },
+    ]);
+    expect(update.update).toHaveBeenCalledWith({ estado: 'recarga' });
+    expect(update.in).toHaveBeenCalledWith('estado', ['entregado', 'recibido']);
+    expect(revalidatePath).toHaveBeenCalledWith('/clientes');
+    expect(revalidatePath).toHaveBeenCalledWith('/recargas');
+    expect(revalidatePath).toHaveBeenCalledWith('/botellones');
+  });
+
+  it('rejects an empty batch without touching the database', async () => {
+    const result = await registrarCarga({ botellonIds: [], fecha: '2026-08-20', hora: '14:30' });
+
+    expect(result.success).toBe(false);
+    expect(result.items).toEqual([]);
     expect(createClientMock).not.toHaveBeenCalled();
   });
 });

@@ -1,38 +1,26 @@
 /**
  * Botellon lifecycle state machine — pure functions, no server-side deps.
  *
- * Ciclo físico del botellón:
- *   recibido → planta → recarga → listo → delivery → entregado
- * Excepciones (desde cualquier punto operativo): danado, perdido, mantenimiento
- * Restauración desde excepción: → planta
+ * Ciclo físico del botellón (5 estados puros, sin planta ni excepciones):
+ *   entregado → recibido → recarga → listo → entregado
+ *   (+ listo → delivery → entregado)
+ * Los botellones sin cliente en `recibido`/`listo` son stock.
  */
 export const ESTADOS = [
+  'entregado',
   'recibido',
-  'planta',
   'recarga',
   'listo',
   'delivery',
-  'entregado',
-  'danado',
-  'perdido',
-  'mantenimiento',
 ] as const;
 export type Estado = (typeof ESTADOS)[number];
 
 const TRANSICIONES: Record<Estado, Estado[]> = {
-  // Flujo lineal
-  recibido: ['planta', 'recarga', 'danado', 'perdido'],
-  planta: ['recarga', 'mantenimiento', 'danado', 'perdido'],
-  recarga: ['listo', 'danado', 'mantenimiento'],
-  listo: ['delivery', 'danado'],
-  delivery: ['entregado', 'perdido', 'danado'],
-  // Multi-source recarga: a returned botellon (entregado) or one already
-  // received (recibido) advances to recarga in one pass (terminal op).
-  entregado: ['recibido', 'recarga', 'perdido'],
-  // Excepciones → restaurar a planta
-  danado: ['planta'],
-  perdido: ['planta'],
-  mantenimiento: ['planta'],
+  entregado: ['recibido'],
+  recibido: ['recarga'],
+  recarga: ['listo'],
+  listo: ['entregado', 'delivery'],
+  delivery: ['entregado'],
 };
 
 export function getTransiciones(estado: Estado): Estado[] {
@@ -54,7 +42,7 @@ export const OPERACIONES: Record<
   { target: Estado; requiresCliente: boolean; createsRec: boolean; sources: Estado[] }
 > = {
   recibir: { target: 'recibido', requiresCliente: false, createsRec: false, sources: ['entregado'] },
-  recargar: { target: 'recarga', requiresCliente: true, createsRec: true, sources: ['entregado', 'recibido'] },
+  recargar: { target: 'recarga', requiresCliente: true, createsRec: true, sources: ['recibido'] },
   listo: { target: 'listo', requiresCliente: false, createsRec: false, sources: ['recarga'] },
 };
 
@@ -68,10 +56,7 @@ export function esTransicionValida(estadoActual: Estado, op: OperacionId): boole
 }
 
 /** Estados operativos (los que van en el kanban, sin "entregado" que vive en circulación) */
-export const ESTADOS_KANBAN: Estado[] = ['recibido', 'planta', 'recarga', 'listo', 'delivery'];
-
-/** Excepciones (dañado/perdido/mantenimiento) */
-export const ESTADOS_EXCEPCION: Estado[] = ['danado', 'perdido', 'mantenimiento'];
+export const ESTADOS_KANBAN: Estado[] = ['recibido', 'recarga', 'listo', 'delivery'];
 
 /**
  * Canonical human-readable labels for each botellon estado. Consumed by badges,
@@ -79,15 +64,11 @@ export const ESTADOS_EXCEPCION: Estado[] = ['danado', 'perdido', 'mantenimiento'
  * unknown (future estados must not crash the UI).
  */
 export const ESTADO_LABELS: Record<string, string> = {
+  entregado: 'Entregado',
   recibido: 'Recibido',
-  planta: 'En planta',
   recarga: 'En recarga',
   listo: 'Listo',
   delivery: 'En delivery',
-  entregado: 'Entregado',
-  danado: 'Dañado',
-  perdido: 'Perdido',
-  mantenimiento: 'Mantenimiento',
 };
 
 /**
@@ -96,13 +77,9 @@ export const ESTADO_LABELS: Record<string, string> = {
  * (consumer renders without a colored badge).
  */
 export const ESTADO_COLORS: Record<string, string> = {
+  entregado: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   recibido: 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-400',
-  planta: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   recarga: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
   listo: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   delivery: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  entregado: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  danado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  perdido: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  mantenimiento: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
 };

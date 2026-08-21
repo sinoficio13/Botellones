@@ -356,13 +356,13 @@ describe('registrarOperacion — recarga branch', () => {
     procesarLoyaltyMock.mockClear();
   });
 
-  const entregados = [
-    { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' },
-    { id: 'b2', codigo: 'BOT-00002', estado: 'entregado', cliente_id: 'c2' },
+  const recibidos = [
+    { id: 'b1', codigo: 'BOT-00001', estado: 'recibido', cliente_id: 'c1' },
+    { id: 'b2', codigo: 'BOT-00002', estado: 'recibido', cliente_id: 'c2' },
   ];
 
   it('happy path: N rows, sequential REC from one max+1, shared fecha/hora, one .in() update, loyalty once per distinct client', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
       data: [
@@ -417,11 +417,11 @@ describe('registrarOperacion — recarga branch', () => {
       realizada_por: PLACEHOLDER,
     });
 
-    // One .in() estado update entregado → recarga, guarded by recarga sources
+    // One .in() estado update recibido → recarga, guarded by recarga sources
     expect(update.update).toHaveBeenCalledTimes(1);
     expect(update.update).toHaveBeenCalledWith({ estado: 'recarga' });
     expect(update.in).toHaveBeenCalledWith('id', ['b1', 'b2']);
-    expect(update.in).toHaveBeenCalledWith('estado', ['entregado', 'recibido']);
+    expect(update.in).toHaveBeenCalledWith('estado', ['recibido']);
 
     // Loyalty ran once per distinct client (loyalty counts + milestone-compensation counts)
     expect(countQueries(recorded)).toHaveLength(4);
@@ -432,8 +432,8 @@ describe('registrarOperacion — recarga branch', () => {
 
   it('runs loyalty once when multiple items share the same client', async () => {
     const sameClient = [
-      { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' },
-      { id: 'b2', codigo: 'BOT-00002', estado: 'entregado', cliente_id: 'c1' },
+      { id: 'b1', codigo: 'BOT-00001', estado: 'recibido', cliente_id: 'c1' },
+      { id: 'b2', codigo: 'BOT-00002', estado: 'recibido', cliente_id: 'c1' },
     ];
     const partition = makeChain(async () => ({ data: sameClient, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
@@ -458,8 +458,8 @@ describe('registrarOperacion — recarga branch', () => {
 
   it('records valid items and rejects invalid ones in the same batch', async () => {
     const mixed = [
-      { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' },
-      { id: 'b3', codigo: 'BOT-00003', estado: 'entregado', cliente_id: null },
+      { id: 'b1', codigo: 'BOT-00001', estado: 'recibido', cliente_id: 'c1' },
+      { id: 'b3', codigo: 'BOT-00003', estado: 'recibido', cliente_id: null },
     ];
     const partition = makeChain(async () => ({ data: mixed, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
@@ -483,7 +483,7 @@ describe('registrarOperacion — recarga branch', () => {
 
   it('rejects clientless items with sin-cliente and writes zero rows', async () => {
     const partition = makeChain(async () => ({
-      data: [{ id: 'b3', codigo: 'BOT-00003', estado: 'entregado', cliente_id: null }],
+      data: [{ id: 'b3', codigo: 'BOT-00003', estado: 'recibido', cliente_id: null }],
       error: null,
     }));
     const { supabase } = makeSupabase([partition]);
@@ -499,7 +499,7 @@ describe('registrarOperacion — recarga branch', () => {
     expect(procesarLoyaltyMock).not.toHaveBeenCalled();
   });
 
-  it('rejects non-entregado items with the estado reason', async () => {
+  it('rejects items outside the recargar sources with the estado reason', async () => {
     const partition = makeChain(async () => ({
       data: [
         { id: 'b4', codigo: 'BOT-00004', estado: 'recarga', cliente_id: 'c1' },
@@ -523,7 +523,7 @@ describe('registrarOperacion — recarga branch', () => {
   it('writes nothing when every item is rejected', async () => {
     const partition = makeChain(async () => ({
       data: [
-        { id: 'b3', codigo: 'BOT-00003', estado: 'entregado', cliente_id: null },
+        { id: 'b3', codigo: 'BOT-00003', estado: 'recibido', cliente_id: null },
         { id: 'b4', codigo: 'BOT-00004', estado: 'recarga', cliente_id: 'c1' },
       ],
       error: null,
@@ -543,7 +543,7 @@ describe('registrarOperacion — recarga branch', () => {
   });
 
   it('deletes inserted rows and reports failure when the estado update fails', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
       data: [
@@ -574,7 +574,7 @@ describe('registrarOperacion — recarga branch', () => {
   });
 
   it('reports failure without deleting anything when the insert itself fails', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({ data: null, error: { message: 'insert exploded' } }));
     const { supabase } = makeSupabase([partition, last, insert]);
@@ -592,7 +592,7 @@ describe('registrarOperacion — recarga branch', () => {
   });
 
   it('keeps an already-normalized HH:MM:SS hora unchanged', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
       data: [
@@ -628,7 +628,7 @@ describe('registrarOperacion — recarga branch', () => {
 
   it('rejects a botellon id that does not exist in the database', async () => {
     const partition = makeChain(async () => ({
-      data: [{ id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' }],
+      data: [{ id: 'b1', codigo: 'BOT-00001', estado: 'recibido', cliente_id: 'c1' }],
       error: null,
     }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
@@ -659,7 +659,7 @@ describe('registrarOperacion — recarga branch', () => {
   // ── R4-1/R2-2: loyalty throw after commit must not fail the committed batch ──
 
 it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
       data: [
@@ -707,7 +707,7 @@ it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', as
     const cinco = [1, 2, 3, 4, 5].map((i) => ({
       id: `b${i}`,
       codigo: `BOT-0000${i}`,
-      estado: 'entregado',
+      estado: 'recibido',
       cliente_id: 'c1',
     }));
     const partition = makeChain(async () => ({ data: cinco, error: null }));
@@ -751,7 +751,7 @@ it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', as
     const cinco = [1, 2, 3, 4, 5].map((i) => ({
       id: `b${i}`,
       codigo: `BOT-0000${i}`,
-      estado: 'entregado',
+      estado: 'recibido',
       cliente_id: 'c1',
     }));
     const partition = makeChain(async () => ({ data: cinco, error: null }));
@@ -780,7 +780,7 @@ it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', as
   // ── R3-2/R1-1/R4-2: deterministic max+1 read with id tie-breaker ──
 
   it('orders the max+1 read deterministically with an id tie-breaker', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
       data: [
@@ -804,7 +804,7 @@ it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', as
   // ── R1-2/R3-5/R4-3: compensating delete error is logged ──
 
   it('logs a compensating delete error instead of silently discarding it', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
+    const partition = makeChain(async () => ({ data: recibidos, error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({
       data: [
@@ -830,7 +830,7 @@ it('keeps the batch success when loyalty throws, surfacing a loyaltyWarning', as
   // ── R1-5: dedupe + strict hora validation ──
 
   it('dedupes duplicate botellonIds so each botellon is processed once', async () => {
-    const partition = makeChain(async () => ({ data: [entregados[0]], error: null }));
+    const partition = makeChain(async () => ({ data: [recibidos[0]], error: null }));
     const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
     const insert = makeChain(async () => ({ data: [{ id: 'r1', botellon_id: 'b1' }], error: null }));
     const update = makeChain(async () => ({ error: null }));
@@ -986,13 +986,13 @@ describe('registrarOperacion — pure operations', () => {
 
 // ── Task 1.4/1.5: registrarOperacion — multi-source recarga + op-scoped no-client ──
 
-describe('registrarOperacion — multi-source recarga', () => {
+describe('registrarOperacion — single-source recarga', () => {
   beforeEach(() => {
     createClientMock.mockReset();
     procesarLoyaltyMock.mockClear();
   });
 
-  it('accepts a recibido source for recargar in one pass', async () => {
+  it('accepts the recibido source for recargar', async () => {
     const partition = makeChain(async () => ({
       data: [{ id: 'b6', codigo: 'BOT-00006', estado: 'recibido', cliente_id: 'c1' }],
       error: null,
@@ -1017,7 +1017,7 @@ describe('registrarOperacion — multi-source recarga', () => {
       { botellonId: 'b6', codigo: 'BOT-00006', ok: true, recargaId: 'r6', numeroRegistro: 'REC-000043' },
     ]);
     expect(update.update).toHaveBeenCalledWith({ estado: 'recarga' });
-    expect(update.in).toHaveBeenCalledWith('estado', ['entregado', 'recibido']);
+    expect(update.in).toHaveBeenCalledWith('estado', ['recibido']);
   });
 
   it('rejects a raced item whose estado left the recarga sources with estado-<estado>', async () => {

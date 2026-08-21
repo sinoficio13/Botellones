@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
-      { premiosPendientes: [], clientesInactivos30: [], clientesInactivos60: [], botellonesDanados: [] },
+      { premiosPendientes: [], clientesInactivos30: [], clientesInactivos60: [] },
       { status: 500 }
     );
   }

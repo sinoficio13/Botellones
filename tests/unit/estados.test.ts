@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ESTADOS,
+  ESTADOS_KANBAN,
   ESTADO_LABELS,
   ESTADO_COLORS,
   getTransiciones,
@@ -11,6 +12,11 @@ import {
 } from '@/lib/utils/estados';
 
 describe('estados shared maps', () => {
+  it('defines exactly the five canonical estados of the pure cycle', () => {
+    expect(ESTADOS).toHaveLength(5);
+    expect(ESTADOS).toEqual(['entregado', 'recibido', 'recarga', 'listo', 'delivery']);
+  });
+
   it('provides a label for every canonical estado', () => {
     // Assert each canonical estado has a human-readable label (not the raw key).
     for (const estado of ESTADOS) {
@@ -29,6 +35,13 @@ describe('estados shared maps', () => {
     expect(ESTADO_COLORS['recarga']).toContain('cyan');
   });
 
+  it('does not carry labels or colors for removed estados', () => {
+    for (const removed of ['planta', 'danado', 'perdido', 'mantenimiento'] as const) {
+      expect(ESTADO_LABELS[removed]).toBeUndefined();
+      expect(ESTADO_COLORS[removed]).toBeUndefined();
+    }
+  });
+
   it('falls back to the raw estado value for unknown states via lookup', () => {
     // The map itself should not contain arbitrary keys; consumers use `?? raw`.
     const unknown = 'estado-futuro';
@@ -36,6 +49,28 @@ describe('estados shared maps', () => {
     const color = ESTADO_COLORS[unknown] ?? '';
     expect(label).toBe('estado-futuro');
     expect(color).toBe('');
+  });
+});
+
+describe('TRANSICIONES cycle contract', () => {
+  it('advances one edge per transition on the linear cycle', () => {
+    expect(getTransiciones('entregado')).toEqual(['recibido']);
+    expect(getTransiciones('recibido')).toEqual(['recarga']);
+    expect(getTransiciones('recarga')).toEqual(['listo']);
+  });
+
+  it('splits at listo into delivery and loops delivery back to entregado', () => {
+    expect(getTransiciones('listo')).toEqual(['entregado', 'delivery']);
+    expect(getTransiciones('delivery')).toEqual(['entregado']);
+  });
+
+  it('no longer routes any estado through planta or exception estados', () => {
+    for (const estado of ESTADOS) {
+      expect(getTransiciones(estado)).not.toContain('planta');
+      expect(getTransiciones(estado)).not.toContain('danado');
+      expect(getTransiciones(estado)).not.toContain('perdido');
+      expect(getTransiciones(estado)).not.toContain('mantenimiento');
+    }
   });
 });
 
@@ -49,12 +84,12 @@ describe('OPERACIONES', () => {
     });
   });
 
-  it('defines recargar → recarga requiring client and REC with two sources', () => {
+  it('defines recargar → recarga requiring client and REC with recibido as its only source', () => {
     expect(OPERACIONES.recargar).toEqual({
       target: 'recarga',
       requiresCliente: true,
       createsRec: true,
-      sources: ['entregado', 'recibido'],
+      sources: ['recibido'],
     });
   });
 
@@ -79,7 +114,6 @@ describe('OPERACIONES', () => {
 describe('esTransicionValida', () => {
   it('accepts a source estado inside the operation sources', () => {
     expect(esTransicionValida('entregado', 'recibir')).toBe(true);
-    expect(esTransicionValida('entregado', 'recargar')).toBe(true);
     expect(esTransicionValida('recibido', 'recargar')).toBe(true);
     expect(esTransicionValida('recarga', 'listo')).toBe(true);
   });
@@ -91,28 +125,13 @@ describe('esTransicionValida', () => {
     expect(esTransicionValida('recibido', 'listo')).toBe(false);
   });
 
-  it('rejects exception estados not listed as sources', () => {
-    expect(esTransicionValida('danado', 'recargar')).toBe(false);
-    expect(esTransicionValida('perdido', 'listo')).toBe(false);
-    expect(esTransicionValida('mantenimiento', 'recibir')).toBe(false);
+  it('rejects the entregado → recargar one-pass shortcut', () => {
+    expect(esTransicionValida('entregado', 'recargar')).toBe(false);
   });
 });
 
-describe('getTransiciones multi-source recarga edges', () => {
-  it('allows entregado → recarga in one pass', () => {
-    expect(getTransiciones('entregado')).toContain('recarga');
-  });
-
-  it('allows recibido → recarga in one pass', () => {
-    expect(getTransiciones('recibido')).toContain('recarga');
-  });
-
-  it('keeps the pre-existing entregado → recibido edge', () => {
-    expect(getTransiciones('entregado')).toContain('recibido');
-  });
-
-  it('does not introduce a new botellon estado', () => {
-    // The set of estados must stay exactly the canonical 9.
-    expect(ESTADOS).toHaveLength(9);
+describe('ESTADOS_KANBAN', () => {
+  it('exposes exactly the four operative columns, without entregado or removed estados', () => {
+    expect(ESTADOS_KANBAN).toEqual(['recibido', 'recarga', 'listo', 'delivery']);
   });
 });

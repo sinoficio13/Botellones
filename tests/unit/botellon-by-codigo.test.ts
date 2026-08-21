@@ -87,7 +87,7 @@ describe('getBotellonByCodigo', () => {
 
   it('does not select the clientes join at all', async () => {
     const supabase = makeSupabase(
-      { id: 'b2', codigo: 'BOT-00002', estado: 'planta', cliente_id: 'c2' },
+      { id: 'b2', codigo: 'BOT-00002', estado: 'recibido', cliente_id: 'c2' },
       3,
       null
     );

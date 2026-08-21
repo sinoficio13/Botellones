@@ -19,7 +19,6 @@ export type DashboardKpis = {
   totalClientes: number;
   nuevosEsteMes: number;
   botellonesActivos: number;
-  botellonesEnPlanta: number;
   recargasHoy: number;
   recargasMes: number;
   recargasMesAnterior: number;
@@ -56,7 +55,6 @@ export type AlertasPanel = {
   premiosPendientes: AlertaItem[];
   clientesInactivos30: AlertaItem[];
   clientesInactivos60: AlertaItem[];
-  botellonesDanados: AlertaItem[];
 };
 
 export type ResumenesNegocio = {
@@ -111,7 +109,6 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
       { count: totalClientes },
       { count: nuevosEsteMes },
       { count: botellonesActivos },
-      { count: botellonesEnPlanta },
       { count: recargasHoy },
       { count: recargasMes },
       { count: recargasMesAnterior },
@@ -126,10 +123,6 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
         .from('botellones')
         .select('*', { count: 'exact', head: true })
         .in('estado', ['entregado']),
-      supabase
-        .from('botellones')
-        .select('*', { count: 'exact', head: true })
-        .eq('estado', 'planta'),
       supabase
         .from('recargas')
         .select('*', { count: 'exact', head: true })
@@ -159,7 +152,6 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
       totalClientes: totalClientes ?? 0,
       nuevosEsteMes: nuevosEsteMes ?? 0,
       botellonesActivos: botellonesActivos ?? 0,
-      botellonesEnPlanta: botellonesEnPlanta ?? 0,
       recargasHoy: recargasHoy ?? 0,
       recargasMes: rMes,
       recargasMesAnterior: rMesAnt,
@@ -171,7 +163,6 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
       totalClientes: 0,
       nuevosEsteMes: 0,
       botellonesActivos: 0,
-      botellonesEnPlanta: 0,
       recargasHoy: 0,
       recargasMes: 0,
       recargasMesAnterior: 0,
@@ -285,14 +276,6 @@ export async function getAlertas(): Promise<AlertasPanel> {
       .order('fecha_alcanzado', { ascending: false })
       .limit(20);
 
-    // botellones dañados/perdidos — join clientes
-    const { data: danados } = await supabase
-      .from('botellones')
-      .select('id, codigo, estado, cliente_id, clientes(nombre)')
-      .in('estado', ['danado', 'perdido'])
-      .order('fecha_creacion', { ascending: false })
-      .limit(20);
-
     // Inactive clients (30+ days since last recarga)
     const since30 = new Date();
     since30.setDate(since30.getDate() - 30);
@@ -308,7 +291,6 @@ export async function getAlertas(): Promise<AlertasPanel> {
         premiosPendientes: [],
         clientesInactivos30: [],
         clientesInactivos60: [],
-        botellonesDanados: [],
       };
     }
 
@@ -379,21 +361,12 @@ export async function getAlertas(): Promise<AlertasPanel> {
       })),
       clientesInactivos30: inactivos30,
       clientesInactivos60: inactivos60,
-      botellonesDanados: (danados ?? []).map((b) => ({
-        id: b.id,
-        tipo: 'danado',
-        titulo: `Botellón ${b.codigo}`,
-        descripcion: `Estado: ${b.estado}${(b.clientes as unknown as ClienteJoin | null)?.nombre ? ` — ${(b.clientes as unknown as ClienteJoin | null)?.nombre}` : ''}`,
-        href: `/botellones/${b.id}`,
-        entidadId: b.id,
-      })),
     };
   } catch {
     return {
       premiosPendientes: [],
       clientesInactivos30: [],
       clientesInactivos60: [],
-      botellonesDanados: [],
     };
   }
 }

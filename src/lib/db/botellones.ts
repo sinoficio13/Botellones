@@ -138,50 +138,20 @@ export async function updateBotellon(_prev: BotellonState | null, formData: Form
   try {
     const supabase = await getSupabase();
 
-    // If assigning a client, set estado to 'entregado'
+    // Assigning a client sells the stock: any clientless botellon becomes
+    // 'entregado'. Unassigning keeps the current estado — clientless botellones
+    // in 'recibido'/'listo' are stock, not 'planta'.
     const update: Record<string, string | null> = {};
     if (estado) update.estado = estado;
     if (cliente_id !== undefined) {
       update.cliente_id = cliente_id || null;
-      if (cliente_id && (!estado || estado === 'planta')) {
+      if (cliente_id) {
         update.estado = 'entregado';
-      }
-      if (!cliente_id && estado === 'entregado') {
-        update.estado = 'planta';
       }
     }
 
     const { error } = await supabase.from('botellones').update(update).eq('id', id);
     if (error) return { error: error.message };
-
-    // ── Damage/loss notification: alert admins when botellón breaks ──
-    const newEstado = update.estado;
-    if (newEstado === 'danado' || newEstado === 'perdido') {
-      const { data: botellon } = await supabase
-        .from('botellones')
-        .select('codigo')
-        .eq('id', id)
-        .single();
-
-      const codigo = botellon?.codigo || 'Desconocido';
-
-      const { data: perfiles } = await supabase
-        .from('perfiles')
-        .select('id');
-
-      if (perfiles?.length) {
-        const inserts = perfiles.map((p) =>
-          supabase.from('notificaciones').insert({
-            tipo: 'botellon_danado',
-            titulo: `Botellón ${codigo} — ${newEstado}`,
-            mensaje: `El botellón ${codigo} fue marcado como ${newEstado}.`,
-            usuario_id: p.id,
-            botellon_id: id,
-          })
-        );
-        await Promise.all(inserts);
-      }
-    }
 
     revalidatePath(`/botellones/${id}`);
     revalidatePath('/botellones');
@@ -252,7 +222,7 @@ export async function moverBotellon(
       update.cliente_id = clienteId;
       update.fecha_entrega = new Date().toISOString();
     }
-    if (nuevoEstado === 'planta' || nuevoEstado === 'recibido') {
+    if (nuevoEstado === 'recibido') {
       update.cliente_id = null;
       update.fecha_entrega = null;
     }

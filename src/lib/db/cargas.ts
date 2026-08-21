@@ -306,16 +306,3 @@ export async function registrarOperacion(input: {
     };
   }
 }
-
-/**
- * Backward-compatible thin wrapper: the previous batch recarga action now
- * delegates to `registrarOperacion` with the fixed `recargar` operation.
- * Dropped in commit 2 once the page points at `registrarOperacion`.
- */
-export async function registrarCarga(input: {
-  botellonIds: string[];
-  fecha: string;
-  hora: string;
-}): Promise<CargaState> {
-  return registrarOperacion({ ...input, operacion: 'recargar' });
-}

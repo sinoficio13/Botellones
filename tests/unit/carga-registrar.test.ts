@@ -23,7 +23,7 @@ vi.mock('@/lib/db/loyalty', async (importOriginal) => {
 
 import { procesarLoyalty, procesarLoyaltyConCompensacion, REALIZADA_POR_PLACEHOLDER } from '@/lib/db/loyalty';
 import { registrarRecarga } from '@/lib/db/recargas';
-import { registrarCarga, registrarOperacion } from '@/lib/db/cargas';
+import { registrarOperacion } from '@/lib/db/cargas';
 import { revalidatePath } from 'next/cache';
 
 const PLACEHOLDER = REALIZADA_POR_PLACEHOLDER;
@@ -1094,65 +1094,6 @@ describe('registrarOperacion — op-scoped no-client gate', () => {
   });
 });
 
-// ── Task 1.5: registrarCarga thin wrapper (delegates with operacion recargar) ──
-
-describe('registrarCarga wrapper', () => {
-  beforeEach(() => {
-    createClientMock.mockReset();
-    procesarLoyaltyMock.mockClear();
-  });
-
-  const entregados = [
-    { id: 'b1', codigo: 'BOT-00001', estado: 'entregado', cliente_id: 'c1' },
-    { id: 'b2', codigo: 'BOT-00002', estado: 'entregado', cliente_id: 'c2' },
-  ];
-
-  it('delegates to registrarOperacion with operacion recargar (REC numbers produced)', async () => {
-    const partition = makeChain(async () => ({ data: entregados, error: null }));
-    const last = makeChain(async () => ({ data: { numero_registro: 'REC-000042' }, error: null }));
-    const insert = makeChain(async () => ({
-      data: [
-        { id: 'r1', botellon_id: 'b1' },
-        { id: 'r2', botellon_id: 'b2' },
-      ],
-      error: null,
-    }));
-    const update = makeChain(async () => ({ error: null }));
-    const countC1 = makeChain(async () => ({ count: 1 }));
-    const countC2 = makeChain(async () => ({ count: 1 }));
-    const countC1Comp = makeChain(async () => ({ count: 1 }));
-    const countC2Comp = makeChain(async () => ({ count: 1 }));
-    const { supabase } = makeSupabase([
-      partition,
-      last,
-      insert,
-      update,
-      countC1,
-      countC2,
-      countC1Comp,
-      countC2Comp,
-    ]);
-    createClientMock.mockResolvedValue(supabase);
-
-    const result = await registrarCarga({ botellonIds: ['b1', 'b2'], fecha: '2026-08-20', hora: '14:30' });
-
-    expect(result.success).toBe(true);
-    expect(result.items).toEqual([
-      { botellonId: 'b1', codigo: 'BOT-00001', ok: true, recargaId: 'r1', numeroRegistro: 'REC-000043' },
-      { botellonId: 'b2', codigo: 'BOT-00002', ok: true, recargaId: 'r2', numeroRegistro: 'REC-000044' },
-    ]);
-    expect(update.update).toHaveBeenCalledWith({ estado: 'recarga' });
-    expect(update.in).toHaveBeenCalledWith('estado', ['entregado', 'recibido']);
-    expect(revalidatePath).toHaveBeenCalledWith('/clientes');
-    expect(revalidatePath).toHaveBeenCalledWith('/recargas');
-    expect(revalidatePath).toHaveBeenCalledWith('/botellones');
-  });
-
-  it('rejects an empty batch without touching the database', async () => {
-    const result = await registrarCarga({ botellonIds: [], fecha: '2026-08-20', hora: '14:30' });
-
-    expect(result.success).toBe(false);
-    expect(result.items).toEqual([]);
-    expect(createClientMock).not.toHaveBeenCalled();
-  });
-});
+// ── Task 2.5: registrarCarga thin wrapper removed in commit 2 ──
+// The page now calls `registrarOperacion` directly; the backward-compatible
+// wrapper and its delegation test were dropped.

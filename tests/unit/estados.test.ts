@@ -5,6 +5,8 @@ import {
   ESTADO_LABELS,
   ESTADO_COLORS,
   getTransiciones,
+  getReversiones,
+  getEstadosPermitidos,
   OPERACIONES,
   esTransicionValida,
   type Estado,
@@ -133,5 +135,44 @@ describe('esTransicionValida', () => {
 describe('ESTADOS_KANBAN', () => {
   it('exposes exactly the four operative columns, without entregado or removed estados', () => {
     expect(ESTADOS_KANBAN).toEqual(['recibido', 'recarga', 'listo', 'delivery']);
+  });
+});
+
+describe('REVERSIONES — undo one step (spec S1/S2)', () => {
+  it('reverses the linear cycle edges exactly', () => {
+    expect(getReversiones('recibido')).toEqual(['entregado']);
+    expect(getReversiones('recarga')).toEqual(['recibido']);
+    expect(getReversiones('listo')).toEqual(['recarga']);
+  });
+
+  it('reverses entregado into both listo and delivery (spec S2 exact set)', () => {
+    expect(getReversiones('entregado')).toEqual(['listo', 'delivery']);
+    expect(getReversiones('delivery')).toEqual(['listo']);
+  });
+
+  it('gives every estado at least one reversion — nothing is terminal (spec R1)', () => {
+    for (const estado of ESTADOS) {
+      expect(getReversiones(estado).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('getEstadosPermitidos — single manual-move rule (spec S3/R1)', () => {
+  it('returns the dedup union of forward, reversal, and identity for entregado', () => {
+    expect(getEstadosPermitidos('entregado')).toEqual(['recibido', 'listo', 'delivery', 'entregado']);
+  });
+
+  it('returns the dedup union without duplicates for a mid-cycle estado', () => {
+    expect(getEstadosPermitidos('recibido')).toEqual(['recarga', 'entregado', 'recibido']);
+    const result = getEstadosPermitidos('recibido');
+    expect(new Set(result).size).toBe(result.length);
+  });
+
+  it('satisfies the inversion invariant for all estado pairs (spec S4)', () => {
+    for (const a of ESTADOS) {
+      for (const b of ESTADOS) {
+        expect(getTransiciones(a).includes(b)).toBe(getReversiones(b).includes(a));
+      }
+    }
   });
 });

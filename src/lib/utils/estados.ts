@@ -5,6 +5,10 @@
  *   entregado → recibido → recarga → listo → entregado
  *   (+ listo → delivery → entregado)
  * Los botellones sin cliente en `recibido`/`listo` son stock.
+ *
+ * Cada arista tiene su inversa en `REVERSIONES`: ningún estado es terminal,
+ * un error se deshace en un paso, y `getEstadosPermitidos` es la única regla
+ * de movimiento manual (unión dedup de avance + reversión + identidad).
  */
 export const ESTADOS = [
   'entregado',
@@ -23,8 +27,35 @@ const TRANSICIONES: Record<Estado, Estado[]> = {
   delivery: ['entregado'],
 };
 
+/**
+ * Immediate-previous inverses of `TRANSICIONES` (locked set, spec R1):
+ * each entry is exactly the set of estados that can reach the key in one
+ * forward step. The inversion invariant `b ∈ getTransiciones(a) ⟺ a ∈
+ * getReversiones(b)` is guarded by tests.
+ */
+const REVERSIONES: Record<Estado, Estado[]> = {
+  entregado: ['listo', 'delivery'],
+  recibido: ['entregado'],
+  recarga: ['recibido'],
+  listo: ['recarga'],
+  delivery: ['listo'],
+};
+
 export function getTransiciones(estado: Estado): Estado[] {
   return TRANSICIONES[estado] || [];
+}
+
+export function getReversiones(estado: Estado): Estado[] {
+  return REVERSIONES[estado] || [];
+}
+
+/**
+ * Single manual-move rule: dedup union of forward transitions, reversions,
+ * and the identity estado. No estado is terminal (every estado has ≥1
+ * reversion), and a mistake is undone in one step.
+ */
+export function getEstadosPermitidos(estado: Estado): Estado[] {
+  return [...new Set([...getTransiciones(estado), ...getReversiones(estado), estado])];
 }
 
 /**

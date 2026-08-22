@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getEstadosPermitidos, type Estado } from '@/lib/utils/estados';
 
 // ── DB join result types ──
 
@@ -128,6 +130,46 @@ export async function createBotellon(
   }
 }
 
+// ── Shared read-validate-write helpers (server validation + CAS, spec R2) ──
+
+/** Reads the current estado + cliente_id of a botellon. */
+async function leerActual(supabase: SupabaseClient, id: string) {
+  const { data, error } = await supabase
+    .from('botellones')
+    .select('estado, cliente_id')
+    .eq('id', id)
+    .single();
+  return {
+    actual: data?.estado as Estado | undefined,
+    clienteActual: data?.cliente_id ?? null,
+    error,
+  };
+}
+
+/**
+ * Strict machine check (GAP-1: no `asignando` branch — the sale exception
+ * lives in the writers where the clientless→assigned boundary is known).
+ * Returns null when the move is valid, else the exact error string.
+ * Identity is always permitted via `getEstadosPermitidos`.
+ */
+function validarDestino(actual: Estado, destino: string): string | null {
+  const permitidos = getEstadosPermitidos(actual);
+  return permitidos.includes(destino as Estado)
+    ? null
+    : `Transición no permitida: ${actual} → ${destino}`;
+}
+
+/**
+ * Shared sale-destino resolver for clientless→assigned writes (GAP-2):
+ * identity keeps the current estado, {entregado, recarga} are machine-exempt,
+ * anything else defaults to 'entregado' (locked decision 3).
+ */
+function resolverDestinoAsignacion(actual: Estado, destino: string | null): string {
+  if (destino === actual) return actual;
+  if (destino === 'entregado' || destino === 'recarga') return destino;
+  return 'entregado';
+}
+
 export async function updateBotellon(_prev: BotellonState | null, formData: FormData): Promise<BotellonState> {
   const id = formData.get('id') as string;
   const estado = formData.get('estado') as string;
@@ -138,20 +180,40 @@ export async function updateBotellon(_prev: BotellonState | null, formData: Form
   try {
     const supabase = await getSupabase();
 
-    // Assigning a client sells the stock: any clientless botellon becomes
-    // 'entregado'. Unassigning keeps the current estado — clientless botellones
-    // in 'recibido'/'listo' are stock, not 'planta'.
+    const { actual, clienteActual, error: readError } = await leerActual(supabase, id);
+    if (readError) return { error: readError.message };
+    if (!actual) return { error: 'Botellón no encontrado' };
+
+    // Sale exception (D7): clientless → assigned only. Both-set → strict.
+    const asignando = cliente_id !== null && clienteActual === null;
+
     const update: Record<string, string | null> = {};
-    if (estado) update.estado = estado;
-    if (cliente_id !== undefined) {
-      update.cliente_id = cliente_id || null;
-      if (cliente_id) {
-        update.estado = 'entregado';
+    if (asignando) {
+      update.estado = resolverDestinoAsignacion(actual, estado || null);
+      update.cliente_id = cliente_id;
+    } else {
+      if (estado) {
+        const error = validarDestino(actual, estado);
+        if (error) return { error }; // zero writes
+        update.estado = estado;
       }
+      // Unassign keeps the current estado — clientless botellones in
+      // 'recibido'/'listo' are stock, not 'planta'.
+      update.cliente_id = cliente_id || null;
     }
 
-    const { error } = await supabase.from('botellones').update(update).eq('id', id);
+    // CAS guard: conditional write on the estado we just read.
+    const { data, error } = await supabase
+      .from('botellones')
+      .update(update)
+      .eq('id', id)
+      .eq('estado', actual)
+      .select();
     if (error) return { error: error.message };
+    if (!data || data.length === 0) {
+      // Concurrent loser (spec S7): same error string as a validation reject.
+      return { error: `Transición no permitida: ${actual} → ${update.estado ?? actual}` };
+    }
 
     revalidatePath(`/botellones/${id}`);
     revalidatePath('/botellones');
@@ -206,6 +268,8 @@ export async function getOperaciones(): Promise<{ botellones: BotellonOperativo[
 /**
  * Move a botellón to a new estado (kanban). If moving to "entregado",
  * a cliente_id must be provided. Returns success or error.
+ * Reads the current row, validates against the machine (or the sale
+ * exception), and writes with a CAS guard on the read estado.
  */
 export async function moverBotellon(
   id: string,
@@ -213,22 +277,54 @@ export async function moverBotellon(
   clienteId: string | null = null
 ): Promise<BotellonState> {
   if (!id) return { error: 'ID requerido' };
+  if (nuevoEstado === 'entregado' && !clienteId) return { error: 'Cliente requerido para entregar' };
   try {
     const supabase = await getSupabase();
+
+    const { actual, clienteActual, error: readError } = await leerActual(supabase, id);
+    if (readError) return { error: readError.message };
+    if (!actual) return { error: 'Botellón no encontrado' };
+
+    // Sale exception (D7): clientless → assigned only.
+    const asignando = clienteId !== null && clienteActual === null;
     const update: Record<string, string | null> = { estado: nuevoEstado };
+    let destino = nuevoEstado;
 
-    if (nuevoEstado === 'entregado') {
-      if (!clienteId) return { error: 'Cliente requerido para entregar' };
+    if (asignando) {
+      destino = resolverDestinoAsignacion(actual, nuevoEstado);
+      update.estado = destino;
       update.cliente_id = clienteId;
-      update.fecha_entrega = new Date().toISOString();
-    }
-    if (nuevoEstado === 'recibido') {
-      update.cliente_id = null;
-      update.fecha_entrega = null;
+      if (destino === 'entregado') {
+        update.fecha_entrega = new Date().toISOString();
+      }
+    } else {
+      const error = validarDestino(actual, nuevoEstado);
+      if (error) return { error }; // zero writes
+
+      // Side effects, orthogonal to validation: entregado stamps
+      // fecha_entrega; recibido clears cliente/fecha (reintegro).
+      if (nuevoEstado === 'entregado') {
+        update.cliente_id = clienteId;
+        update.fecha_entrega = new Date().toISOString();
+      }
+      if (nuevoEstado === 'recibido') {
+        update.cliente_id = null;
+        update.fecha_entrega = null;
+      }
     }
 
-    const { error } = await supabase.from('botellones').update(update).eq('id', id);
+    // CAS guard: conditional write on the estado we just read.
+    const { data, error } = await supabase
+      .from('botellones')
+      .update(update)
+      .eq('id', id)
+      .eq('estado', actual)
+      .select();
     if (error) return { error: error.message };
+    if (!data || data.length === 0) {
+      // Concurrent loser (spec S7): same error string as a validation reject.
+      return { error: `Transición no permitida: ${actual} → ${destino}` };
+    }
 
     revalidatePath('/dashboard');
     revalidatePath('/botellones');

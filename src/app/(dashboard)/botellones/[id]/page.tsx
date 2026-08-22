@@ -1,6 +1,5 @@
 import { getBotellon, getClientesForSelect } from '@/lib/db/botellones';
 import { getConfiguracion } from '@/lib/db/configuracion';
-import { getTransiciones, type Estado } from '@/lib/utils/estados';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
 import Link from 'next/link';
@@ -18,7 +17,6 @@ export default async function BotellonDetailPage({ params }: Props) {
   const botellon = await getBotellon(id);
   if (!botellon) notFound();
 
-  const transiciones = getTransiciones(botellon.estado as Estado);
   const clientes = await getClientesForSelect();
   const config = await getConfiguracion();
 
@@ -58,8 +56,9 @@ export default async function BotellonDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Form: state + client assignment */}
-      <BotellonForm botellon={botellon} transiciones={transiciones} clientes={clientes} />
+      {/* Form: state + client assignment. The live estado badge and the
+          Avanzar/Deshacer selector derive from realtime state (form.tsx). */}
+      <BotellonForm botellon={botellon} clientes={clientes} />
 
       {/* Recarga history */}
       <RecargasHistorial botellonId={botellon.id} />

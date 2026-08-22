@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   getClientesForSelect,
@@ -8,6 +8,8 @@ import {
   type BotellonOperativo,
 } from '@/lib/db/botellones';
 import { ESTADOS_KANBAN } from '@/lib/utils/estados';
+import { createClient } from '@/lib/supabase/client';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // ── Colores y etiquetas por estado ──
 const ESTADO_META: Record<string, { label: string; sub: string; dot: string }> = {
@@ -39,6 +41,57 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 2400);
   };
+
+  // Realtime reconciliation (spec RT R3): every botellones UPDATE from any
+  // operator patches the matching row. Patch-always + refresh-error-only
+  // (design D5): an echo of the operator's own optimistic write is a semantic
+  // no-op because the payload carries no `clientes` join, so the existing join
+  // object is preserved when `cliente_id` is unchanged. router.refresh() stays
+  // only in the server-rejection path below — both converge to canonical data.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel('kanban-botellones')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'botellones' },
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          const nuevo = payload.new as Record<string, unknown> | undefined;
+          if (!nuevo?.id) return;
+          setBotellones((prev) =>
+            prev.map((b) => {
+              if (b.id !== nuevo.id) return b;
+              const clienteId = (nuevo.cliente_id as string | null) ?? null;
+              // Idempotent patch: keep the join when cliente_id is unchanged;
+              // a client assigned by another operator arrives without the name.
+              const clientes =
+                clienteId === b.cliente_id
+                  ? b.clientes
+                  : clienteId
+                    ? { nombre: '' }
+                    : null;
+              return {
+                ...b,
+                estado: nuevo.estado as string,
+                cliente_id: clienteId,
+                fecha_entrega: (nuevo.fecha_entrega as string | null) ?? null,
+                clientes,
+              };
+            })
+          );
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Silent degradation: keep the last rendered state.
+          console.warn('Realtime kanban channel error:', status);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const byEstado = useCallback(
     (estado: string) => botellones.filter((b) => b.estado === estado),
@@ -204,7 +257,9 @@ export function OperacionesDashboard({ botellones: initial, recargasHoy: initial
                       ↩ Devolver
                     </button>
                   </div>
-                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">👤 {b.clientes?.nombre || 'Sin cliente'}</p>
+                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+                    👤 {b.clientes?.nombre || (b.cliente_id ? 'Cliente asignado' : 'Sin cliente')}
+                  </p>
                   <p className={`mt-0.5 text-[11px] ${overdue ? 'font-semibold text-amber-600' : 'text-zinc-400'}`}>
                     hace {dias} día{dias === 1 ? '' : 's'} {overdue && '· sugerir recarga'}
                   </p>
@@ -277,7 +332,7 @@ function BotellonCard({
       </div>
       <select
         onChange={(e) => onMove(e.target.value)}
-        defaultValue={b.estado}
+        value={b.estado}
         className="mt-1.5 w-full rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
       >
         {TODOS_ESTADOS.map((s) => (

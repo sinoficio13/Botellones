@@ -35,12 +35,12 @@ Chain strategy: stacked-to-main
 
 ## Commit 2 — Frontend (after 1.7)
 
-- [ ] 2.1 (RED) `tests/unit/beep.test.ts`: mocked AudioContext — lazy create + resume on first call, no-op when `AudioContext`/`webkitAudioContext` unavailable
-- [ ] 2.2 (GREEN) `src/lib/scanner/beep.ts` (`'use client'`): `playBeep()` — module-scoped lazy AudioContext, OSC on/off ~0.12s, silent no-op if unavailable
-- [ ] 2.3 (RED) `tests/component/carga-page.test.tsx`: re-mock `registrarCarga`→`registrarOperacion`; add failing cases — selector defaults recargar + switch updates payload, green/red badge via `esTransicionValida` + live re-validate on op switch, dup beep (mocked `playBeep`) + transient ring + scanner open + count/payload unchanged, op-scoped no-client (clientless blocked recargar, accumulated recibir/listo), generalized results/success (REC#/premios/loyaltyWarning only recarga, "Asignar cliente" link), fecha/hora 30s auto-refresh preserved
-- [ ] 2.4 (GREEN) `src/app/(dashboard)/recargas/carga/page.tsx`: operation selector (segmented, default recargar; drives confirm payload/label/success), green badge = `ESTADO_LABELS[OPERACIONES[op].target]`, red = current estado with `ESTADO_COLORS['danado']` classes, dup → `playBeep()` + `flashId` ring ~600–800ms + `{outcome:'failure'}` (scanner stays open), no-client overlay only when `requiresCliente`, call `registrarOperacion`, generalize confirm/success screens
-- [ ] 2.5 (REFACTOR) `src/lib/db/cargas.ts`: drop `registrarCarga` wrapper; remove wrapper test from `tests/unit/carga-registrar.test.ts`
-- [ ] 2.6 (COMMIT) Work-unit commit: beep + page + tests; full `npx vitest run` green
+- [x] 2.1 (RED) `tests/unit/beep.test.ts`: mocked AudioContext — lazy create + resume on first call, no-op when `AudioContext`/`webkitAudioContext` unavailable
+- [x] 2.2 (GREEN) `src/lib/scanner/beep.ts` (`'use client'`): `playBeep()` — module-scoped lazy AudioContext, OSC on/off ~0.12s, silent no-op if unavailable
+- [x] 2.3 (RED) `tests/component/carga-page.test.tsx`: re-mock `registrarCarga`→`registrarOperacion`; add failing cases — selector defaults recargar + switch updates payload, green/red badge via `esTransicionValida` + live re-validate on op switch, dup beep (mocked `playBeep`) + transient ring + scanner open + count/payload unchanged, op-scoped no-client (clientless blocked recargar, accumulated recibir/listo), generalized results/success (REC#/premios/loyaltyWarning only recarga, "Asignar cliente" link), fecha/hora 30s auto-refresh preserved
+- [x] 2.4 (GREEN) `src/app/(dashboard)/recargas/carga/page.tsx`: operation selector (segmented, default recargar; drives confirm payload/label/success), green badge = `ESTADO_LABELS[OPERACIONES[op].target]`, red = current estado with `ESTADO_COLORS['danado']` classes, dup → `playBeep()` + `flashId` ring ~600–800ms + `{outcome:'failure'}` (scanner stays open), no-client overlay only when `requiresCliente`, call `registrarOperacion`, generalize confirm/success screens
+- [x] 2.5 (REFACTOR) `src/lib/db/cargas.ts`: drop `registrarCarga` wrapper; remove wrapper test from `tests/unit/carga-registrar.test.ts`
+- [x] 2.6 (COMMIT) Work-unit commit: beep + page + tests; full `npx vitest run` green
 
 ## Dependencies
 

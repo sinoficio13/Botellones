@@ -68,3 +68,6 @@ public/sw.js
 certificates
 supabase/.temp/
 .env*
+
+# Playwright report artifacts
+playwright-report/

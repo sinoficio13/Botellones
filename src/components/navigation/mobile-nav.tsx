@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { logout } from '@/app/(auth)/logout/actions';
 import {
   ArrowLeftRight,
   Bell,
   Droplets,
   Gift,
   LayoutDashboard,
+  LogOut,
   MapPin,
   MoreHorizontal,
   ScanLine,
@@ -130,6 +132,17 @@ export function MobileNav() {
                 {item.label}
               </Link>
             ))}
+          </div>
+          <div className="border-t border-zinc-100 px-2 pt-1 dark:border-zinc-800">
+            <form action={logout} onClick={() => setDrawerOpen(false)}>
+              <button
+                type="submit"
+                className="flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                Cerrar sesión
+              </button>
+            </form>
           </div>
         </SheetContent>
       </Sheet>

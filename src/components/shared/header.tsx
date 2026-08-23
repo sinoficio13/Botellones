@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, Store } from 'lucide-react';
+import { LogOut, MapPin, Store } from 'lucide-react';
+import { logout } from '@/app/(auth)/logout/actions';
 import { BellNotification } from '@/components/notificaciones/bell';
 import { ScannerIsland } from '@/components/scanner/scanner-island';
 import GlobalSearch from '@/components/search/global-search';
@@ -106,12 +107,23 @@ export async function Header() {
           </Link>
         </nav>
 
-        {/* Bell notification + QR scanner islands */}
+        {/* Bell notification + QR scanner islands + logout */}
         <div className="flex items-center gap-2">
           <div className="hidden lg:inline-flex">
             <ScannerIsland />
           </div>
           <BellNotification />
+          <form action={logout}>
+            <button
+              type="submit"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden lg:inline">Cerrar sesión</span>
+            </button>
+          </form>
         </div>
       </div>
     </header>

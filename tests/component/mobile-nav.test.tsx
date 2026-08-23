@@ -118,6 +118,23 @@ describe('MobileNav', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows a Cerrar sesión action inside the Más drawer', async () => {
+    const user = userEvent.setup();
+    render(<MobileNav />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Cerrar sesión' })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Más' }));
+
+    const logoutButton = await screen.findByRole('button', {
+      name: 'Cerrar sesión',
+    });
+    expect(logoutButton).toBeVisible();
+    expect(logoutButton).toHaveClass('min-h-[44px]');
+  });
+
   it('opens the scanner modal from the FAB in one tap', async () => {
     const user = userEvent.setup();
     render(<MobileNav />);

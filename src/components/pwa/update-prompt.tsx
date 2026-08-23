@@ -37,6 +37,13 @@ export function UpdatePrompt() {
       return;
     }
 
+    // Dev mode has no compiled /sw.js (Serwist only emits it in `next build`),
+    // so registering here would 404 and spam "Failed to register a
+    // ServiceWorker" in the console. Skip entirely outside production.
+    if (process.env.NODE_ENV !== "production") {
+      return;
+    }
+
     const serwist = new Serwist("/sw.js", { scope: "/", type: "classic" });
 
     void serwist.register().then(() => {

@@ -36,13 +36,16 @@ const nextConfig: NextConfig = {
 
 // Serwist PWA wrapper. `register: false` keeps registration manual via
 // update-prompt.tsx (avoids the dev-mode /sw.js 404 breaking the page).
-// Applied to production only: serwist injects a webpack config, which
-// Next 16.3 rejects under Turbopack (the dev default). Production builds
-// run with `next build --webpack` so the worker compiles to public/sw.js.
+// `disable: NODE_ENV === 'production'` keeps the PWA out of the production
+// build for now: Serwist's webpack output breaks Vercel's route-group file
+// upload (lstat ENOENT on `(dashboard)/page_client-reference-manifest.js`).
+// Reintroduce the production PWA with @serwist/turbopack when Next 16 +
+// Vercel accept the webpack output.
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   register: false,
+  disable: process.env.NODE_ENV === "production",
 });
 
 export default process.env.NODE_ENV === "production"

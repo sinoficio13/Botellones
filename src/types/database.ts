@@ -451,18 +451,18 @@ export type Database = {
         Args: {
           p_ids: string[]   // uuid[] maps to string[]
           p_estado: string
+          p_restaurar?: boolean | null   // true = undo: restore pre-move estado_desde from DB snapshot (0013 R1-001)
         }
-        Returns: undefined | {
-          Row: {
-            cliente_id: string | null
-            codigo: string
-            created_at: string | null
-            estado: string | null
-            estado_desde: string
-            fecha_creacion: string | null
-            id: string
-          }
-        }
+        Returns: {
+          cliente_id: string | null
+          codigo: string
+          created_at: string | null
+          estado: string | null
+          estado_desde: string
+          fecha_creacion: string | null
+          fecha_entrega: string | null
+          id: string
+        }[]
       }
     }
     Enums: {

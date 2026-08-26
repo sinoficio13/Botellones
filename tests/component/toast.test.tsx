@@ -101,4 +101,32 @@ describe('Toast — REQ-COS-12', () => {
     expect(screen.getByText('No se pudo avanzar')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument();
   });
+
+  it('keeps a toast shown inside onAction alive after the original dismiss (R3-001)', () => {
+    vi.useFakeTimers();
+    renderHost();
+    act(() => {
+      showToast({
+        message: 'Avanzados 3 botellones',
+        tone: 'success',
+        actionLabel: 'Deshacer',
+        onAction: () => {
+          showToast({ message: 'Deshaciendo movimiento…', tone: 'success' });
+        },
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+
+    // The dismiss of the original toast must NOT remove the toast shown inside
+    // onAction (MOD REQ-COS-12 scenario "Action-shown toast survives (R3-001)").
+    expect(screen.queryByText('Avanzados 3 botellones')).not.toBeInTheDocument();
+    expect(screen.getByText('Deshaciendo movimiento…')).toBeInTheDocument();
+
+    // The new toast runs its own 4.5s timer.
+    act(() => vi.advanceTimersByTime(TOAST_DURATION_MS - 1));
+    expect(screen.getByText('Deshaciendo movimiento…')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText('Deshaciendo movimiento…')).not.toBeInTheDocument();
+  });
 });

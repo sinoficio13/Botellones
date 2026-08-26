@@ -20,7 +20,7 @@ type ToastState = ToastInput & { id: number };
 // fase-3 call sites just call showToast().
 let toast: ToastState | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
-let listeners = new Set<() => void>();
+const listeners = new Set<() => void>(); // W-1: never reassigned -> const
 let nextId = 0;
 
 function emit(): void {
@@ -61,10 +61,16 @@ export function showToast(input: ToastInput): void {
   }, TOAST_DURATION_MS);
 }
 
-/** Immediately removes the current toast (also fired after an action runs). */
-export function dismissToast(): void {
-  clearTimer();
-  if (toast !== null) {
+/**
+ * dismissToast — removes the current toast. When an `id` is given it only
+ * dismisses the instance carrying that id (R3-001, MOD REQ-COS-12): a toast
+ * shown inside an action's `onAction` has a different id and survives the
+ * original toast's dismiss. With no id it dismisses whatever is current
+ * (module reset / callers without a captured identity).
+ */
+export function dismissToast(id?: number): void {
+  if (toast !== null && (id === undefined || toast.id === id)) {
+    clearTimer();
     toast = null;
     emit();
   }
@@ -100,8 +106,12 @@ export function ToastHost() {
           <button
             type="button"
             onClick={() => {
+              // R3-001: capture the id BEFORE onAction — if onAction shows a
+              // new toast, dismissToast(id) only removes the instance that
+              // carried this action, leaving the new toast alive.
+              const id = current.id;
               current.onAction?.();
-              dismissToast();
+              dismissToast(id);
             }}
             className="shrink-0 font-medium text-marca"
           >

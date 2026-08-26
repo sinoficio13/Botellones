@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { GrupoCard } from '@/components/operaciones/grupo-card';
 import type { GrupoCola, EstadoOperativo } from '@/hooks/useColaOperaciones';
 import type { ColaBotellon } from '@/lib/db/botellones';
@@ -104,6 +104,39 @@ describe('GrupoCard — REQ-COS-18', () => {
     expect(screen.getByRole('button', { name: '→ Pasar 1 a En recarga' })).toBeDisabled();
   });
 
+  it('manages its own in-flight state: disables while an async onAccion runs, re-enables after (R2-001)', async () => {
+    let resolver!: () => void;
+    const onAccion = vi.fn(
+      () => new Promise<void>((r) => (resolver = r))
+    );
+    render(<GrupoCard grupo={grupo([botellon(1), botellon(2)])} estado="recibido" onAccion={onAccion} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' }));
+    expect(onAccion).toHaveBeenCalledWith(['b-1', 'b-2']);
+    expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeDisabled();
+
+    await act(async () => {
+      resolver();
+    });
+    expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).not.toBeDisabled();
+  });
+
+  it('drops moved ids from marcados when the group membership shrinks (carried R2-001)', () => {
+    const onAccion = vi.fn();
+    const { rerender } = render(
+      <GrupoCard grupo={grupo([botellon(1), botellon(2), botellon(3)])} estado="recibido" onAccion={onAccion} />
+    );
+    expect(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' })).toBeInTheDocument();
+
+    // b-2 moved away: the group rerenders with two members (subset move). The
+    // stale id must leave marcados so count/copy/ids stay in sync with the DOM.
+    rerender(<GrupoCard grupo={grupo([botellon(1), botellon(3)])} estado="recibido" onAccion={onAccion} />);
+
+    expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' }));
+    expect(onAccion).toHaveBeenCalledWith(['b-1', 'b-3']);
+  });
+
   it('disables the WhatsApp target with opacity-40 when the client has no phone (REQ-18 §7.3)', () => {
     render(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} />);
 
@@ -131,7 +164,7 @@ describe('GrupoCard — REQ-COS-18', () => {
     const { container: diez, unmount: unmountDiez } = render(<GrupoCard grupo={diezHoras} estado="recibido" onAccion={vi.fn()} />);
 
     const edadDiez = screen.getByText('10h');
-    expect(edadDiez).toHaveClass('text-urgencia');
+    expect(edadDiez).toHaveClass('text-urgencia-texto');
     expect(diez.querySelector('[data-testid="grupo-card"]')).not.toHaveClass('bg-urgencia/7');
     unmountDiez();
 

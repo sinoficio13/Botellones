@@ -25,6 +25,10 @@ const EXPECTED_POLICIES = {
     admin: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
     repartidor: ['SELECT', 'INSERT'],
   },
+  movimientos: {
+    admin: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+    repartidor: ['SELECT'],
+  },
   botellones: {
     admin: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
     repartidor: ['SELECT'],
@@ -54,13 +58,13 @@ const EXPECTED_TABLES = Object.keys(EXPECTED_POLICIES)
 // The test file documents expectations; actual DB queries run during
 // sdd-verify phase or manual audit.
 describe('RLS Policy Configuration', () => {
-  it('has RLS enabled on all 9 tables', () => {
-    // Verified during audit: all 9 tables have relrowsecurity = true
+  it('has RLS enabled on all 10 tables', () => {
+    // Verified during audit: all 10 tables have relrowsecurity = true
     // perfiles was fixed post-audit (was disabled due to power cut)
-    expect(EXPECTED_TABLES).toHaveLength(9)
+    expect(EXPECTED_TABLES).toHaveLength(10)
   })
 
-  it('has admin full CRUD on all 9 tables (SELECT + INSERT + UPDATE + DELETE)', () => {
+  it('has admin full CRUD on all 10 tables (SELECT + INSERT + UPDATE + DELETE)', () => {
     for (const [table, roles] of Object.entries(EXPECTED_POLICIES)) {
       const adminOps = roles.admin
       expect(adminOps).toContain('SELECT')
@@ -70,7 +74,7 @@ describe('RLS Policy Configuration', () => {
     }
   })
 
-  it('has repartidor SELECT on all 9 tables', () => {
+  it('has repartidor SELECT on all 10 tables', () => {
     for (const [table, roles] of Object.entries(EXPECTED_POLICIES)) {
       expect(roles.repartidor).toContain('SELECT')
     }

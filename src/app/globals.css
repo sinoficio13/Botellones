@@ -63,6 +63,7 @@
   --color-estado-entregado: var(--estado-entregado);
   --color-marca: var(--marca);
   --color-urgencia: var(--urgencia);
+  --color-urgencia-texto: var(--urgencia-texto);
   --color-whatsapp: var(--whatsapp);
   --animate-shimmer: shimmer 1.5s linear infinite;
 
@@ -143,6 +144,13 @@
   --estado-entregado: #6D42C7;
   --marca: #0C7C92;
   --urgencia: #B07515;
+  /*
+   * R4-001: --urgencia (#B07515) es el ámbar de TINTES (bg 7%, íconos). El
+   * TEXTO de urgencia en modo claro necesita un ámbar más oscuro para cumplir
+   * WCAG AA (>=4.5:1 sobre --surface-1 #FAFAFA: #92400E rinde ~6.8:1); en modo
+   * oscuro el texto vuelve a --urgencia (#B07515 sobre #09090B ~5.0:1).
+   */
+  --urgencia-texto: #92400E;
   --whatsapp: #1A9150;
 }
 
@@ -195,6 +203,7 @@
   --estado-entregado: #6D42C7;
   --marca: #0C7C92;
   --urgencia: #B07515;
+  --urgencia-texto: #B07515;
   --whatsapp: #1A9150;
 }
 

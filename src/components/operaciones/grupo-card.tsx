@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, ChevronRight, MessageCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -8,20 +8,25 @@ import { formatAntiguedad, nivelUrgencia } from '@/lib/utils/cola';
 import { ESTADO_LABELS } from '@/lib/utils/estados';
 import { Chip } from '@/components/operaciones/chip';
 import { ActionButton } from '@/components/operaciones/action-button';
-import type { EstadoOperativo, GrupoCola } from '@/hooks/useColaOperaciones';
+import type { DestinoAccion, EstadoOperativo, GrupoCola } from '@/hooks/useColaOperaciones';
 
 export type GrupoCardProps = {
   grupo: GrupoCola;
   estado: EstadoOperativo;
   enAccion?: boolean;
-  onAccion: (ids: string[]) => void;
+  onAccion: (ids: string[]) => void | Promise<unknown>;
 };
 
 /** Chips visibles antes del expansor +N (REQ-COS-18: "show 6 plus a +N expansion"). */
 const CHIPS_VISIBLES = 6;
 
-/** Destino por estado (máquina forward): recibido→recarga, recarga→listo, listo→delivery, delivery→entregado. */
-const DESTINO: Record<EstadoOperativo, EstadoOperativo | 'entregado'> = {
+/**
+ * Destino por estado (máquina forward, REQ-COS-19):
+ * recibido→recarga, recarga→listo, listo→delivery, delivery→entregado.
+ * Exportado para que el cableado onAccion→mover (harness/shell) use la misma
+ * tabla sin duplicarla.
+ */
+export const DESTINO_ACCION: Record<EstadoOperativo, DestinoAccion> = {
   recibido: 'recarga',
   recarga: 'listo',
   listo: 'delivery',
@@ -37,7 +42,7 @@ const DESTINO: Record<EstadoOperativo, EstadoOperativo | 'entregado'> = {
 function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: string): string {
   return estado === 'delivery'
     ? `✓ Entregar ${n} a ${primerNombre}`
-    : `→ Pasar ${n} a ${ESTADO_LABELS[DESTINO[estado]]}`;
+    : `→ Pasar ${n} a ${ESTADO_LABELS[DESTINO_ACCION[estado]]}`;
 }
 
 /**
@@ -57,6 +62,18 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
     () => new Set(grupo.botellones.map((b) => b.id))
   );
   const [expandido, setExpandido] = useState(false);
+  // Estado en-vuelo propio del card (R2-001 carried fix): deshabilita la acción
+  // mientras onAccion (async) corre, además del prop controlado `enAccion`.
+  const [enVuelo, setEnVuelo] = useState(false);
+
+  // R2-001 carried fix (DERIVED, no effect): cuando el grupo se encoge
+  // (movimiento de subconjunto), el conteo/copy/ids deben descartar los ids
+  // que ya no pertenecen al grupo, aunque `marcados` (selección local, D6)
+  // conserve su estado para los chips restantes.
+  const marcadosValidos = useMemo(
+    () => new Set([...marcados].filter((id) => grupo.botellones.some((b) => b.id === id))),
+    [marcados, grupo.botellones]
+  );
 
   const cliente = grupo.botellones[0]?.clientes;
   const nombre = cliente?.nombre ?? '';
@@ -67,7 +84,8 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
 
   const visibles = expandido ? grupo.botellones : grupo.botellones.slice(0, CHIPS_VISIBLES);
   const ocultos = grupo.botellones.length - visibles.length;
-  const sinMarcados = marcados.size === 0;
+  const sinMarcados = marcadosValidos.size === 0;
+  const deshabilitada = sinMarcados || enAccion || enVuelo;
 
   function toggle(id: string, siguiente: boolean) {
     setMarcados((prev) => {
@@ -76,6 +94,15 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
       else proximo.delete(id);
       return proximo;
     });
+  }
+
+  async function ejecutarAccion() {
+    setEnVuelo(true);
+    try {
+      await onAccion([...marcadosValidos]);
+    } finally {
+      setEnVuelo(false);
+    }
   }
 
   return (
@@ -125,7 +152,9 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
           <span
             className={cn(
               'text-xs tabular-nums',
-              urgencia === 'normal' ? 'text-text-muted' : 'text-urgencia'
+              // R4-001: texto de urgencia usa --urgencia-texto (AA en claro);
+              // --urgencia queda para tintes (bg 7%) e íconos.
+              urgencia === 'normal' ? 'text-text-muted' : 'text-urgencia-texto'
             )}
           >
             {antiguedad}
@@ -138,7 +167,7 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
           <Chip
             key={b.id}
             label={b.codigo}
-            pressed={marcados.has(b.id)}
+            pressed={marcadosValidos.has(b.id)}
             onToggle={(siguiente) => toggle(b.id, siguiente)}
           />
         ))}
@@ -155,11 +184,15 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
       </div>
 
       <ActionButton
-        disabled={sinMarcados || enAccion}
-        onClick={() => onAccion([...marcados])}
+        disabled={deshabilitada}
+        onClick={() => {
+          void ejecutarAccion();
+        }}
         className="mt-3 w-full"
       >
-        {sinMarcados ? 'Elegí al menos un botellón' : copiaAccion(estado, marcados.size, primerNombre)}
+        {sinMarcados
+          ? 'Elegí al menos un botellón'
+          : copiaAccion(estado, marcadosValidos.size, primerNombre)}
       </ActionButton>
     </article>
   );

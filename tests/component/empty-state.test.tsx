@@ -47,6 +47,8 @@ describe('Skeleton — REQ-COS-13', () => {
     const shimmer = container.querySelector('div');
     expect(shimmer).not.toBeNull();
     expect(shimmer).toHaveClass('animate-shimmer');
+    // 4R R4-001: shimmer must stop under prefers-reduced-motion
+    expect(shimmer).toHaveClass('motion-reduce:animate-none');
     expect(shimmer).toHaveClass('h-20', 'w-full');
     expect(shimmer).toHaveAttribute('aria-hidden', 'true');
   });

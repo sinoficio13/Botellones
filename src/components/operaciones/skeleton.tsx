@@ -14,7 +14,7 @@ export function Skeleton({ className }: SkeletonProps) {
     <div
       aria-hidden
       className={cn(
-        'animate-shimmer rounded-md bg-[linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2))] bg-[length:200%_100%]',
+        'animate-shimmer motion-reduce:animate-none rounded-md bg-[linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2))] bg-[length:200%_100%]',
         className
       )}
     />

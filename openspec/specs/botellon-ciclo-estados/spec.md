@@ -122,7 +122,8 @@ Stock/inventario MUST NOT be a new estado — clientless botellones in `recibido
 
 ### Requirement: Reversion set and getEstadosPermitidos (single manual-move rule)
 
-`REVERSIONES` MUST equal exactly: `entregado: ['listo','delivery']`, `recibido: ['entregado']`, `recarga: ['recibido']`, `listo: ['recarga']`, `delivery: ['listo']`. `getEstadosPermitidos(estado)` MUST return the dedup union of `getTransiciones(estado)` and `getReversiones(estado)`, MUST always include the identity estado, and no estado MAY be terminal (every estado has at least one reversion).
+`REVERSIONES` MUST equal exactly: `entregado: ['listo','delivery']`, `recibido: ['entregado']`, `recarga: ['recibido']`, `listo: ['recarga']`, `delivery: ['listo']`. `getEstadosPermitidos(estado)` MUST return the dedup union of `getTransiciones(estado)` and `getReversiones(estado)`, MUST always include the identity estado, and no estado MAY be terminal (every estado has at least one reversion). The permitted-set rule MUST be mirrored in SQL: a SQL helper MUST return the same dedup union (transitions + reversions + identity) for all five estados, and the batch mover `mover_botellones` MUST validate its destino against exactly those sets.
+(Previously: TS-only permitted-set rule; no SQL-side mirror and no batch mover.)
 
 #### Scenario: S1 — Undo an error via Deshacer
 
@@ -149,9 +150,22 @@ Stock/inventario MUST NOT be a new estado — clientless botellones in `recibido
 - WHEN both maps are evaluated
 - THEN `b ∈ getTransiciones(a)` iff `a ∈ getReversiones(b)`
 
+#### Scenario: S-M1 — SQL mirror equals the TS machine
+
+- GIVEN all five estados
+- WHEN the SQL helper output is compared with `getEstadosPermitidos(estado)`
+- THEN the permitted sets are identical
+
+#### Scenario: S-M2 — Batch mover validates against the mirror
+
+- GIVEN the batch RPC `mover_botellones`
+- WHEN a destino outside the mirrored permitted set is submitted
+- THEN the batch is rejected with zero writes
+
 ### Requirement: Server-side validation with CAS guard
 
-`updateBotellon` and `moverBotellon` MUST read the current estado, MUST validate `nuevoEstado ∈ getEstadosPermitidos(current)` (or the sale exception), then MUST write with a compare-and-set guard `.eq('id', id).eq('estado', current)`. On validation failure the server MUST return `'Transición no permitida: <actual> → <destino>'` and MUST NOT write to the database.
+`updateBotellon` and `moverBotellon` MUST read the current estado, MUST validate `nuevoEstado ∈ getEstadosPermitidos(current)` (or the sale exception), then MUST write with a compare-and-set guard `.eq('id', id).eq('estado', current)`. On validation failure the server MUST return `'Transición no permitida: <actual> → <destino>'` and MUST NOT write to the database. Every estado write path — manual `moverBotellon`/`updateBotellon`, kanban action, and the batch RPC — MUST stamp `estado_desde = now()` and append a `movimientos` row whenever the estado actually changes; a no-op write MUST append nothing.
+(Previously: writes had no timestamping or audit side-effect.)
 
 #### Scenario: S5 — Invalid manual move rejected with zero writes
 
@@ -178,3 +192,21 @@ Stock/inventario MUST NOT be a new estado — clientless botellones in `recibido
 - GIVEN a botellon in `listo`
 - WHEN `nuevoEstado == 'listo'` is submitted
 - THEN validation passes (identity is always permitted) and the write succeeds
+
+#### Scenario: S-A1 — Successful write stamps and audits
+
+- GIVEN `moverBotellon(id, 'recarga')` on a botellon in `recibido`
+- WHEN the write succeeds
+- THEN `estado_desde` is stamped `now()` and a `movimientos` row records `recibido → recarga` with the current user
+
+#### Scenario: S-A2 — No-op write appends nothing
+
+- GIVEN a write that keeps the current estado
+- WHEN it executes
+- THEN no `movimientos` row is inserted and `estado_desde` is untouched
+
+#### Scenario: S-A3 — Batch RPC is audited per bottle
+
+- GIVEN a successful `mover_botellones` batch
+- WHEN it commits
+- THEN every changed row has its own `movimientos` row (one per bottle)

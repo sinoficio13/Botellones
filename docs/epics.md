@@ -24,12 +24,13 @@
 | EPIC-12 | QR Público Rediseñado      | 4         | EPIC-4                                 | Completado |
 | EPIC-13 | Recarga Rápida desde QR    | 4         | EPIC-12                                | Completado |
 | EPIC-14 | Scanner Interno con Cámara  | 2         | EPIC-13 (opcional)                     | Completado |
+| EPIC-15 | Central de Operaciones     | 15        | EPIC-8, EPIC-4                         | En planificación |
 
 ---
 
 ## Estado de ejecución
 
-Los 15 epics están implementados en código y archivados como cambios SDD en Engram (los de Fase 1, EPIC-0..11, se completaron directo a `main`; los de Fase 2, EPIC-12..14, como cambios SDD dedicados). El detalle completo de cada historias/AC sigue en las secciones de cada epic, que son la referencia de especificación.
+Los 15 epics de Fase 1 y 2 (EPIC-0..14) están implementados en código y archivados como cambios SDD en Engram (los de Fase 1, EPIC-0..11, se completaron directo a `main`; los de Fase 2, EPIC-12..14, como cambios SDD dedicados). El detalle completo de cada historias/AC sigue en las secciones de cada epic, que son la referencia de especificación. **EPIC-15 (Central de Operaciones)** está en planificación, registrado como 5 changes SDD encadenados.
 
 | Epic | Archivado | Cambio SDD (Engram) |
 |---|---|---|
@@ -48,6 +49,7 @@ Los 15 epics están implementados en código y archivados como cambios SDD en En
 | EPIC-12 QR Público Rediseñado | 17/08/2026 | `sdd/qr-publico-rediseno` |
 | EPIC-13 Recarga Rápida desde QR | 18/08/2026 | `sdd/qr-recarga-rapida` |
 | EPIC-14 Scanner Interno | 19/08/2026 | `sdd/scanner-interno` |
+| EPIC-15 Central de Operaciones | En planificación | 5 changes: `central-op-fase1-schema` … `central-op-fase5-realtime-whatsapp-ficha` |
 
 > Nota: EPIC-14 estaba marcado como "opcional" en el plan, pero se implementó igualmente.
 
@@ -898,6 +900,62 @@ src/
 
 ---
 
+## EPIC-15 — Central de Operaciones
+
+> Rediseño total del dashboard de operaciones: cola de trabajo agrupada por cliente, mobile-first, FIFO estricto, acción en un toque con deshacer, WhatsApp y realtime sin reordenar bajo el dedo.
+
+**Depende de:** EPIC-8, EPIC-4
+**Responsable:** Desarrollador
+**Estado:** En planificación — 5 changes SDD encadenados (`central-op-fase1-schema` → `central-op-fase2-tokens` → `central-op-fase3-vista-movil` → `central-op-fase4-kanban-desktop` → `central-op-fase5-realtime-whatsapp-ficha`)
+
+> Detalle completo de historias y AC: [`docs/epics/15-Central-Operaciones.md`](./epics/15-Central-Operaciones.md)
+
+### FASE 1 — Schema + tipos + data mock (sin UI)
+
+**Descripción:** Base para FIFO y movimiento en lote: columna `estado_desde` + trigger, tabla `movimientos`, RPC `mover_botellones(ids[], estado)` transaccional, tipos `GrupoCliente` + `agrupar()` con tests.
+
+**Acceptance Criteria:**
+- [ ] `estado_desde` con backfill y trigger que resetea e inserta en `movimientos`
+- [ ] RPC de lote en una sola transacción, validando la máquina de estados, con guard de rol
+- [ ] `agrupar()` FIFO estricto (más antiguo primero) con tests
+
+### FASE 2 — Tokens de diseño + primitivos
+
+**Descripción:** CSS vars claro/oscuro (spec 5.1) y primitivos: Chip (`aria-pressed`), botón acción `#0C7C92`, toast con Deshacer, skeleton, vacíos.
+
+**Acceptance Criteria:**
+- [ ] Tokens en `:root`/`.dark`, cero hex hardcodeado en componentes
+- [ ] Primitivos con targets ≥44px y contraste ≥4.5:1
+
+### FASE 3 — Vista móvil (cola agrupada)
+
+**Descripción:** Tabs de 4 estados, card de grupo por cliente con chips de selección, acción de avance/entrega con deshacer, buscador, estados vacíos. Reemplaza el dashboard actual.
+
+**Acceptance Criteria:**
+- [ ] Chips todos marcados; 0 marcados → botón deshabilitado
+- [ ] Entregar sin selector de cliente; botón siempre `#0C7C92`
+- [ ] Optimistic + toast Deshacer + RPC; error revierte
+- [ ] Funciona en 375px sin scroll horizontal
+
+### FASE 4 — Vista desktop (kanban agrupado)
+
+**Descripción:** 4 columnas con placeholder vacío, códigos separados por `·`, botón sobre todo el grupo, drag & drop nativo.
+
+**Acceptance Criteria:**
+- [ ] Columna vacía con placeholder de borde punteado (min 120px)
+- [ ] Drag solo ≥1024px; drop inválido no escribe nada
+
+### FASE 5 — Realtime + WhatsApp + ficha cliente
+
+**Descripción:** Realtime con cola + chip flotante (no reordena bajo el dedo), sheet WhatsApp con mensaje por estado, ficha del cliente en bottom sheet con todos los estados.
+
+**Acceptance Criteria:**
+- [ ] Cambio realtime mientras se scrollea NO reordena bajo el dedo
+- [ ] Sheet WhatsApp: mensaje editable por estado, deep link `wa.me`, ícono deshabilitado sin teléfono
+- [ ] Ficha con botellones de TODOS los estados (incl. entregado), Llamar y Ficha
+
+---
+
 ## Orden de ejecución
 
 ```
@@ -923,3 +981,12 @@ EPIC-12 → EPIC-13 → EPIC-14 (opcional)
 - **EPIC-12** rediseña la página pública del QR (paleta "Agua").
 - **EPIC-13** agrega la recarga rápida en 1 tap para admin/repartidor.
 - **EPIC-14** (opcional) agrega el scanner con cámara dentro del dashboard.
+
+## Fase 3 — Central de Operaciones (post-EPIC-14)
+
+```
+EPIC-15 (5 changes SDD encadenados)
+```
+
+- **EPIC-15** rediseña `/dashboard` como cola agrupada por cliente con FIFO, acción en un toque con deshacer, WhatsApp, ficha del cliente y realtime sin reordenar bajo el dedo.
+- Los 5 changes SDD (`central-op-fase1-schema` → `...-fase5`) se ejecutan en orden; cada uno se archiva antes de abrir el siguiente.

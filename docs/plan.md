@@ -1,7 +1,7 @@
 # Plan — Sistema de Gestión de Botellones de Agua
 
-> Estado: **COMPLETADO (15/15 epics implementados; Fase 2 incluida)**
-> Última actualización: 21/08/2026
+> Estado: **EPIC-0..14 COMPLETADOS (15/15); EPIC-15 Central de Operaciones EN PLANIFICACIÓN**
+> Última actualización: 26/08/2026
 
 ## Documentación del proyecto
 
@@ -55,11 +55,12 @@ Toda la especificación detallada está en estos archivos:
 | EPIC-12 QR Público Rediseñado | 4 |
 | EPIC-13 Recarga Rápida desde QR | 4 |
 | EPIC-14 Scanner Interno | 2 |
-| **Total** | **67 historias** |
+| EPIC-15 Central de Operaciones | 15 |
+| **Total** | **82 historias** |
 
 ## Estado de ejecución
 
-Todos los 15 epics están implementados en código y archivados como cambios SDD en Engram (excepto donde se indica). Los epics de la Fase 1 (EPIC-0..11) se completaron directamente a `main`; los de la Fase 2 (EPIC-12..14) se implementaron como cambios SDD dedicados.
+Todos los 15 epics de Fase 1 y 2 están implementados en código y archivados como cambios SDD en Engram (excepto donde se indica). Los epics de la Fase 1 (EPIC-0..11) se completaron directamente a `main`; los de la Fase 2 (EPIC-12..14) se implementaron como cambios SDD dedicados. **EPIC-15 (Central de Operaciones)** está en planificación con 5 changes SDD encadenados.
 
 | Epic | Estado | Archivado | Cambio SDD |
 |---|---|---|---|
@@ -78,6 +79,7 @@ Todos los 15 epics están implementados en código y archivados como cambios SDD
 | EPIC-12 QR Público Rediseñado | Completado | 17/08/2026 | `sdd/qr-publico-rediseno` |
 | EPIC-13 Recarga Rápida desde QR | Completado | 18/08/2026 | `sdd/qr-recarga-rapida` |
 | EPIC-14 Scanner Interno | Completado | 19/08/2026 | `sdd/scanner-interno` |
+| EPIC-15 Central de Operaciones | En planificación | — | `central-op-fase1-schema` … `central-op-fase5-realtime-whatsapp-ficha` |
 
 > Nota: EPIC-14 estaba marcado como "opcional" en el plan, pero se implementó igualmente.
 

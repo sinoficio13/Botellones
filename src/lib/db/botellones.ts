@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getEstadosPermitidos, type Estado } from '@/lib/utils/estados';
+import { getEstadosPermitidos, ESTADOS_KANBAN, type Estado } from '@/lib/utils/estados';
+import type { BotellonAgrupable } from '@/lib/utils/grupos';
 
 // ── DB join result types ──
 
@@ -220,6 +221,39 @@ export async function updateBotellon(_prev: BotellonState | null, formData: Form
     return { success: true, id };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : 'Error al actualizar' };
+  }
+}
+
+// ── Cola operativa (REQ-COS-16) ──
+// Queue feed: client-owned rows only (stock excluded), the 4 queue estados,
+// FIFO order by estado_desde ASC. Consumed by the fase-3 client-grouped queue:
+// the hook feeds these rows through fase-1 `agrupar()` so each estado tab shows
+// FIFO groups (group age = min(estado_desde), members oldest-first).
+
+export type ColaCliente = {
+  nombre: string;
+  cedula: string | null;
+  telefono_1: string | null;
+  whatsapp: string | null;
+};
+
+export type ColaBotellon = BotellonAgrupable & { cliente_id: string; clientes: ColaCliente };
+
+const SELECT_COLA =
+  'id, codigo, estado, estado_desde, cliente_id, clientes(nombre, cedula, telefono_1, whatsapp)';
+
+export async function getColaOperaciones(): Promise<ColaBotellon[]> {
+  try {
+    const supabase = await getSupabase();
+    const { data } = await supabase
+      .from('botellones')
+      .select(SELECT_COLA)
+      .not('cliente_id', 'is', null)
+      .in('estado', ESTADOS_KANBAN)
+      .order('estado_desde', { ascending: true });
+    return (data as unknown as ColaBotellon[]) || [];
+  } catch {
+    return [];
   }
 }
 

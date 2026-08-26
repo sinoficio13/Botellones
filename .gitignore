@@ -71,3 +71,6 @@ supabase/.temp/
 
 # Playwright report artifacts
 playwright-report/
+
+# CodeGraph index (local, machine-specific)
+.codegraph/

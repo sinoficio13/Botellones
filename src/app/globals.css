@@ -8,7 +8,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -46,6 +46,34 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Operaciones design tokens (REQ-COS-8) — additive, no shadcn clobber */
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-fill-disabled: var(--fill-disabled);
+  --color-text-disabled: var(--text-disabled);
+  --color-estado-recibido: var(--estado-recibido);
+  --color-estado-recarga: var(--estado-recarga);
+  --color-estado-listo: var(--estado-listo);
+  --color-estado-delivery: var(--estado-delivery);
+  --color-estado-entregado: var(--estado-entregado);
+  --color-marca: var(--marca);
+  --color-urgencia: var(--urgencia);
+  --color-whatsapp: var(--whatsapp);
+  --animate-shimmer: shimmer 1.5s linear infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
 }
 
 :root {
@@ -81,6 +109,24 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Operaciones design tokens (REQ-COS-8) — light */
+  --surface-1: #FAFAFA;
+  --surface-2: #FFFFFF;
+  --surface-3: #F4F4F5;
+  --border-strong: #D4D4D8;
+  --text-primary: #18181B;
+  --text-secondary: #52525B;
+  --text-muted: #A1A1AA;
+  --fill-disabled: #E4E4E7;
+  --text-disabled: #A1A1AA;
+  --estado-recibido: #64748B;
+  --estado-recarga: #0C7C92;
+  --estado-listo: #1A9150;
+  --estado-delivery: #DB9A2E;
+  --estado-entregado: #6D42C7;
+  --marca: #0C7C92;
+  --urgencia: #B07515;
+  --whatsapp: #1A9150;
 }
 
 .dark {
@@ -115,6 +161,24 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* Operaciones design tokens (REQ-COS-8) — dark */
+  --surface-1: #09090B;
+  --surface-2: #18181B;
+  --surface-3: #27272A;
+  --border-strong: #3F3F46;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  --fill-disabled: #27272A;
+  --text-disabled: #52525B;
+  --estado-recibido: #64748B;
+  --estado-recarga: #0C7C92;
+  --estado-listo: #1A9150;
+  --estado-delivery: #DB9A2E;
+  --estado-entregado: #6D42C7;
+  --marca: #0C7C92;
+  --urgencia: #B07515;
+  --whatsapp: #1A9150;
 }
 
 @layer base {

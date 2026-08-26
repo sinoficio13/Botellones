@@ -109,7 +109,24 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* Operaciones design tokens (REQ-COS-8) — light */
+  /*
+   * Operaciones design tokens (REQ-COS-8) — light.
+   *
+   * Token-namespace intent (review R2-001/R2-002, spec §5.1 — do NOT rename):
+   * - The namespace deliberately mixes Spanish domain vocabulary (--marca,
+   *   --estado-*, --urgencia, --whatsapp) with English surface tokens. This is
+   *   the user's locked §5.1 vocabulary: the state machine and the queue UI
+   *   speak Spanish (estados, marca, urgencia), so tokens mirror the domain.
+   * - --marca duplicates --estado-recarga (#0C7C92) BY DESIGN: marca is the
+   *   action color (buttons, chips, active links), estado-recarga is the state
+   *   color (tab underline, chips). They share the value but are different
+   *   semantic roles; rename only if the spec vocabulary changes.
+   * - --text-muted equals --text-disabled (#A1A1AA) in LIGHT mode only; dark
+   *   mode differentiates them (#71717A vs #52525B). Both values are locked by
+   *   §5.1. Consumers must use text-disabled for disabled affordances and
+   *   text-muted for de-emphasized content, so a future light-mode divergence
+   *   needs no consumer changes.
+   */
   --surface-1: #FAFAFA;
   --surface-2: #FFFFFF;
   --surface-3: #F4F4F5;
@@ -161,7 +178,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  /* Operaciones design tokens (REQ-COS-8) — dark */
+  /* Operaciones design tokens (REQ-COS-8) — dark (same namespace intent as light, R2-001/2) */
   --surface-1: #09090B;
   --surface-2: #18181B;
   --surface-3: #27272A;

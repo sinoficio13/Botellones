@@ -2,11 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { agrupar, type GrupoCliente } from '@/lib/utils/grupos';
+import { ESTADOS_KANBAN, type Estado } from '@/lib/utils/estados';
 import { getColaOperaciones, type ColaBotellon } from '@/lib/db/botellones';
 
-export type EstadoOperativo = 'recibido' | 'recarga' | 'listo' | 'delivery';
+/** Estados de la cola = kanban sin `entregado` (que vive en circulación, fuera de la cola). */
+export type EstadoOperativo = Exclude<Estado, 'entregado'>;
 
-export const ESTADOS_OPERATIVOS: EstadoOperativo[] = ['recibido', 'recarga', 'listo', 'delivery'];
+/**
+ * Los 4 estados operativos de la cola — derivados de `ESTADOS_KANBAN` (única
+ * fuente de verdad, review R2-001) en vez de una lista duplicada a mano.
+ */
+export const ESTADOS_OPERATIVOS: EstadoOperativo[] = ESTADOS_KANBAN.filter(
+  (e): e is EstadoOperativo => e !== 'entregado'
+);
 
 /** `agrupar` output narrowed to queue rows (client-owned only). */
 export type GrupoCola = Omit<GrupoCliente, 'botellones'> & { botellones: ColaBotellon[] };

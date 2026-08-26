@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useColaOperaciones } from '@/hooks/useColaOperaciones';
+import { useColaOperaciones, ESTADOS_OPERATIVOS } from '@/hooks/useColaOperaciones';
+import { ESTADOS_KANBAN } from '@/lib/utils/estados';
 import type { ColaBotellon } from '@/lib/db/botellones';
 
 const { getColaOperacionesMock } = vi.hoisted(() => ({ getColaOperacionesMock: vi.fn() }));
@@ -24,6 +25,10 @@ async function cargar(filas: ColaBotellon[]) {
 }
 
 describe('useColaOperaciones — REQ-COS-16/17 (Slice A frame)', () => {
+  it('ESTADOS_OPERATIVOS derives from ESTADOS_KANBAN minus entregado (approval, R2-001)', () => {
+    expect(ESTADOS_OPERATIVOS).toEqual(ESTADOS_KANBAN.filter((e) => e !== 'entregado'));
+    expect(ESTADOS_OPERATIVOS).toEqual(['recibido', 'recarga', 'listo', 'delivery']);
+  });
   it('excludes NULL cliente_id rows before grouping (REQ-16 S1)', async () => {
     const result = await cargar([
       botellon({ id: 'a1', cliente_id: 'cliente-a' }),

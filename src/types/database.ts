@@ -20,6 +20,7 @@ export type Database = {
           codigo: string
           created_at: string | null
           estado: string | null
+          estado_desde: string
           fecha_creacion: string | null
           id: string
         }
@@ -28,6 +29,7 @@ export type Database = {
           codigo?: string
           created_at?: string | null
           estado?: string | null
+          estado_desde?: string
           fecha_creacion?: string | null
           id?: string
         }
@@ -36,6 +38,7 @@ export type Database = {
           codigo?: string
           created_at?: string | null
           estado?: string | null
+          estado_desde?: string
           fecha_creacion?: string | null
           id?: string
         }
@@ -230,6 +233,41 @@ export type Database = {
           },
         ]
       }
+      movimientos: {
+        Row: {
+          botellon_id: string
+          created_at: string | null
+          estado_nuevo: string
+          estado_previo: string | null
+          id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          botellon_id: string
+          created_at?: string | null
+          estado_nuevo: string
+          estado_previo?: string | null
+          id?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          botellon_id?: string
+          created_at?: string | null
+          estado_nuevo?: string
+          estado_previo?: string | null
+          id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_botellon_id_fkey"
+            columns: ["botellon_id"]
+            isOneToOne: false
+            referencedRelation: "botellones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificaciones: {
         Row: {
           botellon_id: string | null
@@ -409,7 +447,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mover_botellones: {
+        Args: {
+          p_ids: string[]   // uuid[] maps to string[]
+          p_estado: string
+        }
+        Returns: undefined | {
+          Row: {
+            cliente_id: string | null
+            codigo: string
+            created_at: string | null
+            estado: string | null
+            estado_desde: string
+            fecha_creacion: string | null
+            id: string
+          }
+        }
+      }
     }
     Enums: {
       [_ in never]: never

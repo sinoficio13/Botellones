@@ -112,8 +112,29 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
     expect(html).not.toContain('triangle-alert');
   });
 
-  it('keeps the WhatsApp target inert: disabled + opacity-40 without a phone, enabled-but-inert with (REQ-23 S4)', () => {
-    const { unmount: unmountSin } = render(
+  it('keeps the +N suffix OUTSIDE the truncating codes line so it stays visible in a narrow container (carried R4-001)', () => {
+    const botellones = Array.from({ length: 8 }, (_, i) => botellon(i + 1));
+    const { container } = render(
+      <div style={{ width: 120 }}>
+        <GrupoCardKanban grupo={grupo(botellones)} estado="recibido" onAccion={vi.fn()} />
+      </div>
+    );
+
+    // The +N is a separate shrink-0 span, NOT inside the truncate <p> (whose
+    // overflow clips) — so it is guaranteed visible even in a 120px container.
+    const codigos = [...container.querySelectorAll('p')].find((p) => p.className.includes('truncate'));
+    const plusN = [...container.querySelectorAll('span')].find((s) => s.textContent === '+2');
+
+    expect(codigos).not.toBeNull();
+    expect(codigos!.textContent).toContain('BOT-001');
+    expect(plusN).not.toBeNull();
+    // +N lives outside the truncate element (separate span, not its child).
+    expect(codigos!.contains(plusN as Node)).toBe(false);
+    expect(plusN!.className).toContain('shrink-0');
+    expect(screen.getByText('+2')).toBeInTheDocument();
+  });
+
+  it('keeps the WhatsApp target inert: disabled + opacity-40 without a phone, enabled-but-inert with (REQ-23 S4)', () => {    const { unmount: unmountSin } = render(
       <GrupoCardKanban grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} />
     );
     const sinTelefono = screen.getByRole('button', { name: 'WhatsApp de María González' });

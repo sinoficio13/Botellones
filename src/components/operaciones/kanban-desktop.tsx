@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ESTADO_LABELS } from '@/lib/utils/estados';
+import { ESTADO_LABELS, getEstadosPermitidos } from '@/lib/utils/estados';
 import { ESTADOS_OPERATIVOS, type DestinoAccion, type EstadoOperativo, type PorEstado } from '@/hooks/useColaOperaciones';
 import { ListaSkeleton } from '@/components/operaciones/lista-skeleton';
 import { EmptyState } from '@/components/operaciones/empty-state';
 import { DESTINO_ACCION } from '@/components/operaciones/grupo-card';
+import { showToast } from '@/components/operaciones/toast';
 import { GrupoCardKanban } from '@/components/operaciones/grupo-card-kanban';
 
 export type KanbanDesktopProps = {
@@ -41,9 +43,29 @@ const SUBTITULO_ESTADO: Record<EstadoOperativo, string> = {
  *
  * Columns use role="group" (D7) — never region — so jsdom's all-branches
  * render can't collide with the tablet sections' getByRole('region').
- * Drag & drop is Slice B (PR-B): the handlers below are inert stubs.
+ * Drag & drop is REQ-25 (Slice B / PR-B): the parent owns the `dragId`
+ * fallback state (D10, old-kanban pattern); a card's dragstart reports its
+ * ids, the target column's drop resolves dataTransfer || dragId, guards the
+ * move client-side via getEstadosPermitidos (D5 — zero mover calls + generic
+ * red toast on an invalid drop), and dragend clears the fallback.
  */
 export function KanbanDesktop({ porEstado, cargando, onMover }: KanbanDesktopProps) {
+  // D10: parent-owned dragId — fallback for Firefox's empty dataTransfer.getData.
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  /**
+   * D4: locate the origin estado of a dragged group by searching `porEstado`
+   * (GrupoCola has no estado field). Returns null when the ids are unknown.
+   */
+  function buscarOrigen(ids: string[]): EstadoOperativo | null {
+    for (const estado of ESTADOS_OPERATIVOS) {
+      for (const grupo of porEstado[estado]) {
+        if (grupo.botellones.some((b) => ids.includes(b.id))) return estado;
+      }
+    }
+    return null;
+  }
+
   return (
     <>
       {ESTADOS_OPERATIVOS.map((estado) => {
@@ -55,9 +77,26 @@ export function KanbanDesktop({ porEstado, cargando, onMover }: KanbanDesktopPro
             aria-label={`${ESTADO_LABELS[estado]} — ${SUBTITULO_ESTADO[estado]}`}
             data-testid="kanban-columna"
             className="flex min-w-0 flex-col gap-2"
-            // Slice B (PR-B): drag & drop handlers wire here (D10) — inert stubs.
+            // REQ-25: dragover must preventDefault to allow the drop; onDrop
+            // moves the WHOLE group to this column's estado (guarded).
             onDragOver={(e) => e.preventDefault()}
-            onDrop={() => undefined}
+            onDrop={(e) => {
+              e.preventDefault();
+              const raw = e.dataTransfer.getData('text/plain') || dragId;
+              if (!raw) return;
+              const ids = raw.split(',');
+              const origen = buscarOrigen(ids);
+              if (!origen) return;
+              // Same-column drop → no-op (nothing to move, no toast).
+              if (origen === estado) return;
+              // D5 pre-guard: invalid transition → zero mover calls + generic
+              // red toast (locked decision 3), no undo.
+              if (!getEstadosPermitidos(origen).includes(estado)) {
+                showToast({ message: 'No se pudo mover. Reintentá.', tone: 'error' });
+                return;
+              }
+              onMover(ids, estado);
+            }}
           >
             <div className="sticky top-0 z-10 bg-surface-1 py-1">
               <div className="flex items-center gap-1.5">
@@ -84,6 +123,8 @@ export function KanbanDesktop({ porEstado, cargando, onMover }: KanbanDesktopPro
                     grupo={grupo}
                     estado={estado}
                     onAccion={(ids) => onMover(ids, DESTINO_ACCION[estado])}
+                    onDragStart={(idsStr) => setDragId(idsStr)}
+                    onDragEnd={() => setDragId(null)}
                   />
                 ))}
               </div>

@@ -16,6 +16,10 @@ export type GrupoCardKanbanProps = {
   onAccion: (ids: string[]) => void | Promise<unknown>;
   /** Fase-5 placeholder — WhatsApp sheet. Currently inert. */
   onWhatsApp?: () => void;
+  /** REQ-25 (PR-B): the parent owns the dragId fallback — card reports its payload. */
+  onDragStart?: (idsStr: string) => void;
+  /** REQ-25 (PR-B): clears the parent dragId on dragend. */
+  onDragEnd?: () => void;
 };
 
 /** Codes visibles en la línea `·` antes del sufijo +N (REQ-23, D12 — sin expansor en desktop). */
@@ -38,6 +42,8 @@ export function GrupoCardKanban({
   enAccion = false,
   onAccion,
   onWhatsApp,
+  onDragStart,
+  onDragEnd,
 }: GrupoCardKanbanProps) {
   // R1-001: the real clock only exists after mount — server render and the
   // first client render share the null clock (no hydration mismatch).
@@ -58,6 +64,17 @@ export function GrupoCardKanban({
   return (
     <article
       data-testid="grupo-card-kanban"
+      draggable
+      onDragStart={(e) => {
+        // REQ-25: set dataTransfer with the whole group's ids + effectAllowed.
+        e.dataTransfer.setData('text/plain', ids.join(','));
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.(ids.join(','));
+      }}
+      onDragEnd={() => {
+        // REQ-25 S4: clear the parent dragId fallback.
+        onDragEnd?.();
+      }}
       className={cn(
         'rounded-lg border border-border-strong bg-surface-1 p-3',
         urgencia === 'critica' && 'bg-urgencia/7'
@@ -106,11 +123,18 @@ export function GrupoCardKanban({
         </div>
       </div>
 
-      {/* Codes: ONE ·-line, 6 visibles + static +N (REQ-23, D12 — no chips, no expansor). */}
-      <p className="mt-2 truncate text-xs text-text-secondary">
-        {visibles.map((b) => b.codigo).join(' · ')}
-        {ocultos > 0 ? <span className="text-text-muted"> +{ocultos}</span> : null}
-      </p>
+      {/* Codes: ONE ·-line, 6 visibles + static +N (REQ-23, D12 — no chips, no
+          expansor). R4-001 (carried): the +N suffix lives OUTSIDE the truncate
+          element in its own shrink-0 span, so it stays visible even when the
+          codes line is clipped in a narrow container. */}
+      <div className="mt-2 flex min-w-0 items-center gap-1">
+        <p className="truncate text-xs text-text-secondary">
+          {visibles.map((b) => b.codigo).join(' · ')}
+        </p>
+        {ocultos > 0 ? (
+          <span className="shrink-0 text-xs text-text-muted">+{ocultos}</span>
+        ) : null}
+      </div>
 
       <ActionButton
         disabled={enAccion}

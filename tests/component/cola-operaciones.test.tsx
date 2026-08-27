@@ -154,6 +154,27 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     expect(within(grid).queryByRole('tablist')).not.toBeInTheDocument();
   });
 
+  it('wires the CSS-only breakpoints: kanban ≥1024, tablet grid hidden, mobile untouched (MOD-21, REQ-22)', async () => {
+    await montar(filasTipicas());
+
+    // Mobile branch stays mobile-only (fase-3 unchanged).
+    const movil = screen.getByTestId('cola-movil');
+    expect(movil.className).toContain('md:hidden');
+
+    // Tablet 2-col grid now hides ≥1024px (MOD-21: the leak fix) — jsdom
+    // cannot apply media queries, so the classes are the observable (design D9).
+    const grid = screen.getByRole('region', { name: 'Recibido' }).parentElement!;
+    expect(grid.className).toContain('hidden');
+    expect(grid.className).toContain('md:grid-cols-2');
+    expect(grid.className).toContain('lg:hidden');
+
+    // Desktop kanban branch: hidden <1024, 4-col grid ≥1024 (REQ-22).
+    const kanban = screen.getByTestId('cola-kanban');
+    expect(kanban.className).toContain('hidden');
+    expect(kanban.className).toContain('lg:grid');
+    expect(kanban.className).toContain('lg:grid-cols-4');
+  });
+
   it('wires the card action to mover (DESTINO_ACCION) and mounts the ToastHost (REQ-19)', async () => {
     rpcMock.mockResolvedValue({ data: [], error: null });
     await montar([botellon(1, { estado: 'recibido' })]);

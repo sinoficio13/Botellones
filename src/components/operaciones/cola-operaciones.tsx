@@ -14,6 +14,7 @@ import { BarraContexto } from '@/components/operaciones/barra-contexto';
 import { Buscador } from '@/components/operaciones/buscador';
 import { ListaSkeleton } from '@/components/operaciones/lista-skeleton';
 import { GrupoCard, DESTINO_ACCION } from '@/components/operaciones/grupo-card';
+import { KanbanDesktop } from '@/components/operaciones/kanban-desktop';
 import { VacioPorEstado, COPIA_VACIO_TOTAL } from '@/components/operaciones/copy-vacios';
 import { EmptyState } from '@/components/operaciones/empty-state';
 import { ActionButton } from '@/components/operaciones/action-button';
@@ -140,10 +141,11 @@ export function ColaOperaciones() {
           </div>
 
           {/* Tablet 768–1023 (design D9, CSS-only): 2-col sections per estado
-              with sticky headers, NO tabs (spec §6.2). */}
+              with sticky headers, NO tabs (spec §6.2). Hidden ≥1024 (MOD-21:
+              the leak fix — previously `md:grid` applied at every width ≥768). */}
           <div
             data-testid="cola-tablet"
-            className="hidden gap-4 px-4 py-4 md:grid md:grid-cols-2"
+            className="hidden gap-4 px-4 py-4 md:grid md:grid-cols-2 lg:hidden"
           >
             {ESTADOS_OPERATIVOS.map((estado) => (
               <section
@@ -164,6 +166,15 @@ export function ColaOperaciones() {
                 )}
               </section>
             ))}
+          </div>
+
+          {/* Desktop ≥1024 (REQ-22): 4-col kanban grid, CSS-only breakpoint.
+              Same porEstado FIFO data; mobile/tablet branches above untouched. */}
+          <div
+            data-testid="cola-kanban"
+            className="hidden gap-4 px-4 py-4 lg:grid lg:grid-cols-4"
+          >
+            <KanbanDesktop porEstado={porEstado} cargando={cargando} onMover={mover} />
           </div>
         </>
       )}

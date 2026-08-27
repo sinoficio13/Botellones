@@ -28,7 +28,7 @@ const CHIPS_VISIBLES = 6;
  * sides render the identical server-safe placeholder); the effect then sets
  * the real `ahora` and the card re-renders with the true age/urgency.
  */
-function useEdadAhora(): Date | null {
+export function useEdadAhora(): Date | null {
   const [ahora, setAhora] = useState<Date | null>(null);
   useEffect(() => {
     // setState deferred out of the synchronous effect body (react-hooks/
@@ -58,7 +58,7 @@ export const DESTINO_ACCION: Record<EstadoOperativo, DestinoAccion> = {
  * El envío real (RPC + optimistic + undo) se cablea en PR-C; acá el card
  * entrega los ids marcados vía `onAccion`.
  */
-function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: string): string {
+export function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: string): string {
   return estado === 'delivery'
     ? `✓ Entregar ${n} a ${primerNombre}`
     : `→ Pasar ${n} a ${ESTADO_LABELS[DESTINO_ACCION[estado]]}`;

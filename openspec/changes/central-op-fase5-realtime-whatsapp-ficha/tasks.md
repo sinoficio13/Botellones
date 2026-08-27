@@ -41,14 +41,22 @@ Req map: P1⇄REQ-COS-27,MOD-17,30 · P2⇄REQ-COS-28,MOD-18/23,30 · P3⇄REQ-C
 
 ## Phase 2 — PR-B: WhatsApp sheet
 
-- [ ] 2.1 RED `whatsapp.test.ts` (+): 5 literal branches + singular/plural + `buildWaLink` encoding (spaces+accents)
-- [ ] 2.2 GREEN `src/lib/utils/whatsapp.ts` (28): `mensajeWhatsApp` locked literal (§7.3) + `buildWaLink` (D13)
-- [ ] 2.3 RED `sheet-whatsapp.test.tsx`: pre-loaded literal ("Hola Gimnasio, tus 3 botellones están listos. ¿Te lo llevo hoy?"), editable, note, no auto-send on estado change
-- [ ] 2.4 RED (28): deeplink href `wa.me/<digitos>?text=<encoded>`; Cancelar closes without navigation
-- [ ] 2.5 GREEN `src/components/operaciones/sheet-whatsapp.tsx`: controlled bottom sheet (`ui/sheet` side=bottom), editable textarea, note, `--whatsapp` "Abrir WhatsApp" new tab, Cancelar (D8)
-- [ ] 2.6 RED (28, MOD-18/23): `onWhatsApp` fires with phone; no-phone → `aria-disabled` + opacity-40 + toast "Este cliente no tiene teléfono cargado", sheet not opened (D7)
-- [ ] 2.7 GREEN wire: `grupo-card.tsx` + `grupo-card-kanban.tsx` (`aria-disabled`, not `disabled`) + `kanban-desktop.tsx` passthrough + shell handlers in `cola-operaciones.tsx`
-- [ ] 2.8 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`, `npm run build`
+- [x] 2.1 RED `whatsapp.test.ts` (+): 5 literal branches + singular/plural + `buildWaLink` encoding (spaces+accents)
+  - Evidence: 11 new tests written first → `mensajeWhatsApp is not a function` (RED). Covers all 5 §7.3 branches (recibido/recarga/listo/delivery/default) × singular/plural + first-name extraction + buildWaLink encoding (1 test fixed typo in expected encoded literal after node -e check).
+- [x] 2.2 GREEN `src/lib/utils/whatsapp.ts` (28): `mensajeWhatsApp` locked literal (§7.3) + `buildWaLink` (D13)
+  - Evidence: `npx vitest run tests/unit/whatsapp.test.ts` → 17/17 pass (GREEN). Literal copied verbatim from spec §7.3 (tested with exact accented copy).
+- [x] 2.3 RED `sheet-whatsapp.test.tsx`: pre-loaded literal ("Hola Gimnasio, tus 3 botellones están listos. ¿Te lo llevo hoy?"), editable, note, no auto-send on estado change
+  - Evidence: new file → "Failed to resolve import @/components/operaciones/sheet-whatsapp" (RED). 7 tests: spec S1 literal, recibido-singular triangulation, name+mono phone+note, editable, encoded deeplink, Cancelar, S5 no-auto-send.
+- [x] 2.4 RED (28): deeplink href `wa.me/<digitos>?text=<encoded>`; Cancelar closes without navigation
+  - Evidence: same test file — asserts href `https://wa.me/581144445555?text=<encodeURIComponent(...)>` + target `_blank` + rel; Cancelar asserted as `<button>` without href + onClose called.
+- [x] 2.5 GREEN `src/components/operaciones/sheet-whatsapp.tsx`: controlled bottom sheet (`ui/sheet` side=bottom), editable textarea, note, `--whatsapp` "Abrir WhatsApp" new tab, Cancelar (D8)
+  - Evidence: `npx vitest run tests/component/sheet-whatsapp.test.tsx` → 7/7 pass (GREEN). Controlled via shell mount (open always true + onOpenChange→onClose); avatar `bg-whatsapp` + mono phone; tokens only.
+- [x] 2.6 RED (28, MOD-18/23): `onWhatsApp` fires with phone; no-phone → `aria-disabled` + opacity-40 + toast "Este cliente no tiene teléfono cargado", sheet not opened (D7)
+  - Evidence: updated 2 approval tests in `grupo-card.test.tsx` + 1 in `grupo-card-kanban.test.tsx` (disabled→aria-disabled, click fires) + new kanban passthrough test + 4 shell tests in `cola-operaciones.test.tsx` (sheet opens w/ message, no-phone toast, Cancelar closes, S5 tab change). 8 RED failures confirmed before wiring.
+- [x] 2.7 GREEN wire: `grupo-card.tsx` + `grupo-card-kanban.tsx` (`aria-disabled`, not `disabled`) + `kanban-desktop.tsx` passthrough + shell handlers in `cola-operaciones.tsx`
+  - Evidence: D7 switch in both cards (aria-disabled + onClick always fires); `KanbanDesktopProps.onWhatsApp?: (grupo, estado)` passthrough; shell `sheetWhatsApp` state + `abrirWhatsApp` (no-phone → showToast error, else setSheetWhatsApp); `<SheetWhatsApp>` rendered conditionally. 6 files → 81/81 pass.
+- [x] 2.8 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`, `npm run build`
+  - Evidence: `npm run test` → 392/392 pass (36 files); `npx tsc --noEmit` → exit 0 (fixed missing `GrupoCola` import in kanban-desktop.tsx); `npm run build` → Compiled successfully. No hex in new components; no ui/* edits; no migrations; mover path untouched. LINE BUDGET: tracked diff 297 + 2 new untracked files (218) ≈ 515 changed lines > 400 — see apply report (size-exception recommendation, same as PR-A).
 
 ## Phase 3 — PR-C: Ficha + carried fixes
 

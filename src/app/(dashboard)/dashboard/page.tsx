@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic';
 /**
  * Central de Operaciones — cola operativa agrupada por cliente (fase 3):
  * tabs + cards en mobile, secciones por estado en tablet, buscador, skeleton
- * y vacíos. El kanban viejo (operaciones-dashboard) queda en el árbol hasta
- * el slice de limpieza (rollback zero-loss: revertir este swap lo restaura).
+ * y vacíos. El kanban viejo (operaciones-dashboard) se eliminó en el slice de
+ * limpieza; rollback: restaurar el archivo desde git history.
  */
 export default async function DashboardPage() {
   return (

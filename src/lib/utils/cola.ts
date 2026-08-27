@@ -32,3 +32,15 @@ export function nivelUrgencia(estadoDesde: string, ahora?: Date): NivelUrgencia 
   if (horas <= 24) return 'urgencia';
   return 'critica';
 }
+
+/**
+ * Cédula search normalization (REQ-COS-20, design D7): digits-only, with
+ * spaces/separators and leading zeros stripped. Applied to BOTH the stored
+ * cédula and the query so "12 345", "0012345" and "12345" all match.
+ * NULL/empty → "" (unsearchable). Kept here as a pure helper so the server
+ * helper (`buscarColaOperaciones`) and any client-side mirror share one rule.
+ */
+export function normalizarCedula(s: string | null): string {
+  if (!s) return '';
+  return s.replace(/\D/g, '').replace(/^0+/, '');
+}

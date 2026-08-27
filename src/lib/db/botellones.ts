@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEstadosPermitidos, ESTADOS_KANBAN, type Estado } from '@/lib/utils/estados';
 import type { BotellonAgrupable } from '@/lib/utils/grupos';
+import { normalizarCedula } from '@/lib/utils/cola';
 
 // ── DB join result types ──
 
@@ -242,6 +243,14 @@ export type ColaBotellon = BotellonAgrupable & { cliente_id: string; clientes: C
 const SELECT_COLA =
   'id, codigo, estado, estado_desde, cliente_id, clientes(nombre, cedula, telefono_1, whatsapp)';
 
+// Nombre-search variant of SELECT_COLA: `!inner` on the embedded client forces
+// inner-join semantics so the embedded ilike filter REDUCES top-level rows
+// (PostgREST embedded-resource filters never reduce rows without it). The hint
+// belongs in the SELECT — the filter path (`clientes!inner.nombre`) is not
+// supported and errors 42703 on the project's PostgREST (verified live).
+const SELECT_COLA_NOMBRE =
+  'id, codigo, estado, estado_desde, cliente_id, clientes!inner(nombre, cedula, telefono_1, whatsapp)';
+
 export async function getColaOperaciones(): Promise<ColaBotellon[]> {
   try {
     const supabase = await getSupabase();
@@ -255,6 +264,80 @@ export async function getColaOperaciones(): Promise<ColaBotellon[]> {
   } catch {
     return [];
   }
+}
+
+// ── Buscador (REQ-COS-20) ──
+// Parallel server-side search over the same 4 queue estados the queue shows
+// (client-owned): nombre ilike and código ilike via PostgREST, plus a cédula
+// candidates fetch filtered in JS with digits-only normalization (design D7 —
+// PostgREST cannot regexp-normalize). Results grouped by match type; a row may
+// appear in more than one bucket when it matches several criteria.
+
+export type ResultadoBusqueda = {
+  porNombre: ColaBotellon[];
+  porCedula: ColaBotellon[];
+  porCodigo: ColaBotellon[];
+};
+
+/** Rows the cédula filter inspects — the client join may be null on orphan rows. */
+type FilaCandidata = ColaBotellon & { clientes: ColaCliente | null };
+
+const SIN_RESULTADOS: ResultadoBusqueda = { porNombre: [], porCedula: [], porCodigo: [] };
+
+/** Shape of the resolved supabase-js responses the search chains produce. */
+type RespuestaCola = { data: unknown[] | null; error?: { message: string } | null };
+
+export async function buscarColaOperaciones(q: string): Promise<ResultadoBusqueda> {
+  const termino = q.trim();
+  if (termino.length < 2) return SIN_RESULTADOS;
+
+  let porNombre: RespuestaCola;
+  let porCodigo: RespuestaCola;
+  let candidatos: RespuestaCola;
+
+  try {
+    const supabase = await getSupabase();
+    // Shared prefix: client-owned rows in the 4 queue estados (matches the queue).
+    const base = () =>
+      supabase.from('botellones').select(SELECT_COLA).not('cliente_id', 'is', null).in('estado', ESTADOS_KANBAN);
+    // Nombre chain: inner-join select (`clientes!inner(...)`) so the embedded
+    // ilike filter excludes non-matching rows and the join is always present.
+    const baseNombre = () =>
+      supabase.from('botellones').select(SELECT_COLA_NOMBRE).not('cliente_id', 'is', null).in('estado', ESTADOS_KANBAN);
+
+    [porNombre, porCodigo, candidatos] = await Promise.all([
+      baseNombre().ilike('clientes.nombre', `%${termino}%`).order('estado_desde', { ascending: true }),
+      base().ilike('codigo', `%${termino}%`).order('estado_desde', { ascending: true }),
+      base().order('estado_desde', { ascending: true }),
+    ]);
+  } catch {
+    // Transport-level failures (supabase import, chain rejection): last-resort
+    // empty buckets. The PostgREST error check below lives OUTSIDE this try so
+    // its throw is NOT swallowed here — see the comment at the check.
+    return SIN_RESULTADOS;
+  }
+
+  // supabase-js RESOLVES PostgREST errors as `{ data: null, error }` — it does
+  // NOT reject, so an unchecked `error` here used to flow into the empty
+  // buckets below and render a false 'Sin resultados' state (the Buscador's
+  // error alert only fires on a rejected promise). Throw on ANY chain error so
+  // the server-action promise rejects and the client `.catch` shows the alert.
+  const errorPostgrest = [porNombre, porCodigo, candidatos].find((r) => r.error)?.error;
+  if (errorPostgrest) throw new Error(errorPostgrest.message);
+
+  // Cédula: digits-only on BOTH sides; contains-semantics mirrors ilike.
+  const cedulaQ = normalizarCedula(termino);
+  const porCedula = cedulaQ
+    ? ((candidatos.data ?? []) as unknown as FilaCandidata[]).filter((b) =>
+        normalizarCedula(b.clientes?.cedula ?? null).includes(cedulaQ)
+      )
+    : [];
+
+  return {
+    porNombre: (porNombre.data as unknown as ColaBotellon[]) ?? [],
+    porCedula: porCedula as unknown as ColaBotellon[],
+    porCodigo: (porCodigo.data as unknown as ColaBotellon[]) ?? [],
+  };
 }
 
 export async function getClientesForSelect(search?: string) {

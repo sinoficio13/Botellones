@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatAntiguedad, nivelUrgencia, type NivelUrgencia } from '@/lib/utils/cola';
+import { formatAntiguedad, nivelUrgencia, normalizarCedula, type NivelUrgencia } from '@/lib/utils/cola';
 
 /**
  * cola.ts pure helpers — REQ-COS-18 (age/urgency).
@@ -60,5 +60,32 @@ describe('nivelUrgencia — REQ-COS-18 urgency matrix', () => {
     const ahora = new Date('2026-08-26T12:00:00.000Z');
     const futuro = new Date(ahora.getTime() + 60_000).toISOString();
     expect(nivelUrgencia(futuro, ahora)).toBe('normal');
+  });
+});
+
+describe('normalizarCedula — REQ-COS-20 digits-only normalization', () => {
+  it('strips spaces: "12 345" → "12345"', () => {
+    expect(normalizarCedula('12 345')).toBe('12345');
+  });
+
+  it('strips leading zeros and non-digits: " 0 123 456 " → "123456"', () => {
+    expect(normalizarCedula(' 0 123 456 ')).toBe('123456');
+  });
+
+  it('strips leading zeros on a contiguous number: "0012345" → "12345"', () => {
+    expect(normalizarCedula('0012345')).toBe('12345');
+  });
+
+  it('returns "" for null and for empty input', () => {
+    expect(normalizarCedula(null)).toBe('');
+    expect(normalizarCedula('')).toBe('');
+  });
+
+  it('strips separators and keeps only digits: "12-345/67" → "1234567"', () => {
+    expect(normalizarCedula('12-345/67')).toBe('1234567');
+  });
+
+  it('returns "" when only zeros are present', () => {
+    expect(normalizarCedula('000')).toBe('');
   });
 });

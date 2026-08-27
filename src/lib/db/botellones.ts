@@ -363,36 +363,6 @@ export async function getClientesForSelect(search?: string) {
   }
 }
 
-export type BotellonOperativo = {
-  id: string;
-  codigo: string;
-  estado: string;
-  cliente_id: string | null;
-  fecha_entrega: string | null;
-  clientes: { nombre: string } | null;
-};
-
-/**
- * Operaciones dashboard: all botellones with client join, plus today's recarga count.
- */
-export async function getOperaciones(): Promise<{ botellones: BotellonOperativo[]; recargasHoy: number }> {
-  try {
-    const supabase = await getSupabase();
-    const { data } = await supabase
-      .from('botellones')
-      .select('id, codigo, estado, cliente_id, fecha_entrega, clientes(nombre)')
-      .order('codigo');
-    const hoy = new Date().toISOString().slice(0, 10);
-    const { count } = await supabase
-      .from('recargas')
-      .select('*', { count: 'exact', head: true })
-      .eq('fecha', hoy);
-    return { botellones: (data as unknown as BotellonOperativo[]) || [], recargasHoy: count || 0 };
-  } catch {
-    return { botellones: [], recargasHoy: 0 };
-  }
-}
-
 /**
  * Move a botellón to a new estado (kanban). If moving to "entregado",
  * a cliente_id must be provided. Returns success or error.

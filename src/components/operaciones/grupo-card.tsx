@@ -14,6 +14,8 @@ export type GrupoCardProps = {
   grupo: GrupoCola;
   estado: EstadoOperativo;
   enAccion?: boolean;
+  /** Card nueva por realtime (REQ-COS-27 D9): outline --marca 2px 1.2s → fade. */
+  entrando?: boolean;
   onAccion: (ids: string[]) => void | Promise<unknown>;
 };
 
@@ -74,7 +76,7 @@ export function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: st
  * >24h ▲ AlertTriangle + fondo ámbar 7% vía token; <6h normal. Edad con
  * `formatAntiguedad`. Solo tokens — sin hex (REQ-18).
  */
-export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCardProps) {
+export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion }: GrupoCardProps) {
   // R1-001: the real clock only exists after mount — server render and the
   // first client render share the null clock (no hydration mismatch).
   const ahora = useEdadAhora();
@@ -133,9 +135,13 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
   return (
     <article
       data-testid="grupo-card"
+      data-entrada={entrando || undefined}
       className={cn(
         'rounded-lg border border-border-strong bg-surface-1 p-3',
-        urgencia === 'critica' && 'bg-urgencia/7'
+        urgencia === 'critica' && 'bg-urgencia/7',
+        // REQ-COS-27 D9: card nueva por realtime → outline 2px --marca que
+        // fadea (el hook limpia `entrando` a los 1.2s; sin slide ni salto).
+        entrando && 'outline outline-2 outline-marca'
       )}
     >
       <div className="flex items-start justify-between gap-2">

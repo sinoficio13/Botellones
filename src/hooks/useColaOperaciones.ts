@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { agrupar, type GrupoCliente } from '@/lib/utils/grupos';
 import { ESTADOS_KANBAN, ESTADO_LABELS, type Estado } from '@/lib/utils/estados';
 import { getColaOperaciones, type ColaBotellon } from '@/lib/db/botellones';
 import { createClient } from '@/lib/supabase/client';
+import { useRealtimeCola, type EventoRealtime } from '@/hooks/useRealtimeCola';
 import { showToast } from '@/components/operaciones/toast';
 
 /** Estados de la cola = kanban sin `entregado` (que vive en circulación, fuera de la cola). */
@@ -63,6 +64,98 @@ function aplicarFilas(
   return [...sinMovidos, ...reintegrados];
 }
 
+/** Duración del outline de card nueva (REQ-COS-27 D9): 2px --marca 1.2s → fade. */
+export const ENTRANDO_MS = 1200;
+
+/**
+ * Gate de reordenamiento (REQ-COS-27, design D3) — puro y trivially testable.
+ * Un cambio se encola (chip) si el operador está scrolleando O si el cambio
+ * afecta el orden visible de la pestaña activa (el estado anterior o el nuevo
+ * pertenecen al tab). En cualquier otro caso se aplica directo.
+ */
+export function decidirGate(
+  estadoAnterior: string | undefined,
+  estadoNuevo: string | undefined,
+  tab: EstadoOperativo,
+  scrolleando: boolean
+): boolean {
+  const afectaVisible = estadoAnterior === tab || estadoNuevo === tab;
+  return scrolleando || afectaVisible;
+}
+
+/**
+ * Merge un evento realtime de una fila YA conocida (ya en `botellones`, con su
+ * join `clientes` preservado) contra la lista live (REQ-COS-27, D4). DELETE o
+ * un UPDATE que saca la fila de la cola (entregado / cliente null) la elimina;
+ * un UPDATE a un estado de cola la parchea por id conservando el join. La
+ * cola es client-owned: las filas sin cliente (stock) no viven acá.
+ */
+export function mergeEvento(prev: ColaBotellon[], evento: EventoRealtime): ColaBotellon[] {
+  if (evento.eventType === 'DELETE') return prev.filter((b) => b.id !== evento.id);
+
+  const saleDeCola =
+    evento.estadoNuevo === 'entregado' || evento.clienteIdNuevo === null;
+  if (saleDeCola) return prev.filter((b) => b.id !== evento.id);
+
+  return prev.map((b) =>
+    b.id === evento.id
+      ? {
+          ...b,
+          estado: evento.estadoNuevo ?? b.estado,
+          cliente_id: evento.clienteIdNuevo ?? b.cliente_id,
+        }
+      : b
+  );
+}
+
+/**
+ * Diff de "card nueva" (D9): los cliente_id cuyo grupo aparece NUEVO en la
+ * pestaña activa (`tab`) entre `anterior` y `siguiente` reciben el outline de
+ * entrada. Compara por presencia de grupo en la lista visible del tab activo —
+ * una botella que entra al estado activo de un cliente que ya estaba ahí no
+ * re-anima; solo las cards realmente nuevas del tab lo hacen.
+ */
+export function calcularEntrando(
+  anterior: ColaBotellon[],
+  siguiente: ColaBotellon[],
+  tab: EstadoOperativo
+): Set<string> {
+  const enAnterior = new Set(
+    anterior.filter((b) => b.estado === tab && b.cliente_id !== null).map((b) => b.cliente_id) as string[]
+  );
+  const entrantes = new Set<string>();
+  for (const b of siguiente) {
+    if (b.estado === tab && b.cliente_id !== null && !enAnterior.has(b.cliente_id)) {
+      entrantes.add(b.cliente_id);
+    }
+  }
+  return entrantes;
+}
+
+/**
+ * ¿Requiere un refetch one-shot? (D5) El payload realtime no trae el join
+ * `clientes`; una fila desconocida (INSERT, o UPDATE que entra a la cola desde
+ * entregado/stock) no puede reconstruirse parcial → refetch único de la cola.
+ * Las filas conocidas se mergean por id preservando su join (sin refetch).
+ */
+export function necesitaRefetch(evento: EventoRealtime, conocido: boolean): boolean {
+  if (conocido) return false;
+  if (evento.eventType === 'DELETE') return false;
+  if (evento.eventType === 'INSERT') return evento.clienteIdNuevo !== null;
+  // UPDATE de una fila desconocida: solo interesa si entra a la cola (cliente no nulo, estado de cola).
+  return evento.clienteIdNuevo !== null && evento.estadoNuevo !== 'entregado';
+}
+
+/** Agrupa filas por estado operativo (única fuente: `agrupar`, fase-1). */
+function agruparPorEstado(filas: ColaBotellon[]): PorEstado {
+  const soloClientes = filas.filter((b) => b.cliente_id !== null);
+  const particion: PorEstado = { recibido: [], recarga: [], listo: [], delivery: [] };
+  for (const estado of ESTADOS_OPERATIVOS) {
+    particion[estado] = agrupar(soloClientes.filter((b) => b.estado === estado)) as GrupoCola[];
+  }
+  return particion;
+}
+
 /**
  * useColaOperaciones — client-grouped FIFO queue state (REQ-COS-16/17/19).
  * Fetches the queue once on mount (design D5), partitions rows per estado and
@@ -81,19 +174,113 @@ function aplicarFilas(
  *   returned rows so the group returns with its original age; error -> red
  *   toast, rows stay in the post-move estado.
  */
-export function useColaOperaciones(): {
+export function useColaOperaciones(opts: { tab?: EstadoOperativo } = {}): {
   cargando: boolean;
   error: string | null;
   porEstado: PorEstado;
+  porEstadoVisibles: PorEstado;
   totales: { clientes: number; botellones: number };
   mover: (ids: string[], destino: DestinoAccion) => Promise<ResultadoAccion>;
   reintentar: () => void;
+  pendientes: number;
+  aplicarPendientes: () => void;
+  entrando: Set<string>;
+  setScrolleando: (b: boolean) => void;
 } {
+  // D3: tab activa del shell (mobile; tablet/kanban heredan el default). Solo
+  // el shell es consumidor — es seguro que la firma tome `{ tab }`.
+  const tab = opts.tab ?? 'recibido';
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [botellones, setBotellones] = useState<ColaBotellon[]>([]);
+  // Two-layer row model (D4): `botellones` (live) siempre se parchea; `visibles`
+  // (snapshot) congela el render de la lista activa cuando hay un cambio encolado.
+  const [visibles, setVisibles] = useState<ColaBotellon[] | null>(null);
+  const [pendientes, setPendientes] = useState(0);
+  const [entrando, setEntrando] = useState<Set<string>>(new Set());
+  const [scrolleando, setScrolleando] = useState(false);
   const [intento, setIntento] = useState(0);
   const enVueloRef = useRef<PromiseLike<void> | null>(null);
+  // Echo suppression (D6): ids que este cliente está moviendo (optimistic) se
+  // saltean en el handler realtime para evitar chips fantasma / dobles patches.
+  const idsEnMovimientoRef = useRef<Set<string>>(new Set());
+  const tabRef = useRef(tab);
+  const scrolleandoRef = useRef(scrolleando);
+  const estadoRef = useRef({ botellones, visibles, pendientes, entrando });
+  const timerEntrandoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
+  useEffect(() => {
+    scrolleandoRef.current = scrolleando;
+  }, [scrolleando]);
+  useEffect(() => {
+    estadoRef.current = { botellones, visibles, pendientes, entrando };
+  }, [botellones, visibles, pendientes, entrando]);
+
+  /** Encola el diff de entrada y agenda el borrado tras 1.2s (D9). Solo usa setters estables + ref de timer. */
+  const marcarEntrando = useCallback((nuevos: Set<string>) => {
+    if (nuevos.size === 0) return;
+    setEntrando((prev) => new Set([...prev, ...nuevos]));
+    if (timerEntrandoRef.current) clearTimeout(timerEntrandoRef.current);
+    timerEntrandoRef.current = setTimeout(() => setEntrando(new Set()), ENTRANDO_MS);
+  }, []);
+
+  /**
+   * Refetch one-shot (D5): vuelve a pedir la cola para incorporar filas con
+   * join desconocido (INSERT / entrada a la cola desde entregado/stock). Difiere
+   * `entrando` contra la lista previa y libera cualquier snapshot congelado.
+   */
+  const refetchear = useCallback(() => {
+    const previo = estadoRef.current.botellones;
+    getColaOperaciones()
+      .then((filas) => {
+        if (filas === null) return;
+        marcarEntrando(calcularEntrando(previo, filas, tabRef.current));
+        setBotellones(filas);
+        setVisibles(null);
+      })
+      .catch(() => {
+        /* degradación silenciosa: se mantiene el último estado renderizado */
+      });
+  }, [marcarEntrando]);
+
+  /** Maneja un evento realtime normalizado (REQ-COS-27, D4/D5/D6). */
+  const manejarEvento = useCallback(
+    (evento: EventoRealtime) => {
+      const id = evento.id;
+      if (!id) return;
+      // Echo suppression: skip eventos de los ids que este cliente mueve.
+      if (idsEnMovimientoRef.current.has(id)) return;
+
+      const actual = estadoRef.current;
+      const conocido = actual.botellones.some((b) => b.id === id);
+      if (necesitaRefetch(evento, conocido)) {
+        refetchear();
+        return;
+      }
+      if (!conocido) return; // stock / fila irrelevante (no vive en la cola)
+
+      const anterior = actual.botellones.find((b) => b.id === id)!.estado;
+      const siguiente = mergeEvento(actual.botellones, evento);
+      const gated = decidirGate(anterior, evento.estadoNuevo, tabRef.current, scrolleandoRef.current);
+
+      if (gated) {
+        // Congela la lista visible pre-parche; los contadores (derivados de
+        // `botellones`) siguen live. El chip aplica al tocar.
+        setVisibles(actual.botellones);
+        setPendientes((p) => p + 1);
+      } else {
+        setVisibles(null);
+        marcarEntrando(calcularEntrando(actual.botellones, siguiente, tabRef.current));
+      }
+      setBotellones(siguiente);
+    },
+    [refetchear, marcarEntrando]
+  );
+
+  useRealtimeCola(manejarEvento);
 
   useEffect(() => {
     let activo = true;
@@ -135,18 +322,26 @@ export function useColaOperaciones(): {
     setIntento((n) => n + 1);
   }
 
-  const porEstado = useMemo<PorEstado>(() => {
-    const soloClientes = botellones.filter((b) => b.cliente_id !== null);
-    const particion: PorEstado = { recibido: [], recarga: [], listo: [], delivery: [] };
-    for (const estado of ESTADOS_OPERATIVOS) {
-      particion[estado] = agrupar(soloClientes.filter((b) => b.estado === estado)) as GrupoCola[];
-    }
-    return particion;
-  }, [botellones]);
+  // porEstado (LIVE) alimenta contadores de tabs + barra de contexto: siempre
+  // deriva de `botellones`, incluso con un cambio encolado (MOD-17 S2).
+  const porEstado = useMemo<PorEstado>(() => agruparPorEstado(botellones), [botellones]);
 
+  // porEstadoVisibles (GATED): la lista que se RENDERIZA. Cuando hay un cambio
+  // encolado (`visibles !== null`) usa el snapshot congelado para que la lista
+  // activa no se reordene bajo el dedo (REQ-COS-27, D4); si no, = live.
+  const porEstadoVisibles = useMemo<PorEstado>(
+    () => agruparPorEstado(visibles ?? botellones),
+    [botellones, visibles]
+  );
+
+  // D11 (carried): `totales` filtra ESTADOS_KANBAN (mismo predicado que
+  // getColaOperaciones) — las filas entregadas ya no se cuentan en la cola
+  // (mover las re-agrega vía aplicarFilas con estado `entregado`).
   const totales = useMemo(() => {
-    const conCliente = botellones.filter((b) => b.cliente_id !== null);
-    return { clientes: new Set(conCliente.map((b) => b.cliente_id)).size, botellones: conCliente.length };
+    const enCola = botellones.filter(
+      (b) => b.cliente_id !== null && ESTADOS_KANBAN.includes(b.estado as Estado)
+    );
+    return { clientes: new Set(enCola.map((b) => b.cliente_id)).size, botellones: enCola.length };
   }, [botellones]);
 
   /**
@@ -165,17 +360,23 @@ export function useColaOperaciones(): {
     if (!movimientoExitoso()) {
       return { ok: false, error: 'Movimiento fallido; nada que deshacer' };
     }
+    // D6 echo suppression: el RPC de restauración también emite realtime — los
+    // ids se saltean hasta que settle para evitar chips fantasma del propio undo.
+    const idsUndo = [...movidos.keys()];
+    for (const id of idsUndo) idsEnMovimientoRef.current.add(id);
     const supabase = createClient();
     const { data, error } = await supabase.rpc('mover_botellones', {
-      p_ids: [...movidos.keys()],
+      p_ids: idsUndo,
       p_estado: estadoAnterior,
       p_restaurar: true,
     });
     if (error) {
+      for (const id of idsUndo) idsEnMovimientoRef.current.delete(id);
       showToast({ message: 'No se pudo deshacer. Reintentá.', tone: 'error' });
       return { ok: false, error: error.message };
     }
     setBotellones((prev) => aplicarFilas(prev, movidos, data ?? []));
+    for (const id of idsUndo) idsEnMovimientoRef.current.delete(id);
     return { ok: true, deshacer: () => Promise.resolve({ ok: false, error: 'Nada que deshacer' }) };
   }
 
@@ -192,6 +393,12 @@ export function useColaOperaciones(): {
 
     // 2. Optimistic removal: el grupo sale de la lista al instante.
     setBotellones((prev) => prev.filter((b) => !movidos.has(b.id)));
+
+    // D6 echo suppression: registra los ids en vuelo ANTES del RPC; el handler
+    // realtime los saltea hasta que el RPC settle (evita chips fantasma/dobles
+    // patches del eco de este propio movimiento).
+    const idsMovidos = [...movidos.keys()];
+    for (const id of idsMovidos) idsEnMovimientoRef.current.add(id);
 
     // 3. Toast de éxito con Deshacer (antes de que resuelva el RPC).
     let movimientoExitoso = false;
@@ -215,6 +422,7 @@ export function useColaOperaciones(): {
 
     // 5a. Error -> revertir snapshot + toast rojo sin undo (REQ-COS-19 S3).
     if (error) {
+      for (const id of idsMovidos) idsEnMovimientoRef.current.delete(id);
       setBotellones((prev) => [...prev, ...movidos.values()]);
       showToast({ message: 'No se pudo mover. Reintentá.', tone: 'error' });
       return { ok: false, error: error.message };
@@ -223,6 +431,7 @@ export function useColaOperaciones(): {
     // 5b. Éxito -> aplicar filas devueltas (D10): el grupo aterriza en el
     //     destino con edad fresca (now() del trigger).
     movimientoExitoso = true;
+    for (const id of idsMovidos) idsEnMovimientoRef.current.delete(id);
     setBotellones((prev) => aplicarFilas(prev, movidos, data ?? []));
     return {
       ok: true,
@@ -230,5 +439,30 @@ export function useColaOperaciones(): {
     };
   }
 
-  return { cargando, error, porEstado, totales, mover, reintentar };
+  /**
+   * Aplica los cambios encolados (chip tap, REQ-COS-27 S3): libera el snapshot
+   * congelado (visibles = null) y difiere `entrando` contra el estado live para
+   * animar las cards nuevas. `botellones` ya estaba live — no re-mergea.
+   */
+  function aplicarPendientes() {
+    const actual = estadoRef.current;
+    const base = actual.visibles ?? actual.botellones;
+    marcarEntrando(calcularEntrando(base, actual.botellones, tabRef.current));
+    setVisibles(null);
+    setPendientes(0);
+  }
+
+  return {
+    cargando,
+    error,
+    porEstado,
+    porEstadoVisibles,
+    totales,
+    mover,
+    reintentar,
+    pendientes,
+    aplicarPendientes,
+    entrando,
+    setScrolleando,
+  };
 }

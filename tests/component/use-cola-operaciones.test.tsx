@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useColaOperaciones, ESTADOS_OPERATIVOS } from '@/hooks/useColaOperaciones';
 import { ESTADOS_KANBAN } from '@/lib/utils/estados';
@@ -6,6 +6,36 @@ import type { ColaBotellon } from '@/lib/db/botellones';
 
 const { getColaOperacionesMock } = vi.hoisted(() => ({ getColaOperacionesMock: vi.fn() }));
 vi.mock('@/lib/db/botellones', () => ({ getColaOperaciones: getColaOperacionesMock }));
+
+// The hook now subscribes to realtime on mount (useRealtimeCola, REQ-COS-27):
+// the browser client mock needs the fake-channel surface (estado-en-vivo
+// pattern) so the subscription effect does not throw in jsdom.
+const { createClientMock } = vi.hoisted(() => ({ createClientMock: vi.fn() }));
+vi.mock('@/lib/supabase/client', () => ({ createClient: createClientMock }));
+
+function makeFakeSupabase() {
+  const supabase = {
+    channel: vi.fn(() => {
+      const ch = {
+        on: vi.fn((_e: string, _c: unknown, cb: (p: unknown) => void) => {
+          ch.payloadHandler = cb;
+          return ch;
+        }),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+        payloadHandler: null as ((p: unknown) => void) | null,
+      };
+      return ch;
+    }),
+    removeChannel: vi.fn(),
+    rpc: vi.fn(),
+  };
+  return supabase;
+}
+
+beforeEach(() => {
+  createClientMock.mockReturnValue(makeFakeSupabase());
+});
 
 /** REQ-COS-16 fixture row. ColaBotellon forces cliente_id non-null; stock rows pass null via cast. */
 function botellon(o: Partial<Omit<ColaBotellon, 'cliente_id'>> & { cliente_id?: string | null }): ColaBotellon {

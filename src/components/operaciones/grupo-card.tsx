@@ -17,6 +17,9 @@ export type GrupoCardProps = {
   /** Card nueva por realtime (REQ-COS-27 D9): outline --marca 2px 1.2s → fade. */
   entrando?: boolean;
   onAccion: (ids: string[]) => void | Promise<unknown>;
+  /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
+   * the shell decides toast (no phone) vs sheet (D7). */
+  onWhatsApp?: () => void;
 };
 
 /** Chips visibles antes del expansor +N (REQ-COS-18: "show 6 plus a +N expansion"). */
@@ -76,7 +79,7 @@ export function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: st
  * >24h ▲ AlertTriangle + fondo ámbar 7% vía token; <6h normal. Edad con
  * `formatAntiguedad`. Solo tokens — sin hex (REQ-18).
  */
-export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion }: GrupoCardProps) {
+export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion, onWhatsApp }: GrupoCardProps) {
   // R1-001: the real clock only exists after mount — server render and the
   // first client render share the null clock (no hydration mismatch).
   const ahora = useEdadAhora();
@@ -165,11 +168,14 @@ export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, o
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* WhatsApp — FASE 5 placeholder (bottom sheet). Disabled sin teléfono (§7.3); inerte con teléfono. */}
+          {/* WhatsApp — REQ-COS-28 (D7): aria-disabled (NOT disabled) sin teléfono
+              para que el tap SIEMPRE dispare onWhatsApp y el shell decida (toast
+              "Este cliente no tiene teléfono cargado" vs abrir el sheet). */}
           <button
             type="button"
             aria-label={`WhatsApp de ${nombre}`}
-            disabled={!cliente?.whatsapp}
+            aria-disabled={!cliente?.whatsapp || undefined}
+            onClick={onWhatsApp}
             className={cn(
               'grid size-11 place-items-center rounded-md text-text-secondary',
               !cliente?.whatsapp && 'opacity-40'

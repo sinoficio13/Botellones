@@ -138,26 +138,39 @@ describe('GrupoCard — REQ-COS-18', () => {
     expect(onAccion).toHaveBeenCalledWith(['b-1', 'b-3']);
   });
 
-  it('disables the WhatsApp target with opacity-40 when the client has no phone (REQ-18 §7.3)', () => {
-    render(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} />);
+  it('marks the WhatsApp target aria-disabled + opacity-40 without a phone, but the tap still fires onWhatsApp (D7)', () => {
+    const onWhatsApp = vi.fn();
+    render(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} onWhatsApp={onWhatsApp} />);
 
     const whatsapp = screen.getByRole('button', { name: 'WhatsApp de María González' });
-    expect(whatsapp).toBeDisabled();
+    // D7: aria-disabled (NOT the disabled attr) so the click always fires and
+    // the shell handler decides (toast vs sheet) — a disabled button would
+    // swallow the click and the toast could never fire.
+    expect(whatsapp).toHaveAttribute('aria-disabled', 'true');
+    expect(whatsapp).not.toBeDisabled();
     expect(whatsapp).toHaveClass('opacity-40');
+
+    fireEvent.click(whatsapp);
+    expect(onWhatsApp).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the WhatsApp target enabled (inert tap) when the client has a phone', () => {
+  it('fires onWhatsApp on tap when the client has a phone (target wired, REQ-COS-18 S4)', () => {
+    const onWhatsApp = vi.fn();
     render(
       <GrupoCard
         grupo={grupo([botellon(1, { clientes: { nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' } })])}
         estado="recibido"
         onAccion={vi.fn()}
+        onWhatsApp={onWhatsApp}
       />
     );
 
     const whatsapp = screen.getByRole('button', { name: 'WhatsApp de María González' });
-    expect(whatsapp).not.toBeDisabled();
+    expect(whatsapp).not.toHaveAttribute('aria-disabled');
     expect(whatsapp).not.toHaveClass('opacity-40');
+
+    fireEvent.click(whatsapp);
+    expect(onWhatsApp).toHaveBeenCalledTimes(1);
   });
 
   it('shows amber urgency text for 6–24h and ▲ AlertTriangle + amber 7% bg for >24h (REQ-18 S2)', async () => {

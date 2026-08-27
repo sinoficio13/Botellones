@@ -16,10 +16,12 @@ import { ListaSkeleton } from '@/components/operaciones/lista-skeleton';
 import { GrupoCard, DESTINO_ACCION } from '@/components/operaciones/grupo-card';
 import { KanbanDesktop } from '@/components/operaciones/kanban-desktop';
 import { ChipRealtime } from '@/components/operaciones/chip-realtime';
+import { SheetWhatsApp } from '@/components/operaciones/sheet-whatsapp';
 import { VacioPorEstado, COPIA_VACIO_TOTAL } from '@/components/operaciones/copy-vacios';
 import { EmptyState } from '@/components/operaciones/empty-state';
 import { ActionButton } from '@/components/operaciones/action-button';
 import { ToastHost } from '@/components/operaciones/toast';
+import { showToast } from '@/components/operaciones/toast';
 import { ScannerModal } from '@/components/scanner/scanner-modal';
 
 /** Debounce de fin de scroll (REQ-COS-27 D3): scrolleando se limpia 150ms después del último evento. */
@@ -45,6 +47,12 @@ const FIN_SCROLL_MS = 150;
 export function ColaOperaciones() {
   const [tab, setTab] = useState<EstadoOperativo>('recibido');
   const [scannerAbierto, setScannerAbierto] = useState(false);
+  // D8: WhatsApp sheet state (REQ-COS-28) — {grupo, estado} while open, null
+  // when closed (controlled; only one sheet at a time).
+  const [sheetWhatsApp, setSheetWhatsApp] = useState<{
+    grupo: GrupoCola;
+    estado: EstadoOperativo;
+  } | null>(null);
   const router = useRouter();
 
   const {
@@ -101,6 +109,20 @@ export function ColaOperaciones() {
     return () => setTab(destino[estado]);
   }
 
+  /**
+   * REQ-COS-28 S4 (D7): the WhatsApp tap ALWAYS lands here — the card fires it
+   * regardless of phone. A client without a phone gets the toast and the sheet
+   * stays closed; with a phone the sheet opens pre-loaded for this estado.
+   */
+  function abrirWhatsApp(grupo: GrupoCola, estado: EstadoOperativo) {
+    const cliente = grupo.botellones[0]?.clientes;
+    if (!cliente?.whatsapp) {
+      showToast({ message: 'Este cliente no tiene teléfono cargado', tone: 'error' });
+      return;
+    }
+    setSheetWhatsApp({ grupo, estado });
+  }
+
   function renderGrupos(estado: EstadoOperativo, grupos: GrupoCola[]) {
     return grupos.map((grupo) => (
       <GrupoCard
@@ -109,6 +131,7 @@ export function ColaOperaciones() {
         estado={estado}
         entrando={entrando.has(grupo.cliente_id ?? '')}
         onAccion={(ids) => mover(ids, DESTINO_ACCION[estado])}
+        onWhatsApp={() => abrirWhatsApp(grupo, estado)}
       />
     ));
   }
@@ -213,12 +236,25 @@ export function ColaOperaciones() {
             data-testid="cola-kanban"
             className="hidden gap-4 px-4 py-4 lg:grid lg:grid-cols-4"
           >
-            <KanbanDesktop porEstado={porEstadoVisibles} cargando={cargando} onMover={mover} />
+            <KanbanDesktop
+              porEstado={porEstadoVisibles}
+              cargando={cargando}
+              onMover={mover}
+              onWhatsApp={abrirWhatsApp}
+            />
           </div>
         </>
       )}
 
       {scannerAbierto ? <ScannerModal onClose={() => setScannerAbierto(false)} /> : null}
+
+      {sheetWhatsApp ? (
+        <SheetWhatsApp
+          grupo={sheetWhatsApp.grupo}
+          estado={sheetWhatsApp.estado}
+          onClose={() => setSheetWhatsApp(null)}
+        />
+      ) : null}
     </div>
   );
 }

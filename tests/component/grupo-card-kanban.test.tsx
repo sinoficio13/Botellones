@@ -134,20 +134,32 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
     expect(screen.getByText('+2')).toBeInTheDocument();
   });
 
-  it('keeps the WhatsApp target inert: disabled + opacity-40 without a phone, enabled-but-inert with (REQ-23 S4)', () => {    const { unmount: unmountSin } = render(
-      <GrupoCardKanban grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} />
+  it('marks the WhatsApp target aria-disabled + opacity-40 without a phone, but the tap still fires onWhatsApp (D7, REQ-23 S4)', () => {
+    const onWhatsApp = vi.fn();
+    const { unmount: unmountSin } = render(
+      <GrupoCardKanban grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} onWhatsApp={onWhatsApp} />
     );
     const sinTelefono = screen.getByRole('button', { name: 'WhatsApp de María González' });
-    expect(sinTelefono).toBeDisabled();
+    // D7: aria-disabled (NOT the disabled attr) so the click always fires and
+    // the shell handler decides (toast vs sheet) — a disabled button would
+    // swallow the click and the no-phone toast could never fire.
+    expect(sinTelefono).toHaveAttribute('aria-disabled', 'true');
+    expect(sinTelefono).not.toBeDisabled();
     expect(sinTelefono).toHaveClass('opacity-40');
+
+    fireEvent.click(sinTelefono);
+    expect(onWhatsApp).toHaveBeenCalledTimes(1);
     unmountSin();
 
     const conTelefono = grupo([
       botellon(2, { clientes: { nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' } }),
     ]);
-    render(<GrupoCardKanban grupo={conTelefono} estado="recibido" onAccion={vi.fn()} />);
+    render(<GrupoCardKanban grupo={conTelefono} estado="recibido" onAccion={vi.fn()} onWhatsApp={onWhatsApp} />);
     const conTel = screen.getByRole('button', { name: 'WhatsApp de María González' });
-    expect(conTel).not.toBeDisabled();
+    expect(conTel).not.toHaveAttribute('aria-disabled');
     expect(conTel).not.toHaveClass('opacity-40');
+
+    fireEvent.click(conTel);
+    expect(onWhatsApp).toHaveBeenCalledTimes(2);
   });
 });

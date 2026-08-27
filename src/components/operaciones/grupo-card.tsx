@@ -20,18 +20,26 @@ export type GrupoCardProps = {
   /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
    * the shell decides toast (no phone) vs sheet (D7). */
   onWhatsApp?: () => void;
+  /** REQ-COS-29: name/cédula tap → shell opens the client ficha sheet (D8). */
+  onAbrirFicha?: () => void;
 };
 
 /** Chips visibles antes del expansor +N (REQ-COS-18: "show 6 plus a +N expansion"). */
 const CHIPS_VISIBLES = 6;
 
+/** Intervalo del reloj de edad (D10): re-setea `ahora` cada 30s. */
+export const EDAD_TICK_MS = 30_000;
+
 /**
- * useEdadAhora — carried R1-001 (SSR/hydration). Age/urgency depend on the
- * real clock: `new Date()` on the server (T1) and on the client (T2) can cross
- * the 6h/24h boundary between render and hydration → mismatch. The clock is
- * only available AFTER mount (null on server + first client render, so both
- * sides render the identical server-safe placeholder); the effect then sets
- * the real `ahora` and the card re-renders with the true age/urgency.
+ * useEdadAhora — carried R1-001 (SSR/hydration) + D10 (frozen clock). Age/urgency
+ * depend on the real clock: `new Date()` on the server (T1) and on the client
+ * (T2) can cross the 6h/24h boundary between render and hydration → mismatch.
+ * The clock is only available AFTER mount (null on server + first client
+ * render, so both sides render the identical server-safe placeholder); the
+ * effect then sets the real `ahora` and the card re-renders with the true
+ * age/urgency. D10 (carried): `ahora` re-sets every 30s (setInterval) so
+ * realtime re-renders show fresh ages/urgency — a mount-only clock would go
+ * stale on a long-lived queue screen. Reused by the ficha list (REQ-COS-29).
  */
 export function useEdadAhora(): Date | null {
   const [ahora, setAhora] = useState<Date | null>(null);
@@ -39,7 +47,12 @@ export function useEdadAhora(): Date | null {
     // setState deferred out of the synchronous effect body (react-hooks/
     // set-state-in-effect): the clock becomes available right after mount.
     const timer = setTimeout(() => setAhora(new Date()), 0);
-    return () => clearTimeout(timer);
+    // D10: 30s tick so ages stay fresh without a remount.
+    const tick = setInterval(() => setAhora(new Date()), EDAD_TICK_MS);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(tick);
+    };
   }, []);
   return ahora;
 }
@@ -79,7 +92,7 @@ export function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: st
  * >24h ▲ AlertTriangle + fondo ámbar 7% vía token; <6h normal. Edad con
  * `formatAntiguedad`. Solo tokens — sin hex (REQ-18).
  */
-export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion, onWhatsApp }: GrupoCardProps) {
+export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion, onWhatsApp, onAbrirFicha }: GrupoCardProps) {
   // R1-001: the real clock only exists after mount — server render and the
   // first client render share the null clock (no hydration mismatch).
   const ahora = useEdadAhora();
@@ -149,9 +162,11 @@ export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, o
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {/* FASE 5 placeholder: ficha del cliente. Target inerte por diseño (spec §7.3). */}
+          {/* REQ-COS-29: ficha del cliente. El tap abre el sheet (D8) — el
+              shell decide el estado del sheet; el card solo dispara. */}
           <button
             type="button"
+            onClick={onAbrirFicha}
             className="flex min-h-11 max-w-full items-center gap-0.5 text-left text-sm font-medium text-text-primary"
           >
             <span className="truncate">{nombre}</span>

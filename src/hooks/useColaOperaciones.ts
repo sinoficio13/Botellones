@@ -418,7 +418,22 @@ export function useColaOperaciones(opts: { tab?: EstadoOperativo } = {}): {
       () => undefined,
       () => undefined
     );
-    const { data, error } = await promesa;
+    // D12 (carried): a TRANSPORT rejection (RPC promise rejects — network down)
+    // must NOT throw out of mover() and escape ResultadoAccion; the try/catch
+    // converts it to the same error path as a resolved {data, error} failure
+    // (revert + red toast + {ok:false}).
+    let data: FilaRpc[] | null;
+    let error: { message: string } | null;
+    try {
+      const respuesta = await promesa;
+      data = respuesta.data;
+      error = respuesta.error;
+    } catch (err) {
+      for (const id of idsMovidos) idsEnMovimientoRef.current.delete(id);
+      setBotellones((prev) => [...prev, ...movidos.values()]);
+      showToast({ message: 'No se pudo mover. Reintentá.', tone: 'error' });
+      return { ok: false, error: err instanceof Error ? err.message : 'Error de red' };
+    }
 
     // 5a. Error -> revertir snapshot + toast rojo sin undo (REQ-COS-19 S3).
     if (error) {

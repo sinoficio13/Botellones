@@ -3,8 +3,9 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ColaOperaciones } from '@/components/operaciones/cola-operaciones';
 import type { ColaBotellon } from '@/lib/db/botellones';
 
-const { getColaOperacionesMock, rpcMock, pushMock } = vi.hoisted(() => ({
+const { getColaOperacionesMock, getBotellonesClienteMock, rpcMock, pushMock } = vi.hoisted(() => ({
   getColaOperacionesMock: vi.fn(),
+  getBotellonesClienteMock: vi.fn(),
   rpcMock: vi.fn(),
   pushMock: vi.fn(),
 }));
@@ -20,7 +21,10 @@ const { fakeChannels } = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock('@/lib/db/botellones', () => ({ getColaOperaciones: getColaOperacionesMock }));
+vi.mock('@/lib/db/botellones', () => ({
+  getColaOperaciones: getColaOperacionesMock,
+  getBotellonesCliente: getBotellonesClienteMock,
+}));
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     rpc: rpcMock,
@@ -438,5 +442,57 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     // Tab change re-rendered the queue; no sheet opened and no wa.me link exists.
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Abrir WhatsApp' })).not.toBeInTheDocument();
+  });
+
+  // ── Ficha cliente (REQ-COS-29, PR-C) ──
+
+  it('opens the client ficha sheet on the name tap and shows data + all-estados list', async () => {
+    await montar([botellon(1)]);
+    getBotellonesClienteMock.mockResolvedValue({
+      cliente: { id: 'cliente-b', nombre: 'María González', cedula: '12345678', telefono_1: null, whatsapp: null },
+      direccion: { calle: 'Av. Siempre Viva', ciudad: 'Caracas', estado: 'Miranda' },
+      botellones: [
+        { id: 'b-1', codigo: 'BOT-001', estado: 'recibido', estado_desde: hace(3) },
+        { id: 'b-9', codigo: 'BOT-009', estado: 'entregado', estado_desde: hace(30) },
+      ],
+    });
+
+    const movil = screen.getByTestId('cola-movil');
+    fireEvent.click(within(movil).getByRole('button', { name: 'María González' }));
+
+    // Sheet open with the client data + dirección join.
+    expect(await screen.findByText('Av. Siempre Viva, Caracas, Miranda')).toBeInTheDocument();
+    // All-estados list incl. entregado.
+    expect(screen.getByText('Sus botellones (2)')).toBeInTheDocument();
+    expect(screen.getByText('Entregado')).toBeInTheDocument();
+    // Cerrar closes the ficha sheet.
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(screen.queryByText('Sus botellones (2)')).not.toBeInTheDocument();
+  });
+
+  it('swaps the ficha for the WhatsApp sheet on the WhatsApp action (D8)', async () => {
+    await montar([
+      botellon(1, {
+        clientes: { nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' },
+      }),
+    ]);
+    getBotellonesClienteMock.mockResolvedValue({
+      cliente: { id: 'cliente-b', nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' },
+      direccion: null,
+      botellones: [{ id: 'b-1', codigo: 'BOT-001', estado: 'recibido', estado_desde: hace(3) }],
+    });
+
+    const movil = screen.getByTestId('cola-movil');
+    fireEvent.click(within(movil).getByRole('button', { name: 'María González' }));
+    await screen.findByText('Sin dirección cargada');
+
+    // Ficha → WhatsApp action swaps sheets: ficha closes, shared sheet opens
+    // pre-loaded for this client (only one sheet open, D8).
+    fireEvent.click(screen.getByRole('button', { name: 'WhatsApp' }));
+    const textarea = await screen.findByRole('textbox');
+    expect(textarea).toHaveValue(
+      'Hola María, recibimos tu botellón. Te aviso apenas esté listo.'
+    );
+    expect(screen.queryByText('Sus botellones (1)')).not.toBeInTheDocument();
   });
 });

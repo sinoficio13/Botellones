@@ -214,4 +214,14 @@ describe('GrupoCard — REQ-COS-18', () => {
     );
     expect(container.querySelector('svg.lucide-triangle-alert')).not.toBeNull();
   });
+
+  it('marks a realtime-entering card with data-entrada and omits it otherwise (REQ-COS-27 D9)', () => {
+    const { rerender } = render(
+      <GrupoCard grupo={grupo([botellon(1)])} estado="recibido" entrando onAccion={vi.fn()} />
+    );
+    expect(screen.getByTestId('grupo-card')).toHaveAttribute('data-entrada', 'true');
+
+    rerender(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" entrando={false} onAccion={vi.fn()} />);
+    expect(screen.getByTestId('grupo-card')).not.toHaveAttribute('data-entrada');
+  });
 });

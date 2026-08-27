@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ESTADO_LABELS } from '@/lib/utils/estados';
 import {
@@ -15,11 +15,15 @@ import { Buscador } from '@/components/operaciones/buscador';
 import { ListaSkeleton } from '@/components/operaciones/lista-skeleton';
 import { GrupoCard, DESTINO_ACCION } from '@/components/operaciones/grupo-card';
 import { KanbanDesktop } from '@/components/operaciones/kanban-desktop';
+import { ChipRealtime } from '@/components/operaciones/chip-realtime';
 import { VacioPorEstado, COPIA_VACIO_TOTAL } from '@/components/operaciones/copy-vacios';
 import { EmptyState } from '@/components/operaciones/empty-state';
 import { ActionButton } from '@/components/operaciones/action-button';
 import { ToastHost } from '@/components/operaciones/toast';
 import { ScannerModal } from '@/components/scanner/scanner-modal';
+
+/** Debounce de fin de scroll (REQ-COS-27 D3): scrolleando se limpia 150ms después del último evento. */
+const FIN_SCROLL_MS = 150;
 
 /**
  * ColaOperaciones — screen shell of the Central de Operaciones queue
@@ -39,10 +43,40 @@ import { ScannerModal } from '@/components/scanner/scanner-modal';
  * UI copy Spanish; tokens only.
  */
 export function ColaOperaciones() {
-  const { cargando, error, porEstado, totales, mover, reintentar } = useColaOperaciones();
   const [tab, setTab] = useState<EstadoOperativo>('recibido');
   const [scannerAbierto, setScannerAbierto] = useState(false);
   const router = useRouter();
+
+  const {
+    cargando,
+    error,
+    porEstado,
+    porEstadoVisibles,
+    totales,
+    mover,
+    reintentar,
+    pendientes,
+    aplicarPendientes,
+    entrando,
+    setScrolleando,
+  } = useColaOperaciones({ tab });
+
+  // REQ-COS-27 D3: mientras el operador scrollea, los cambios realtime se
+  // encolan detrás del chip (nunca reordenar bajo el dedo); 150ms tras el
+  // último scroll el gate vuelve a aplicar directo.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function onScroll() {
+      setScrolleando(true);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setScrolleando(false), FIN_SCROLL_MS);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (timer) clearTimeout(timer);
+    };
+  }, [setScrolleando]);
 
   const contadores: Record<EstadoOperativo, number> = {
     recibido: porEstado.recibido.length,
@@ -73,6 +107,7 @@ export function ColaOperaciones() {
         key={grupo.cliente_id}
         grupo={grupo}
         estado={estado}
+        entrando={entrando.has(grupo.cliente_id ?? '')}
         onAccion={(ids) => mover(ids, DESTINO_ACCION[estado])}
       />
     ));
@@ -130,13 +165,17 @@ export function ColaOperaciones() {
           <div className="md:hidden">
             <TabsEstados activo={tab} onCambio={setTab} contadores={contadores} />
           </div>
+          {/* Chip flotante "↑ N botellones nuevos" bajo las tabs (REQ-COS-27):
+              sticky, visible en todos los layouts; tap aplica los cambios
+              encolados. No renderiza nada cuando no hay pendientes. */}
+          <ChipRealtime cantidad={pendientes} onAplicar={aplicarPendientes} />
           <div data-testid="cola-movil" className="space-y-3 px-4 py-4 md:hidden">
             {cargando ? (
               <ListaSkeleton cantidad={3} />
-            ) : porEstado[tab].length === 0 ? (
+            ) : porEstadoVisibles[tab].length === 0 ? (
               <VacioPorEstado estado={tab} onAccion={accionVacio(tab)} />
             ) : (
-              renderGrupos(tab, porEstado[tab])
+              renderGrupos(tab, porEstadoVisibles[tab])
             )}
           </div>
 
@@ -159,10 +198,10 @@ export function ColaOperaciones() {
                 </h2>
                 {cargando ? (
                   <ListaSkeleton cantidad={2} />
-                ) : porEstado[estado].length === 0 ? (
+                ) : porEstadoVisibles[estado].length === 0 ? (
                   <VacioPorEstado estado={estado} onAccion={accionVacio(estado)} />
                 ) : (
-                  renderGrupos(estado, porEstado[estado])
+                  renderGrupos(estado, porEstadoVisibles[estado])
                 )}
               </section>
             ))}
@@ -174,7 +213,7 @@ export function ColaOperaciones() {
             data-testid="cola-kanban"
             className="hidden gap-4 px-4 py-4 lg:grid lg:grid-cols-4"
           >
-            <KanbanDesktop porEstado={porEstado} cargando={cargando} onMover={mover} />
+            <KanbanDesktop porEstado={porEstadoVisibles} cargando={cargando} onMover={mover} />
           </div>
         </>
       )}

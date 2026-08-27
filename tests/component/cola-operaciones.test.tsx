@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ColaOperaciones } from '@/components/operaciones/cola-operaciones';
 import type { ColaBotellon } from '@/lib/db/botellones';
 
@@ -9,8 +9,36 @@ const { getColaOperacionesMock, rpcMock, pushMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
 }));
 
+// Fake-channel supabase (estado-en-vivo pattern): the shell mounts
+// useRealtimeCola (REQ-COS-27), so tests dispatch synthetic postgres_changes
+// payloads to the captured channel to drive the queue gate/chip.
+const { fakeChannels } = vi.hoisted(() => ({
+  fakeChannels: [] as Array<{
+    on: ReturnType<typeof vi.fn>;
+    subscribe: ReturnType<typeof vi.fn>;
+    payloadHandler: ((payload: unknown) => void) | null;
+  }>,
+}));
+
 vi.mock('@/lib/db/botellones', () => ({ getColaOperaciones: getColaOperacionesMock }));
-vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ rpc: rpcMock }) }));
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    rpc: rpcMock,
+    channel: vi.fn(() => {
+      const ch = {
+        on: vi.fn((_e: string, _c: unknown, cb: (p: unknown) => void) => {
+          ch.payloadHandler = cb;
+          return ch;
+        }),
+        subscribe: vi.fn(),
+        payloadHandler: null as ((payload: unknown) => void) | null,
+      };
+      fakeChannels.push(ch);
+      return ch;
+    }),
+    removeChannel: vi.fn(),
+  }),
+}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushMock }) }));
 // The real ScannerModal owns the camera lifecycle (useQrScanner) which cannot
 // run in jsdom — the shell test only proves the shell OPENS/CLOSES it.
@@ -23,6 +51,14 @@ vi.mock('@/components/scanner/scanner-modal', () => ({
     </div>
   ),
 }));
+
+/** Emit a raw postgres_changes payload into the shell's realtime channel. */
+function emitEvento(payload: unknown) {
+  fireEvent.scroll(window); // scrolleando=true → gate queued (S1)
+  act(() => {
+    fakeChannels[0]?.payloadHandler?.(payload);
+  });
+}
 
 /** Fixture row: edad derivada del reloj real (igual que los tests de grupo-card). */
 function hace(horas: number): string {
@@ -64,6 +100,10 @@ async function montar(filas: ColaBotellon[]) {
 }
 
 describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
+  beforeEach(() => {
+    fakeChannels.length = 0;
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -206,5 +246,127 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     await waitFor(() => expect(screen.queryAllByTestId('grupo-card').length).toBeGreaterThan(0));
     expect(getColaOperacionesMock).toHaveBeenCalledTimes(2);
+  });
+
+  // ── Realtime chip (REQ-COS-27, PR-A) ──
+
+  it('renders the floating chip "↑ N botellones nuevos" under the tabs and tap applies the queue (S1/S3)', async () => {
+    await montar([botellon(1, { estado: 'recibido' })]);
+
+    // No chip at rest.
+    expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument();
+
+    // Scroll (scrolleando=true) + a realtime change on the active tab → queued.
+    fireEvent.scroll(window);
+    act(() => {
+      fakeChannels[0]?.payloadHandler?.({
+        eventType: 'UPDATE',
+        new: { id: 'b-1', estado: 'recarga', cliente_id: 'cliente-a' },
+        old: { id: 'b-1' },
+      });
+    });
+
+    const chip = screen.getByTestId('chip-realtime');
+    expect(chip).toHaveTextContent('↑ 1 botellones nuevos');
+
+    // Tap applies: chip disappears, the mobile recibido list shows no cards
+    // (the moved group lives in recarga now — visible on the tablet grid).
+    fireEvent.click(chip);
+    await waitFor(() => expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument());
+    const movil = screen.getByTestId('cola-movil');
+    expect(within(movil).queryAllByTestId('grupo-card')).toHaveLength(0);
+  });
+
+  it('scroll listener wires scrolleando: change while scrolling is queued, after debounce it applies directly', async () => {
+    await montar([botellon(1, { estado: 'recibido' }), botellon(3, { estado: 'recarga' })]);
+
+    // While scrolling → queued behind the chip.
+    fireEvent.scroll(window);
+    act(() => {
+      fakeChannels[0]?.payloadHandler?.({
+        eventType: 'UPDATE',
+        new: { id: 'b-1', estado: 'recarga', cliente_id: 'cliente-a' },
+        old: { id: 'b-1' },
+      });
+    });
+    expect(screen.getByTestId('chip-realtime')).toBeInTheDocument();
+    // Apply the queue first so the next event has a clean slate.
+    fireEvent.click(screen.getByTestId('chip-realtime'));
+    await waitFor(() => expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument());
+
+    // After the 150ms debounce the listener clears scrolleando → a NON-visible
+    // change (recarga→listo, fuera del tab activo) applies directly (no chip).
+    await new Promise((r) => setTimeout(r, 200));
+    act(() => {
+      fakeChannels[0]?.payloadHandler?.({
+        eventType: 'UPDATE',
+        new: { id: 'b-3', estado: 'listo', cliente_id: 'cliente-b' },
+        old: { id: 'b-3' },
+      });
+    });
+    expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument();
+  });
+
+  it('tab counters stay LIVE while a change is queued behind the chip (MOD-17 S2)', async () => {
+    await montar([botellon(1, { estado: 'recibido' }), botellon(2, { estado: 'recibido' })]);
+
+    // 2 groups in recibido → counter "Recibido 2".
+    expect(screen.getByRole('tab', { name: /Recibido 2/ })).toBeInTheDocument();
+
+    // Scroll + realtime move of b-1 out of recibido → queued, but the live
+    // counter must drop to 1 BEFORE the chip is tapped.
+    fireEvent.scroll(window);
+    act(() => {
+      fakeChannels[0]?.payloadHandler?.({
+        eventType: 'UPDATE',
+        new: { id: 'b-1', estado: 'recarga', cliente_id: 'cliente-a' },
+        old: { id: 'b-1' },
+      });
+    });
+    expect(screen.getByTestId('chip-realtime')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Recibido 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /En recarga 1/ })).toBeInTheDocument();
+  });
+
+  it('outline: a card newly entering the active tab animates data-entrada and clears after 1200ms (REQ-COS-27 D9)', async () => {
+    vi.useFakeTimers();
+    // b-1 (cliente-b) starts in recarga; active tab is recibido (b-2, cliente-a).
+    // b-1 entering recibido makes cliente-b's card NEW in the active tab → outline on apply.
+    getColaOperacionesMock.mockResolvedValue([
+      botellon(1, { estado: 'recarga' }),
+      botellon(2, { estado: 'recibido' }),
+    ]);
+    render(<ColaOperaciones />);
+    // Flush the async load + the card's mount clock timer.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    // Scrolling → queued; chip tap applies → the moved card is outlined.
+    fireEvent.scroll(window);
+    act(() => {
+      fakeChannels[0]?.payloadHandler?.({
+        eventType: 'UPDATE',
+        new: { id: 'b-1', estado: 'recibido', cliente_id: 'cliente-b' },
+        old: { id: 'b-1' },
+      });
+    });
+    fireEvent.click(screen.getByTestId('chip-realtime'));
+
+    // Mobile active-tab list: the card for the moved bottle (BOT-001, cliente-b)
+    // is the newly-entering one → exactly one outlined card, and it is that one.
+    const movil = screen.getByTestId('cola-movil');
+    const cards = within(movil).getAllByTestId('grupo-card');
+    expect(cards).toHaveLength(2);
+    const outlined = cards.filter((c) => c.getAttribute('data-entrada') === 'true');
+    expect(outlined).toHaveLength(1);
+    expect(outlined[0]).toHaveTextContent('BOT-001');
+    expect(outlined[0]).not.toHaveTextContent('BOT-002');
+
+    // After 1.2s the outline clears (timer owned by the hook, D9).
+    act(() => { vi.advanceTimersByTime(1200); });
+    for (const card of within(movil).getAllByTestId('grupo-card')) {
+      expect(card).not.toHaveAttribute('data-entrada');
+    }
+    vi.useRealTimers();
   });
 });

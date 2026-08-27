@@ -14,7 +14,18 @@ const { rpcMock, getColaOperacionesMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/db/botellones', () => ({ getColaOperaciones: getColaOperacionesMock }));
-vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ rpc: rpcMock }) }));
+// The hook subscribes to realtime on mount (useRealtimeCola, REQ-COS-27), so
+// the browser client mock needs the fake-channel surface next to `rpc`.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    rpc: rpcMock,
+    channel: vi.fn(() => ({
+      on: vi.fn(() => ({ subscribe: vi.fn() })),
+      subscribe: vi.fn(),
+    })),
+    removeChannel: vi.fn(),
+  }),
+}));
 
 /** Fixture row aged 30h (critica -> age "1d" per the cola.ts design matrix). */
 function hace(horas: number): string {

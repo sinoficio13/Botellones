@@ -1,0 +1,62 @@
+# Tasks: Central de Operaciones — Fase 5 (Realtime + WhatsApp + Ficha cliente)
+
+## Review Workload Forecast
+
+Estimated changed lines: PR-A ~350 · PR-B ~340 · PR-C ~380 (total ~1070)
+Suggested split: PR-A → PR-B → PR-C on `redesign/central-operaciones` (base: tracker / PR-A / PR-B)
+Delivery strategy: ask-on-risk (feature-branch chain reused)
+
+Decision needed before apply: Yes
+Chained PRs recommended: Yes
+Chain strategy: feature-branch-chain
+400-line budget risk: Medium
+
+Work units (test cmd = `npx vitest run` + that phase's test files):
+- **A** Realtime+chip (base tracker): harness 2-device dev (scroll+move→chip, live counters, tap applies); rollback remove sub/chip → static fetch (no DB).
+- **B** WhatsApp sheet (base PR-A): harness dev tap icon→sheet, edit, wa.me new tab; rollback unwire `onWhatsApp`, delete `sheet-whatsapp.tsx`.
+- **C** Ficha+carried (base PR-B): harness dev tap name→ficha, actions, all-estados; rollback unwire ficha, delete `ficha-cliente.tsx`, drop helper.
+
+Req map: P1⇄REQ-COS-27,MOD-17,30 · P2⇄REQ-COS-28,MOD-18/23,30 · P3⇄REQ-COS-29,MOD-18/23,30.
+
+## Phase 1 — PR-A: Realtime queue + chip
+
+- [x] 1.1 RED `use-realtime-cola.test.tsx` (27): fake-channel mock (estado-en-vivo pattern) — channel `cola-realtime`, event `*`/table `botellones`, removeChannel on unmount, silent CHANNEL_ERROR/TIMED_OUT
+  - Evidence: wrote test first → failed "Failed to resolve import @/hooks/useRealtimeCola" (RED). 4 channel-lifecycle tests (subscribe config, removeChannel, silent warn ×2, `normalizarEvento` 4 cases).
+- [x] 1.2 GREEN `src/hooks/useRealtimeCola.ts`: channel lifecycle + payload mapping + stable `onEvento` ref
+  - Evidence: `npx vitest run tests/component/use-realtime-cola.test.tsx` → 12/12 pass (GREEN). `normalizarEvento` pure helper exported for unit tests.
+- [x] 1.3 RED (27): gate — queued while scrolling, queued when `afectaTabActivo`, direct otherwise; echo skip; unknown-client INSERT → one refetch; DELETE removes
+  - Evidence: 8 hook-level behavior tests in the same file: queued-while-scrolling (S1), queued-afectaTabActivo + direct-non-visible (S2), chip-apply (S3), live counters (MOD-17 S2), DELETE, refetch-one-shot (D5), echo skip (D6), entrando lifecycle (D9).
+- [x] 1.4 GREEN `src/hooks/useColaOperaciones.ts` (MOD-17): `({tab})`; two-layer state (`botellones` live + `visibles` snapshot); `decidirGate`; `pendientes`/`aplicarPendientes`; `entrando`; `setScrolleando`; totals predicate fix (D11)
+  - Evidence: hook exports pure `decidirGate`/`mergeEvento`/`calcularEntrando`/`necesitaRefetch`; two-layer memos `porEstado` (live) + `porEstadoVisibles` (gated). Full suite 352→369 with D11 totals fix — existing totals test still green (fixture rows all in ESTADOS_KANBAN).
+- [x] 1.5 RED `cola-operaciones.test.tsx` (+): chip "↑ N botellones nuevos" renders, tap applies; scroll debounce; counters live while queued (MOD-17 S2)
+  - Evidence: wrote tests first → failed on missing `chip-realtime` testid (RED). 4 shell tests: chip render+tap (S1/S3), scroll-debounce wiring, live counters (MOD-17 S2), outline lifecycle (D9).
+- [x] 1.6 GREEN `src/components/operaciones/chip-realtime.tsx`: sticky chip under tabs, plural-safe copy, tap → `aplicarPendientes`, null when 0
+  - Evidence: `npx vitest run tests/component/cola-operaciones.test.tsx` → 13/13 pass (GREEN). Copy "↑ N botellones nuevos" (plural for N=1 per §7.5), tokens only.
+- [x] 1.7 RED (27): outline — `entrando` diff → outline class present, gone after 1200ms (fake timers)
+  - Evidence: card-level test (`grupo-card.test.tsx`): `data-entrada="true"` present when `entrando`, absent otherwise; shell pipeline test: realtime→chip tap→outlined card (BOT-001) → cleared after 1200ms fake timers. NOTE (order deviation): written after 1.8 GREEN — the shell chip tests required the `entrando` prop wired first; tests verify real behavior and fail without the implementation.
+- [x] 1.8 GREEN `cola-operaciones.tsx` + `grupo-card.tsx`: scroll listener → `setScrolleando`; chip render; `entrando` prop + `outline outline-2 outline-marca` (D9)
+  - Evidence: window scroll listener + 150ms debounce (`FIN_SCROLL_MS`); gated render branches (`porEstadoVisibles`) for mobile/tablet/kanban; counters stay live from `porEstado`; `data-entrada` + `outline outline-2 outline-marca` token (no hex). D6 echo suppression also applied to the undo RPC path.
+- [x] 1.9 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`; if PR-A >400, DROP droppable e2e chip spec (REQ-COS-30 MAY) — never add `tests/e2e/cola-realtime.spec.ts`
+  - Evidence: `npm run test` → 369/369 pass (35 files); `npx tsc --noEmit` → exit 0. E2E chip spec NOT added (dropped). LINE BUDGET: total ≈933 changed lines > 400 — see apply report (size-exception recommendation).
+
+## Phase 2 — PR-B: WhatsApp sheet
+
+- [ ] 2.1 RED `whatsapp.test.ts` (+): 5 literal branches + singular/plural + `buildWaLink` encoding (spaces+accents)
+- [ ] 2.2 GREEN `src/lib/utils/whatsapp.ts` (28): `mensajeWhatsApp` locked literal (§7.3) + `buildWaLink` (D13)
+- [ ] 2.3 RED `sheet-whatsapp.test.tsx`: pre-loaded literal ("Hola Gimnasio, tus 3 botellones están listos. ¿Te lo llevo hoy?"), editable, note, no auto-send on estado change
+- [ ] 2.4 RED (28): deeplink href `wa.me/<digitos>?text=<encoded>`; Cancelar closes without navigation
+- [ ] 2.5 GREEN `src/components/operaciones/sheet-whatsapp.tsx`: controlled bottom sheet (`ui/sheet` side=bottom), editable textarea, note, `--whatsapp` "Abrir WhatsApp" new tab, Cancelar (D8)
+- [ ] 2.6 RED (28, MOD-18/23): `onWhatsApp` fires with phone; no-phone → `aria-disabled` + opacity-40 + toast "Este cliente no tiene teléfono cargado", sheet not opened (D7)
+- [ ] 2.7 GREEN wire: `grupo-card.tsx` + `grupo-card-kanban.tsx` (`aria-disabled`, not `disabled`) + `kanban-desktop.tsx` passthrough + shell handlers in `cola-operaciones.tsx`
+- [ ] 2.8 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`, `npm run build`
+
+## Phase 3 — PR-C: Ficha + carried fixes
+
+- [ ] 3.1 RED `botellones-cliente.test.ts` (29): `getBotellonesCliente` returns all 5 estados incl. `entregado` + join + null-safe
+- [ ] 3.2 GREEN `src/lib/db/botellones.ts`: `getBotellonesCliente(clienteId)` (`'use server'`, no estado filter, `direcciones(*)` join, null-safe try/catch, D14)
+- [ ] 3.3 RED `ficha-cliente.test.tsx`: nombre/cédula mono/dirección join; WhatsApp→sheet swap, Llamar `tel:`, Ficha `/clientes/[id]`; all-estados incl. entregado with badge + age; Escape closes, focus returns
+- [ ] 3.4 GREEN `src/components/operaciones/ficha-cliente.tsx`: data + 3 actions + all-estados list (`formatAntiguedad`); cédula mono, "—" when NULL; prefix display-only comment
+- [ ] 3.5 GREEN wire name targets (MOD-18/23): `grupo-card.tsx` + `grupo-card-kanban.tsx` (span→button `onAbrirFicha`) + `kanban-desktop.tsx` + shell `sheetFicha` state (D8)
+- [ ] 3.6 Carried RED: `undo-flow.test.tsx` S2 honesty (mock restores original `estado_desde`, assert pre-undo age); `kanban-desktop.test.tsx` dragId cleared after drop
+- [ ] 3.7 Carried GREEN: `useColaOperaciones.ts` `mover` try/catch → error path (D12); `kanban-desktop.tsx` `setDragId(null)` in drop; `useEdadAhora` 30s tick (D10)
+- [ ] 3.8 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`, `npm run build`; grep no-hex in new components; each PR ≤400 lines

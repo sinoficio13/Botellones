@@ -33,17 +33,30 @@ const COPIA: Record<EstadoOperativo, CopiaVacio> = {
   },
 };
 
-export function VacioPorEstado({ estado }: { estado: EstadoOperativo }) {
+export function VacioPorEstado({
+  estado,
+  onAccion,
+}: {
+  estado: EstadoOperativo;
+  /** Slice E wiring: recibido → Escanear (scanner), "Ver X" → tab switch. */
+  onAccion?: () => void;
+}) {
   const { titulo, descripcion, accionLabel } = COPIA[estado];
   return (
     <EmptyState
       title={titulo}
       description={descripcion}
       action={
-        <button type="button" className="mt-2 text-sm font-medium text-marca">
+        <button type="button" onClick={onAccion} className="mt-2 text-sm font-medium text-marca">
           {accionLabel}
         </button>
       }
     />
   );
 }
+
+/** First-use total-empty copy (REQ-COS-21, spec §8.3) — actions wired by the shell. */
+export const COPIA_VACIO_TOTAL = {
+  titulo: 'La cola está vacía',
+  descripcion: 'Escanéá un botellón o cargalo manualmente para empezar.',
+} as const;

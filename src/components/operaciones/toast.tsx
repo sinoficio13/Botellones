@@ -38,6 +38,16 @@ function getSnapshot(): ToastState | null {
   return toast;
 }
 
+/**
+ * Server snapshot (carried fix, Slice E): the queue shell mounts `<ToastHost />`
+ * server-side; without a server snapshot React errors "Missing getServerSnapshot"
+ * during SSR. Toasts are client-only — the server always renders none, so the
+ * server and the first client render agree (no hydration mismatch).
+ */
+function getServerSnapshot(): ToastState | null {
+  return null;
+}
+
 function clearTimer(): void {
   if (timer !== null) {
     clearTimeout(timer);
@@ -83,7 +93,7 @@ export function dismissToast(id?: number): void {
  * region; the action button renders only for success tone.
  */
 export function ToastHost() {
-  const current = useSyncExternalStore(subscribe, getSnapshot);
+  const current = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   if (current === null) {
     return null;

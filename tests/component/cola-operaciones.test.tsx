@@ -369,4 +369,74 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     }
     vi.useRealTimers();
   });
+
+  // ── WhatsApp sheet (REQ-COS-28, PR-B) ──
+
+  it('opens the WhatsApp sheet with the pre-loaded message when tapping the target of a phone-holder', async () => {
+    await montar([
+      botellon(1, {
+        clientes: { nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' },
+      }),
+    ]);
+
+    const movil = screen.getByTestId('cola-movil');
+    fireEvent.click(within(movil).getByRole('button', { name: 'WhatsApp de María González' }));
+
+    // Sheet open with the §7.3 literal pre-loaded for the current tab (recibido, 1 bottle).
+    const textarea = await screen.findByRole('textbox');
+    expect(textarea).toHaveValue(
+      'Hola María, recibimos tu botellón. Te aviso apenas esté listo.'
+    );
+    expect(screen.getByRole('link', { name: 'Abrir WhatsApp' })).toHaveAttribute(
+      'href',
+      'https://wa.me/581144445555?text=Hola%20Mar%C3%ADa%2C%20recibimos%20tu%20botell%C3%B3n.%20Te%20aviso%20apenas%20est%C3%A9%20listo.'
+    );
+  });
+
+  it('no-phone: tap shows the toast "Este cliente no tiene teléfono cargado" and does NOT open the sheet', async () => {
+    // Default fixture has whatsapp: null → no-phone path (D7: shell decides).
+    await montar([botellon(1)]);
+
+    const movil = screen.getByTestId('cola-movil');
+    fireEvent.click(within(movil).getByRole('button', { name: 'WhatsApp de María González' }));
+
+    expect(await screen.findByText('Este cliente no tiene teléfono cargado')).toBeInTheDocument();
+    // Sheet NOT opened (no textarea, no deep link).
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Abrir WhatsApp' })).not.toBeInTheDocument();
+  });
+
+  it('closes the WhatsApp sheet via Cancelar (REQ-COS-28 S3)', async () => {
+    await montar([
+      botellon(1, {
+        clientes: { nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' },
+      }),
+    ]);
+
+    const movil = screen.getByTestId('cola-movil');
+    fireEvent.click(within(movil).getByRole('button', { name: 'WhatsApp de María González' }));
+    const textarea = await screen.findByRole('textbox');
+    expect(textarea).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('does NOT auto-open the sheet or send on tab change (REQ-COS-28 S5)', async () => {
+    // b-1 (cliente-b) in recibido (tab activo) + b-2 (cliente-a) in recarga —
+    // distinct clients so the tab switch mounts a fresh card (stale marcados
+    // reuse is a pre-existing edge case, out of scope here).
+    await montar([botellon(1), botellon(2, { estado: 'recarga' })]);
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'En recarga 1' }));
+    await waitFor(() =>
+      expect(within(screen.getByTestId('cola-movil')).getByRole('button', { name: '→ Pasar 1 a Listo' })).toBeInTheDocument()
+    );
+
+    // Tab change re-rendered the queue; no sheet opened and no wa.me link exists.
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Abrir WhatsApp' })).not.toBeInTheDocument();
+  });
 });

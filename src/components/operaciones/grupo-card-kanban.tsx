@@ -14,7 +14,8 @@ export type GrupoCardKanbanProps = {
   enAccion?: boolean;
   /** Whole-group action: ids = grupo.botellones.map(b => b.id) (REQ-23). */
   onAccion: (ids: string[]) => void | Promise<unknown>;
-  /** Fase-5 placeholder — WhatsApp sheet. Currently inert. */
+  /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
+   * the shell decides toast (no phone) vs sheet (D7). */
   onWhatsApp?: () => void;
   /** REQ-25 (PR-B): the parent owns the dragId fallback — card reports its payload. */
   onDragStart?: (idsStr: string) => void;
@@ -94,11 +95,13 @@ export function GrupoCardKanban({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* WhatsApp — FASE 5 placeholder (bottom sheet). Disabled sin teléfono (§7.3); inerte con teléfono. */}
+          {/* WhatsApp — REQ-COS-28 (D7): aria-disabled (NOT disabled) sin teléfono
+              para que el tap SIEMPRE dispare onWhatsApp y el shell decida (toast
+              "Este cliente no tiene teléfono cargado" vs abrir el sheet). */}
           <button
             type="button"
             aria-label={`WhatsApp de ${nombre}`}
-            disabled={!cliente?.whatsapp}
+            aria-disabled={!cliente?.whatsapp || undefined}
             onClick={onWhatsApp}
             className={cn(
               'grid size-11 place-items-center rounded-md text-text-secondary',

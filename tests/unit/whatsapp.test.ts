@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
+import { normalizeWhatsAppPhone, mensajeWhatsApp, buildWaLink } from '@/lib/utils/whatsapp';
 
 describe('normalizeWhatsAppPhone', () => {
   it('converts a local 04xx number to international 58 form', () => {
@@ -27,5 +27,71 @@ describe('normalizeWhatsAppPhone', () => {
 
   it('collapses multiple leading zeros before prepending the country code', () => {
     expect(normalizeWhatsAppPhone('004121234567')).toBe('584121234567');
+  });
+});
+
+describe('mensajeWhatsApp — locked §7.3 literal (REQ-COS-28)', () => {
+  it('recibido plural: count-aware "botellones" and "estén listos"', () => {
+    expect(mensajeWhatsApp('recibido', 'María González', 3)).toBe(
+      'Hola María, recibimos 3 botellones. Te aviso apenas estén listos.'
+    );
+  });
+
+  it('recibido singular: "tu botellón" and "esté listo"', () => {
+    expect(mensajeWhatsApp('recibido', 'María González', 1)).toBe(
+      'Hola María, recibimos tu botellón. Te aviso apenas esté listo.'
+    );
+  });
+
+  it('recarga plural uses the count-aware unit', () => {
+    expect(mensajeWhatsApp('recarga', 'María González', 2)).toBe(
+      'Hola María, ya estamos recargando 2 botellones.'
+    );
+  });
+
+  it('recarga singular uses "tu botellón"', () => {
+    expect(mensajeWhatsApp('recarga', 'María González', 1)).toBe(
+      'Hola María, ya estamos recargando tu botellón.'
+    );
+  });
+
+  it('listo plural with a multi-word name takes the FIRST name (spec scenario)', () => {
+    expect(mensajeWhatsApp('listo', 'Gimnasio Ríos', 3)).toBe(
+      'Hola Gimnasio, tus 3 botellones están listos. ¿Te lo llevo hoy?'
+    );
+  });
+
+  it('listo singular: "tu botellón está listo"', () => {
+    expect(mensajeWhatsApp('listo', 'María González', 1)).toBe(
+      'Hola María, tu botellón está listo. ¿Te lo llevo hoy?'
+    );
+  });
+
+  it('delivery plural uses the count-aware unit', () => {
+    expect(mensajeWhatsApp('delivery', 'María González', 4)).toBe(
+      'Hola María, vamos en camino con 4 botellones.'
+    );
+  });
+
+  it('delivery singular uses "tu botellón"', () => {
+    expect(mensajeWhatsApp('delivery', 'María González', 1)).toBe(
+      'Hola María, vamos en camino con tu botellón.'
+    );
+  });
+
+  it('unknown estado falls back to "Hola {p}, "', () => {
+    expect(mensajeWhatsApp('entregado', 'María González', 2)).toBe('Hola María, ');
+  });
+});
+
+describe('buildWaLink — wa.me deep link (REQ-COS-28, D13)', () => {
+  it('encodes spaces and accents in the message with encodeURIComponent', () => {
+    expect(buildWaLink('584121234567', 'Hola María, ¿cómo estás?')).toBe(
+      'https://wa.me/584121234567?text=Hola%20Mar%C3%ADa%2C%20%C2%BFc%C3%B3mo%20est%C3%A1s%3F'
+    );
+  });
+
+  it('keeps a plain message untouched by the encoder', () => {
+    expect(buildWaLink('584121234567', 'Hola!')).toBe('https://wa.me/584121234567?text=Hola!');
   });
 });

@@ -233,3 +233,24 @@ describe('KanbanDesktop — REQ-COS-25 drag & drop', () => {
     expect(onMover).not.toHaveBeenCalled();
   });
 });
+
+describe('KanbanDesktop — REQ-COS-23 WhatsApp wiring (PR-B)', () => {
+  afterEach(() => {
+    dismissToast();
+  });
+
+  it('passes the WhatsApp tap through to onWhatsApp with (grupo, estado) for a phone-holder', () => {
+    const onWhatsApp = vi.fn();
+    const porEstado = porEstadoVacio();
+    porEstado.recibido = [
+      grupo([botellon(1, { clientes: { nombre: 'María González', cedula: '12345678', telefono_1: '1144445555', whatsapp: '1144445555' } })]),
+    ];
+    render(<KanbanDesktop porEstado={porEstado} cargando={false} onMover={vi.fn()} onWhatsApp={onWhatsApp} />);
+
+    const card = within(columnaDe('Recibido')).getByTestId('grupo-card-kanban');
+    fireEvent.click(within(card).getByRole('button', { name: 'WhatsApp de María González' }));
+
+    expect(onWhatsApp).toHaveBeenCalledTimes(1);
+    expect(onWhatsApp).toHaveBeenCalledWith(expect.objectContaining({ cliente_id: 'cliente-1' }), 'recibido');
+  });
+});

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ESTADO_LABELS, getEstadosPermitidos } from '@/lib/utils/estados';
-import { ESTADOS_OPERATIVOS, type DestinoAccion, type EstadoOperativo, type PorEstado } from '@/hooks/useColaOperaciones';
+import { ESTADOS_OPERATIVOS, type DestinoAccion, type EstadoOperativo, type GrupoCola, type PorEstado } from '@/hooks/useColaOperaciones';
 import { ListaSkeleton } from '@/components/operaciones/lista-skeleton';
 import { EmptyState } from '@/components/operaciones/empty-state';
 import { DESTINO_ACCION } from '@/components/operaciones/grupo-card';
@@ -15,6 +15,8 @@ export type KanbanDesktopProps = {
   cargando: boolean;
   /** = fase-3 `mover` (DestinoAccion includes 'entregado' — Entregar stays button-only). */
   onMover: (ids: string[], destino: DestinoAccion) => void | Promise<unknown>;
+  /** REQ-COS-28 (PR-B): WhatsApp tap passthrough → shell opens the sheet. */
+  onWhatsApp?: (grupo: GrupoCola, estado: EstadoOperativo) => void;
 };
 
 /** Estado → 2px dot token (D6 — component-local presentation map, codebase convention). */
@@ -49,7 +51,7 @@ const SUBTITULO_ESTADO: Record<EstadoOperativo, string> = {
  * move client-side via getEstadosPermitidos (D5 — zero mover calls + generic
  * red toast on an invalid drop), and dragend clears the fallback.
  */
-export function KanbanDesktop({ porEstado, cargando, onMover }: KanbanDesktopProps) {
+export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp }: KanbanDesktopProps) {
   // D10: parent-owned dragId — fallback for Firefox's empty dataTransfer.getData.
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -123,6 +125,7 @@ export function KanbanDesktop({ porEstado, cargando, onMover }: KanbanDesktopPro
                     grupo={grupo}
                     estado={estado}
                     onAccion={(ids) => onMover(ids, DESTINO_ACCION[estado])}
+                    onWhatsApp={() => onWhatsApp?.(grupo, estado)}
                     onDragStart={(idsStr) => setDragId(idsStr)}
                     onDragEnd={() => setDragId(null)}
                   />

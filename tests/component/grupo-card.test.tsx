@@ -228,7 +228,7 @@ describe('GrupoCard — REQ-COS-18', () => {
     expect(container.querySelector('svg.lucide-triangle-alert')).not.toBeNull();
   });
 
-  it('marks a realtime-entering card with data-entrada and omits it otherwise (REQ-COS-27 D9)', () => {
+it('marks a realtime-entering card with data-entrada and omits it otherwise (REQ-COS-27 D9)', () => {
     const { rerender } = render(
       <GrupoCard grupo={grupo([botellon(1)])} estado="recibido" entrando onAccion={vi.fn()} />
     );
@@ -236,5 +236,44 @@ describe('GrupoCard — REQ-COS-18', () => {
 
     rerender(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" entrando={false} onAccion={vi.fn()} />);
     expect(screen.getByTestId('grupo-card')).not.toHaveAttribute('data-entrada');
+  });
+
+  it('fires onAbrirFicha on the name target tap (REQ-COS-29, MOD-18/23 wiring)', () => {
+    const onAbrirFicha = vi.fn();
+    render(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} onAbrirFicha={onAbrirFicha} />);
+
+    // The name block is a real button target (≥44px); tapping it opens the ficha.
+    const nombre = screen.getByRole('button', { name: 'María González' });
+    expect(nombre).toHaveClass('min-h-11');
+
+    fireEvent.click(nombre);
+    expect(onAbrirFicha).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-ticks the age clock every 30s so realtime re-renders show fresh ages (D10)', async () => {
+    vi.useFakeTimers();
+    try {
+      // estado_desde 59m30s old at T0: displayed "59m" (floor of minutes).
+      // Advancing 30s crosses 60m → "1h". ONLY the 30s interval (D10) re-sets
+      // `ahora` and re-renders the fresh age; a mount-only clock would stay
+      // frozen at "59m" — this assertion fails without the tick.
+      const base = Date.now();
+      const desde = new Date(base - (59.5 * 60_000)).toISOString();
+      render(<GrupoCard grupo={grupo([botellon(1, { estado_desde: desde })], desde)} estado="recibido" onAccion={vi.fn()} />);
+
+      // Mount clock (setTimeout 0) → real age renders.
+      act(() => {
+        vi.advanceTimersByTime(0);
+      });
+      expect(screen.getByText('59m')).toBeInTheDocument();
+
+      // Advance past the 30s tick: the interval re-sets `ahora` → "1h".
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+      });
+      expect(screen.getByText('1h')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

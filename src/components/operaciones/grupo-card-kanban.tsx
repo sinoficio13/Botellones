@@ -17,6 +17,8 @@ export type GrupoCardKanbanProps = {
   /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
    * the shell decides toast (no phone) vs sheet (D7). */
   onWhatsApp?: () => void;
+  /** REQ-COS-29: name tap → shell opens the client ficha sheet (D8). */
+  onAbrirFicha?: () => void;
   /** REQ-25 (PR-B): the parent owns the dragId fallback — card reports its payload. */
   onDragStart?: (idsStr: string) => void;
   /** REQ-25 (PR-B): clears the parent dragId on dragend. */
@@ -43,6 +45,7 @@ export function GrupoCardKanban({
   enAccion = false,
   onAccion,
   onWhatsApp,
+  onAbrirFicha,
   onDragStart,
   onDragEnd,
 }: GrupoCardKanbanProps) {
@@ -83,7 +86,15 @@ export function GrupoCardKanban({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span className="truncate text-sm font-medium text-text-primary">{nombre}</span>
+          {/* REQ-COS-29: name tap opens the client ficha sheet (D8) — the span
+              becomes a button so the target is keyboard-accessible and ≥44px. */}
+          <button
+            type="button"
+            onClick={onAbrirFicha}
+            className="min-h-11 max-w-full truncate text-left text-sm font-medium text-text-primary"
+          >
+            {nombre}
+          </button>
           <span
             className={cn(
               'font-mono text-xs',

@@ -17,6 +17,7 @@ import { GrupoCard, DESTINO_ACCION } from '@/components/operaciones/grupo-card';
 import { KanbanDesktop } from '@/components/operaciones/kanban-desktop';
 import { ChipRealtime } from '@/components/operaciones/chip-realtime';
 import { SheetWhatsApp } from '@/components/operaciones/sheet-whatsapp';
+import { FichaCliente } from '@/components/operaciones/ficha-cliente';
 import { VacioPorEstado, COPIA_VACIO_TOTAL } from '@/components/operaciones/copy-vacios';
 import { EmptyState } from '@/components/operaciones/empty-state';
 import { ActionButton } from '@/components/operaciones/action-button';
@@ -50,6 +51,12 @@ export function ColaOperaciones() {
   // D8: WhatsApp sheet state (REQ-COS-28) — {grupo, estado} while open, null
   // when closed (controlled; only one sheet at a time).
   const [sheetWhatsApp, setSheetWhatsApp] = useState<{
+    grupo: GrupoCola;
+    estado: EstadoOperativo;
+  } | null>(null);
+  // D8: client ficha sheet state (REQ-COS-29) — same controlled pattern; the
+  // ficha's WhatsApp action swaps to the WhatsApp sheet (only one open).
+  const [sheetFicha, setSheetFicha] = useState<{
     grupo: GrupoCola;
     estado: EstadoOperativo;
   } | null>(null);
@@ -123,6 +130,25 @@ export function ColaOperaciones() {
     setSheetWhatsApp({ grupo, estado });
   }
 
+  /**
+   * REQ-COS-29 (D8): the ficha's WhatsApp action swaps sheets — the ficha
+   * closes and the shared WhatsApp sheet opens pre-loaded for this client.
+   */
+  function abrirFichaWhatsApp(grupo: GrupoCola, estado: EstadoOperativo) {
+    setSheetFicha(null);
+    abrirWhatsApp(grupo, estado);
+  }
+
+  /**
+   * REQ-COS-29: name tap opens the client ficha. Queue cards are always
+   * client-owned, but the type allows null (stock groups) — guard so the
+   * ficha never fetches with a null cliente_id.
+   */
+  function abrirFicha(grupo: GrupoCola, estado: EstadoOperativo) {
+    if (!grupo.cliente_id) return;
+    setSheetFicha({ grupo, estado });
+  }
+
   function renderGrupos(estado: EstadoOperativo, grupos: GrupoCola[]) {
     return grupos.map((grupo) => (
       <GrupoCard
@@ -132,6 +158,7 @@ export function ColaOperaciones() {
         entrando={entrando.has(grupo.cliente_id ?? '')}
         onAccion={(ids) => mover(ids, DESTINO_ACCION[estado])}
         onWhatsApp={() => abrirWhatsApp(grupo, estado)}
+        onAbrirFicha={() => abrirFicha(grupo, estado)}
       />
     ));
   }
@@ -241,6 +268,7 @@ export function ColaOperaciones() {
               cargando={cargando}
               onMover={mover}
               onWhatsApp={abrirWhatsApp}
+              onAbrirFicha={abrirFicha}
             />
           </div>
         </>
@@ -253,6 +281,16 @@ export function ColaOperaciones() {
           grupo={sheetWhatsApp.grupo}
           estado={sheetWhatsApp.estado}
           onClose={() => setSheetWhatsApp(null)}
+        />
+      ) : null}
+
+      {sheetFicha ? (
+        <FichaCliente
+          // abrirFicha guards null cliente_id before setting the state, so
+          // the ficha only ever opens for a client-owned group.
+          clienteId={sheetFicha.grupo.cliente_id!}
+          onClose={() => setSheetFicha(null)}
+          onWhatsApp={() => abrirFichaWhatsApp(sheetFicha.grupo, sheetFicha.estado)}
         />
       ) : null}
     </div>

@@ -60,11 +60,19 @@ Req map: P1⇄REQ-COS-27,MOD-17,30 · P2⇄REQ-COS-28,MOD-18/23,30 · P3⇄REQ-C
 
 ## Phase 3 — PR-C: Ficha + carried fixes
 
-- [ ] 3.1 RED `botellones-cliente.test.ts` (29): `getBotellonesCliente` returns all 5 estados incl. `entregado` + join + null-safe
-- [ ] 3.2 GREEN `src/lib/db/botellones.ts`: `getBotellonesCliente(clienteId)` (`'use server'`, no estado filter, `direcciones(*)` join, null-safe try/catch, D14)
-- [ ] 3.3 RED `ficha-cliente.test.tsx`: nombre/cédula mono/dirección join; WhatsApp→sheet swap, Llamar `tel:`, Ficha `/clientes/[id]`; all-estados incl. entregado with badge + age; Escape closes, focus returns
-- [ ] 3.4 GREEN `src/components/operaciones/ficha-cliente.tsx`: data + 3 actions + all-estados list (`formatAntiguedad`); cédula mono, "—" when NULL; prefix display-only comment
-- [ ] 3.5 GREEN wire name targets (MOD-18/23): `grupo-card.tsx` + `grupo-card-kanban.tsx` (span→button `onAbrirFicha`) + `kanban-desktop.tsx` + shell `sheetFicha` state (D8)
-- [ ] 3.6 Carried RED: `undo-flow.test.tsx` S2 honesty (mock restores original `estado_desde`, assert pre-undo age); `kanban-desktop.test.tsx` dragId cleared after drop
-- [ ] 3.7 Carried GREEN: `useColaOperaciones.ts` `mover` try/catch → error path (D12); `kanban-desktop.tsx` `setDragId(null)` in drop; `useEdadAhora` 30s tick (D10)
-- [ ] 3.8 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`, `npm run build`; grep no-hex in new components; each PR ≤400 lines
+- [x] 3.1 RED `botellones-cliente.test.ts` (29): `getBotellonesCliente` returns all 5 estados incl. `entregado` + join + null-safe
+  - Evidence: new file → 4 RED failures (function missing). 4 tests: query contract (direcciones(*) join + no estado filter), all 5 estados incl. entregado + first direccion row, unknown client → empty shape, transport rejection → empty shape (null-safe).
+- [x] 3.2 GREEN `src/lib/db/botellones.ts`: `getBotellonesCliente(clienteId)` (`'use server'`, no estado filter, `direcciones(*)` join, null-safe try/catch, D14)
+  - Evidence: `npx vitest run tests/unit/botellones-cliente.test.ts` → 4/4 pass (GREEN). Mock fixed once: supabase-js query builders are THENABLE (await builder.eq(...) resolves) — mock chain needed a `then` to mirror that. Test-name only; production code unchanged.
+- [x] 3.3 RED `ficha-cliente.test.tsx`: nombre/cédula mono/dirección join; WhatsApp→sheet swap, Llamar `tel:`, Ficha `/clientes/[id]`; all-estados incl. entregado with badge + age; Escape closes, focus returns
+  - Evidence: new file → "Failed to resolve import @/components/operaciones/ficha-cliente" (RED). 7 tests: data render (nombre SheetTitle 16/500, mono cédula, dirección join), "Sus botellones (2)" with badge + age incl. entregado, WhatsApp action fires onWhatsApp (D8 swap), Llamar `tel:` anchor, Ficha router.push('/clientes/cliente-1'), Cerrar closes, Escape closes + NULL cédula "—" mono.
+- [x] 3.4 GREEN `src/components/operaciones/ficha-cliente.tsx`: data + 3 actions + all-estados list (`formatAntiguedad`); cédula mono, "—" when NULL; prefix display-only comment
+  - Evidence: `npx vitest run tests/component/ficha-cliente.test.tsx` → 7/7 pass (GREEN). Controlled bottom sheet (ui/sheet side=bottom, D8); fetches getBotellonesCliente per open; ESTADO_COLORS badge + age (client clock); tokens only, no hex; cédula prefix note comment.
+- [x] 3.5 GREEN wire name targets (MOD-18/23): `grupo-card.tsx` + `grupo-card-kanban.tsx` (span→button `onAbrirFicha`) + `kanban-desktop.tsx` + shell `sheetFicha` state (D8)
+  - Evidence: 5 RED wiring tests (grupo-card onAbrirFicha, grupo-card-kanban span→button, kanban passthrough, shell ficha-open + D8 swap) → GREEN 69/69 in 5 files. Shell guard `abrirFicha` (null cliente_id → no-op) + `abrirFichaWhatsApp` swap; tsc caught `cliente_id: string | null` → guard + `!` at render site.
+- [x] 3.6 Carried RED: `undo-flow.test.tsx` S2 honesty (mock restores original `estado_desde`, assert pre-undo age); `kanban-desktop.test.tsx` dragId cleared after drop
+  - Evidence: S2 honesty ALREADY in tree (committed 6962a8e/6f00bc1 — title "restores estado AND the original estado_desde via p_restaurar", mock restores original timestamps, asserts pre-undo "1d"); verified 5/5. dragId RED: true RED (2 calls — stale fallback fired again) then GREEN with setDragId(null) in drop.
+- [x] 3.7 Carried GREEN: `useColaOperaciones.ts` `mover` try/catch → error path (D12); `kanban-desktop.tsx` `setDragId(null)` in drop; `useEdadAhora` 30s tick (D10)
+  - Evidence: D12 RED (unhandled rejection escaping mover) → GREEN try/catch → revert + red toast + `{ok:false}`, no unhandled errors (6/6). dragId: RED→GREEN (12/12). D10: RED (fake timers, 59m30s→"59m", +30s must show "1h" — failed frozen) → GREEN setInterval EDAD_TICK_MS=30000 (40/40 across 3 card/ficha files).
+- [x] 3.8 REFACTOR + verify (30): `npm run test`, `tsc --noEmit`, `npm run build`; grep no-hex in new components; each PR ≤400 lines
+  - Evidence: `npm run test` → 411/411 pass (38 files); `npx tsc --noEmit` → exit 0; `npm run build` → Compiled successfully. No hex in ficha-cliente.tsx (grep). LINE BUDGET: total ≈788 changed lines > 400 — ficha core ≈745 + carried fixes ≈43. Same size-exception pattern as PR-A (933) and PR-B (515): design estimates miss ~2x on test lines. Carried fixes are small and in-scope; if the maintainer wants them isolated they split cleanly to PR-D (~43 lines: D12, dragId, D10 + tests), but the ficha core alone exceeds 400 regardless.

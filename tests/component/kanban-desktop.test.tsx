@@ -183,6 +183,25 @@ describe('KanbanDesktop — REQ-COS-25 drag & drop', () => {
     expect(onMover).toHaveBeenCalledTimes(1); // only the pre-dragEnd drop moved
   });
 
+  it('clears the dragId fallback ON DROP, so a stale fallback cannot fire a later drop (carried)', () => {
+    const onMover = vi.fn();
+    const porEstado = porEstadoVacio();
+    porEstado.recibido = [grupo([botellon(1)])];
+    render(<KanbanDesktop porEstado={porEstado} cargando={false} onMover={onMover} />);
+
+    const card = within(columnaDe('Recibido')).getByTestId('grupo-card-kanban');
+    // dragStart sets the fallback; drop's getData returns '' → uses dragId.
+    arrastrarDesde(card, () => '');
+    fireEvent.drop(columnaDe('En recarga'), { dataTransfer: { getData: () => '' } });
+    expect(onMover).toHaveBeenCalledWith(['b-1'], 'recarga');
+
+    // NO dragEnd fired. The drop itself must clear dragId: a second VALID drop
+    // (Recarga again — recibido→recarga is permitted) with empty getData must
+    // NOT move — otherwise the stale fallback fires onMover a second time.
+    fireEvent.drop(columnaDe('En recarga'), { dataTransfer: { getData: () => '' } });
+    expect(onMover).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores an invalid drop (delivery→Recarga) with zero mover calls and a red toast (REQ-25 S3)', () => {
     const onMover = vi.fn();
     const porEstado = porEstadoVacio();
@@ -252,5 +271,18 @@ describe('KanbanDesktop — REQ-COS-23 WhatsApp wiring (PR-B)', () => {
 
     expect(onWhatsApp).toHaveBeenCalledTimes(1);
     expect(onWhatsApp).toHaveBeenCalledWith(expect.objectContaining({ cliente_id: 'cliente-1' }), 'recibido');
+  });
+
+  it('passes the ficha tap through to onAbrirFicha with (grupo, estado) (REQ-COS-29 wiring)', () => {
+    const onAbrirFicha = vi.fn();
+    const porEstado = porEstadoVacio();
+    porEstado.recibido = [grupo([botellon(1)])];
+    render(<KanbanDesktop porEstado={porEstado} cargando={false} onMover={vi.fn()} onAbrirFicha={onAbrirFicha} />);
+
+    const card = within(columnaDe('Recibido')).getByTestId('grupo-card-kanban');
+    fireEvent.click(within(card).getByRole('button', { name: 'María González' }));
+
+    expect(onAbrirFicha).toHaveBeenCalledTimes(1);
+    expect(onAbrirFicha).toHaveBeenCalledWith(expect.objectContaining({ cliente_id: 'cliente-1' }), 'recibido');
   });
 });

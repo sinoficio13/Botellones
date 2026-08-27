@@ -277,6 +277,59 @@ export async function getColaOperaciones(): Promise<ColaBotellon[] | null> {
   }
 }
 
+// ── Ficha cliente (REQ-COS-29, D14) ──
+// Client ficha bottom-sheet feed: the client row (id/nombre/cédula/phones)
+// + the first `direcciones(*)` row + ALL botellones in ANY estado (no estado
+// filter — incl. `entregado`, which lives outside the queue), each with
+// `estado_desde` so the sheet computes age client-side with `formatAntiguedad`.
+
+export type BotellonesClienteResult = {
+  cliente: {
+    id: string;
+    nombre: string;
+    cedula: string | null;
+    telefono_1: string | null;
+    whatsapp: string | null;
+  } | null;
+  /** Primera fila de `direcciones(*)` (join embebido) o null. */
+  direccion: Record<string, string | null> | null;
+  botellones: { id: string; codigo: string; estado: string; estado_desde: string }[];
+};
+
+/**
+ * Client ficha feed (REQ-COS-29). Null-safe per repo convention: any failure
+ * (transport or unknown client) resolves `{ cliente: null, direccion: null,
+ * botellones: [] }` — the sheet renders placeholders, never crashes.
+ */
+export async function getBotellonesCliente(clienteId: string): Promise<BotellonesClienteResult> {
+  try {
+    const supabase = await getSupabase();
+    const { data: cliente } = await supabase
+      .from('clientes')
+      .select('id, nombre, cedula, telefono_1, whatsapp, direcciones(*)')
+      .eq('id', clienteId)
+      .maybeSingle();
+    const { data: botellones } = await supabase
+      .from('botellones')
+      .select('id, codigo, estado, estado_desde')
+      .eq('cliente_id', clienteId);
+    if (!cliente) return { cliente: null, direccion: null, botellones: botellones ?? [] };
+    return {
+      cliente: {
+        id: cliente.id,
+        nombre: cliente.nombre,
+        cedula: cliente.cedula ?? null,
+        telefono_1: cliente.telefono_1 ?? null,
+        whatsapp: cliente.whatsapp ?? null,
+      },
+      direccion: (cliente.direcciones as Record<string, string | null>[] | null)?.[0] ?? null,
+      botellones: (botellones ?? []) as BotellonesClienteResult['botellones'],
+    };
+  } catch {
+    return { cliente: null, direccion: null, botellones: [] };
+  }
+}
+
 // ── Buscador (REQ-COS-20) ──
 // Parallel server-side search over the same 4 queue estados the queue shows
 // (client-owned): nombre ilike and código ilike via PostgREST, plus a cédula

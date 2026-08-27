@@ -17,6 +17,8 @@ export type KanbanDesktopProps = {
   onMover: (ids: string[], destino: DestinoAccion) => void | Promise<unknown>;
   /** REQ-COS-28 (PR-B): WhatsApp tap passthrough → shell opens the sheet. */
   onWhatsApp?: (grupo: GrupoCola, estado: EstadoOperativo) => void;
+  /** REQ-COS-29 (PR-C): name tap passthrough → shell opens the client ficha. */
+  onAbrirFicha?: (grupo: GrupoCola, estado: EstadoOperativo) => void;
 };
 
 /** Estado → 2px dot token (D6 — component-local presentation map, codebase convention). */
@@ -51,7 +53,7 @@ const SUBTITULO_ESTADO: Record<EstadoOperativo, string> = {
  * move client-side via getEstadosPermitidos (D5 — zero mover calls + generic
  * red toast on an invalid drop), and dragend clears the fallback.
  */
-export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp }: KanbanDesktopProps) {
+export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp, onAbrirFicha }: KanbanDesktopProps) {
   // D10: parent-owned dragId — fallback for Firefox's empty dataTransfer.getData.
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -85,6 +87,10 @@ export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp }: Kanb
             onDrop={(e) => {
               e.preventDefault();
               const raw = e.dataTransfer.getData('text/plain') || dragId;
+              // Carried fix: the drop CONSUMES the fallback — clear dragId here
+              // (not only on dragend) so a stale fallback can't fire a later
+              // drop that never had a fresh dragstart (Firefox quirk).
+              setDragId(null);
               if (!raw) return;
               const ids = raw.split(',');
               const origen = buscarOrigen(ids);
@@ -126,6 +132,7 @@ export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp }: Kanb
                     estado={estado}
                     onAccion={(ids) => onMover(ids, DESTINO_ACCION[estado])}
                     onWhatsApp={() => onWhatsApp?.(grupo, estado)}
+                    onAbrirFicha={() => onAbrirFicha?.(grupo, estado)}
                     onDragStart={(idsStr) => setDragId(idsStr)}
                     onDragEnd={() => setDragId(null)}
                   />

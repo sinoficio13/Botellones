@@ -162,4 +162,16 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
     fireEvent.click(conTel);
     expect(onWhatsApp).toHaveBeenCalledTimes(2);
   });
+
+  it('turns the name span into a button that fires onAbrirFicha (REQ-COS-29, MOD-18/23 wiring)', () => {
+    const onAbrirFicha = vi.fn();
+    render(<GrupoCardKanban grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} onAbrirFicha={onAbrirFicha} />);
+
+    // The name block becomes a real button target (ficha, REQ-COS-29).
+    const nombre = screen.getByRole('button', { name: 'María González' });
+    expect(nombre).toHaveClass('min-h-11');
+
+    fireEvent.click(nombre);
+    expect(onAbrirFicha).toHaveBeenCalledTimes(1);
+  });
 });

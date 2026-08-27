@@ -176,6 +176,25 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
     expect(screen.queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument();
   });
 
+  it('converts a REJECTED RPC (transport failure) to the error path — revert + red toast, {ok:false} (D12)', async () => {
+    const filas = [botellon(1), botellon(2)];
+    // Transport-level rejection (network down), NOT a resolved {data, error}:
+    // the await must not throw out of mover() — D12 wraps it in try/catch and
+    // converts to the existing error path.
+    rpcMock.mockRejectedValue(new Error('network down'));
+    await montar(filas, '→ Pasar 2 a En recarga');
+
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' }));
+
+    // Same error path as S3: the group reverts, red toast, no Deshacer —
+    // and mover RESOLVES {ok:false} instead of rejecting/escaping the action.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeInTheDocument()
+    );
+    expect(screen.getByText('No se pudo mover. Reintentá.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument();
+  });
+
   it('disables the action with "Elegí al menos un botellón" when zero chips are marked (S4)', async () => {
     const filas = [botellon(1), botellon(2)];
     await montar(filas, '→ Pasar 2 a En recarga');

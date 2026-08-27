@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronRight, MessageCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -19,6 +19,25 @@ export type GrupoCardProps = {
 
 /** Chips visibles antes del expansor +N (REQ-COS-18: "show 6 plus a +N expansion"). */
 const CHIPS_VISIBLES = 6;
+
+/**
+ * useEdadAhora — carried R1-001 (SSR/hydration). Age/urgency depend on the
+ * real clock: `new Date()` on the server (T1) and on the client (T2) can cross
+ * the 6h/24h boundary between render and hydration → mismatch. The clock is
+ * only available AFTER mount (null on server + first client render, so both
+ * sides render the identical server-safe placeholder); the effect then sets
+ * the real `ahora` and the card re-renders with the true age/urgency.
+ */
+function useEdadAhora(): Date | null {
+  const [ahora, setAhora] = useState<Date | null>(null);
+  useEffect(() => {
+    // setState deferred out of the synchronous effect body (react-hooks/
+    // set-state-in-effect): the clock becomes available right after mount.
+    const timer = setTimeout(() => setAhora(new Date()), 0);
+    return () => clearTimeout(timer);
+  }, []);
+  return ahora;
+}
 
 /**
  * Destino por estado (máquina forward, REQ-COS-19):
@@ -56,6 +75,9 @@ function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: string): 
  * `formatAntiguedad`. Solo tokens — sin hex (REQ-18).
  */
 export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCardProps) {
+  // R1-001: the real clock only exists after mount — server render and the
+  // first client render share the null clock (no hydration mismatch).
+  const ahora = useEdadAhora();
   // Selección local al card (design D6): todas marcadas al montar; el hook no
   // expone API de selección. Sobrevive a movimientos de subconjuntos.
   const [marcados, setMarcados] = useState<Set<string>>(
@@ -79,8 +101,11 @@ export function GrupoCard({ grupo, estado, enAccion = false, onAccion }: GrupoCa
   const nombre = cliente?.nombre ?? '';
   const primerNombre = nombre.split(/\s+/)[0] ?? '';
   const cedula = cliente?.cedula ?? '—';
-  const urgencia = nivelUrgencia(grupo.estado_desde);
-  const antiguedad = formatAntiguedad(grupo.estado_desde);
+  // R1-001: null clock (server + first client render) → server-safe placeholder
+  // ('0m' / normal); the effect's setAhora triggers the re-render with the real
+  // age/urgency right after mount.
+  const urgencia = ahora ? nivelUrgencia(grupo.estado_desde, ahora) : 'normal';
+  const antiguedad = ahora ? formatAntiguedad(grupo.estado_desde, ahora) : '0m';
 
   const visibles = expandido ? grupo.botellones : grupo.botellones.slice(0, CHIPS_VISIBLES);
   const ocultos = grupo.botellones.length - visibles.length;

@@ -74,3 +74,51 @@ describe('useColaOperaciones — REQ-COS-16/17 (Slice A frame)', () => {
     expect(result.current.porEstado.recibido).toEqual([]);
   });
 });
+
+describe('useColaOperaciones — fetch error state (carried R4-004)', () => {
+  it('flags an error when the server action REJECTS (transport failure), distinct from empty', async () => {
+    getColaOperacionesMock.mockRejectedValue(new Error('network down'));
+    const { result } = renderHook(() => useColaOperaciones());
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+
+    expect(result.current.error).toBe('No se pudo cargar la cola. Reintentá.');
+    expect(result.current.porEstado.recibido).toEqual([]);
+    expect(result.current.totales).toEqual({ clientes: 0, botellones: 0 });
+  });
+
+  it('flags an error when getColaOperaciones returns null (fetch-failed signal, R4-004)', async () => {
+    // getColaOperaciones swallows PostgREST/transport errors into `null` (never
+    // `[]` — that is the genuine-empty signal); the hook maps null → error.
+    getColaOperacionesMock.mockResolvedValue(null);
+    const { result } = renderHook(() => useColaOperaciones());
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+
+    expect(result.current.error).toBe('No se pudo cargar la cola. Reintentá.');
+    expect(result.current.porEstado.recibido).toEqual([]);
+  });
+
+  it('a genuinely empty queue ([]) is NOT an error', async () => {
+    const result = await cargar([]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.porEstado.recibido).toEqual([]);
+  });
+
+  it('reintentar refetches and clears the error on success (R4-004)', async () => {
+    getColaOperacionesMock.mockClear(); // call-count is per-test (accumulates across the file)
+    getColaOperacionesMock.mockRejectedValueOnce(new Error('boom'));
+    getColaOperacionesMock.mockResolvedValueOnce([
+      botellon({ id: 'a1', cliente_id: 'cliente-a', estado: 'recibido' }),
+    ]);
+    const { result } = renderHook(() => useColaOperaciones());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    act(() => {
+      result.current.reintentar();
+    });
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.porEstado.recibido).toHaveLength(1);
+    expect(getColaOperacionesMock).toHaveBeenCalledTimes(2);
+  });
+});

@@ -145,8 +145,10 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
       p_restaurar: true,
     });
 
-    // Original age restored (30h -> "1d"), NOT the fresh now() stamp.
-    expect(screen.getByText('1d')).toBeInTheDocument();
+    // Original age restored (30h -> "1d"), NOT the fresh now() stamp. The age
+    // renders after mount (R1-001: the clock is client-only, so a remounted
+    // card first renders the server-safe placeholder then the real age).
+    await waitFor(() => expect(screen.getByText('1d')).toBeInTheDocument());
   });
 
   it('reverts the optimistic removal and shows a red toast without undo on RPC error (S3)', async () => {

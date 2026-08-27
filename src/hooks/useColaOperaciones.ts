@@ -83,19 +83,38 @@ function aplicarFilas(
  */
 export function useColaOperaciones(): {
   cargando: boolean;
+  error: string | null;
   porEstado: PorEstado;
   totales: { clientes: number; botellones: number };
   mover: (ids: string[], destino: DestinoAccion) => Promise<ResultadoAccion>;
+  reintentar: () => void;
 } {
   const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [botellones, setBotellones] = useState<ColaBotellon[]>([]);
+  const [intento, setIntento] = useState(0);
   const enVueloRef = useRef<PromiseLike<void> | null>(null);
 
   useEffect(() => {
     let activo = true;
+    // R4-004: getColaOperaciones resolves null on failure (distinguishable from
+    // a genuine empty []); a transport rejection is caught here too. Both map
+    // to the fetch-error state; the shell renders an error empty-state + retry.
     getColaOperaciones()
       .then((filas) => {
-        if (activo) setBotellones(filas);
+        if (!activo) return;
+        if (filas === null) {
+          setError('No se pudo cargar la cola. Reintentá.');
+          setBotellones([]);
+        } else {
+          setBotellones(filas);
+        }
+      })
+      .catch(() => {
+        if (activo) {
+          setError('No se pudo cargar la cola. Reintentá.');
+          setBotellones([]);
+        }
       })
       .finally(() => {
         if (activo) setCargando(false);
@@ -103,7 +122,18 @@ export function useColaOperaciones(): {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [intento]);
+
+  /**
+   * Retry (R4-004): resets the loading/error flags and bumps `intento` so the
+   * effect refetches. State resets live in the handler (not the effect) —
+   * react-hooks/set-state-in-effect safe.
+   */
+  function reintentar() {
+    setCargando(true);
+    setError(null);
+    setIntento((n) => n + 1);
+  }
 
   const porEstado = useMemo<PorEstado>(() => {
     const soloClientes = botellones.filter((b) => b.cliente_id !== null);
@@ -200,5 +230,5 @@ export function useColaOperaciones(): {
     };
   }
 
-  return { cargando, porEstado, totales, mover };
+  return { cargando, error, porEstado, totales, mover, reintentar };
 }

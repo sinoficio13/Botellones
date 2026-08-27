@@ -251,18 +251,29 @@ const SELECT_COLA =
 const SELECT_COLA_NOMBRE =
   'id, codigo, estado, estado_desde, cliente_id, clientes!inner(nombre, cedula, telefono_1, whatsapp)';
 
-export async function getColaOperaciones(): Promise<ColaBotellon[]> {
+/**
+ * Queue feed (REQ-COS-16). Client-owned rows in the 4 queue estados, FIFO by
+ * `estado_desde` ASC.
+ *
+ * Error semantics (carried R4-004): returns `null` when the fetch failed
+ * (transport rejection OR PostgREST error — supabase-js resolves errors as
+ * `{ data: null, error }`, so the resolved `error` is checked explicitly) so
+ * the hook can show a distinct fetch-error state; returns `[]` ONLY for a
+ * genuine empty queue. The hook maps null → error, [] → empty.
+ */
+export async function getColaOperaciones(): Promise<ColaBotellon[] | null> {
   try {
     const supabase = await getSupabase();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('botellones')
       .select(SELECT_COLA)
       .not('cliente_id', 'is', null)
       .in('estado', ESTADOS_KANBAN)
       .order('estado_desde', { ascending: true });
+    if (error) return null;
     return (data as unknown as ColaBotellon[]) || [];
   } catch {
-    return [];
+    return null;
   }
 }
 

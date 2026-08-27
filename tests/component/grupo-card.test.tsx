@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { GrupoCard } from '@/components/operaciones/grupo-card';
 import type { GrupoCola, EstadoOperativo } from '@/hooks/useColaOperaciones';
 import type { ColaBotellon } from '@/lib/db/botellones';
@@ -159,9 +160,11 @@ describe('GrupoCard — REQ-COS-18', () => {
     expect(whatsapp).not.toHaveClass('opacity-40');
   });
 
-  it('shows amber urgency text for 6–24h and ▲ AlertTriangle + amber 7% bg for >24h (REQ-18 S2)', () => {
+  it('shows amber urgency text for 6–24h and ▲ AlertTriangle + amber 7% bg for >24h (REQ-18 S2)', async () => {
     const diezHoras = grupo([botellon(1, { estado_desde: hace(10) })], hace(10));
     const { container: diez, unmount: unmountDiez } = render(<GrupoCard grupo={diezHoras} estado="recibido" onAccion={vi.fn()} />);
+    // R1-001: the real age renders after mount (clock is client-only) — wait for it.
+    await waitFor(() => expect(screen.getByText('10h')).toBeInTheDocument());
 
     const edadDiez = screen.getByText('10h');
     expect(edadDiez).toHaveClass('text-urgencia-texto');
@@ -172,7 +175,7 @@ describe('GrupoCard — REQ-COS-18', () => {
     const { container: treinta, unmount: unmountTreinta } = render(<GrupoCard grupo={treintaHoras} estado="recibido" onAccion={vi.fn()} />);
 
     // 30h → age shows "1d" (design matrix: ≥24h displays rounded days); urgency stays critica.
-    expect(screen.getByText('1d')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('1d')).toBeInTheDocument());
     expect(treinta.querySelector('[data-testid="grupo-card"]')).toHaveClass('bg-urgencia/7');
     expect(treinta.querySelector('svg.lucide-triangle-alert')).not.toBeNull();
     unmountTreinta();
@@ -180,7 +183,7 @@ describe('GrupoCard — REQ-COS-18', () => {
     const cincoHoras = grupo([botellon(3, { estado_desde: hace(5) })], hace(5));
     const { container: normal } = render(<GrupoCard grupo={cincoHoras} estado="recibido" onAccion={vi.fn()} />);
 
-    expect(screen.getByText('5h')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('5h')).toBeInTheDocument());
     expect(normal.querySelector('[data-testid="grupo-card"]')).not.toHaveClass('bg-urgencia/7');
   });
 
@@ -192,5 +195,23 @@ describe('GrupoCard — REQ-COS-18', () => {
   ])('uses the per-estado action copy for %s', (estado, copia) => {
     render(<GrupoCard grupo={grupo([botellon(1)])} estado={estado} onAccion={vi.fn()} />);
     expect(screen.getByRole('button', { name: copia })).toBeInTheDocument();
+  });
+
+  it('renders a server-safe urgency in SSR output — age computed client-side after mount (carried R1-001)', async () => {
+    const grupo30h = grupo([botellon(1, { estado_desde: hace(30) })], hace(30));
+
+    // Server render (no effects run): the age/urgency must NOT leak the real
+    // clock into the HTML, or hydration would mismatch (server T1 vs client T2
+    // crossing the 6h/24h boundary). Server-safe = no critica urgency at all.
+    const html = renderToString(<GrupoCard grupo={grupo30h} estado="recibido" onAccion={vi.fn()} />);
+    expect(html).not.toContain('bg-urgencia/7');
+    expect(html).not.toContain('triangle-alert');
+
+    // After mount the real age renders (30h → critica: amber 7% bg + ▲ icon).
+    const { container } = render(<GrupoCard grupo={grupo30h} estado="recibido" onAccion={vi.fn()} />);
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="grupo-card"]')).toHaveClass('bg-urgencia/7')
+    );
+    expect(container.querySelector('svg.lucide-triangle-alert')).not.toBeNull();
   });
 });

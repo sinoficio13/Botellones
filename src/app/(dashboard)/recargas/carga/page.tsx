@@ -88,6 +88,9 @@ export default function CargaPage() {
   // Id of the session row currently showing the transient duplicate-scan ring.
   const [flashId, setFlashId] = useState<string | null>(null);
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Manual code entry (camera-less PC fallback): typed BOT code + inline error.
+  const [codigoManual, setCodigoManual] = useState('');
+  const [errorManual, setErrorManual] = useState<string | null>(null);
 
   // `registrarOperacion` takes a plain input object, but `useActionState` needs
   // a (prevState, payload) action. The ids, operation, fecha, and hora are read
@@ -105,6 +108,58 @@ export default function CargaPage() {
     null
   );
 
+  /**
+   * Shared accumulation for scanned AND manually typed botellones: op-scoped
+   * no-client block, in-session dedupe (beep + flash), then append with the
+   * resolved client display name. Manual entry reuses this exact path so both
+   * flows keep identical duplicate-flash and no-client-overlay behavior.
+   */
+  async function acumularBotellon(botellon: {
+    id: string;
+    codigo: string;
+    cliente_id: string | null;
+    estado: string | null;
+  }): Promise<void> {
+    // Op-scoped no-client: only operations that require a client (recargar)
+    // block on a clientless botellon; pure ops accumulate it.
+    if (OPERACIONES[operacion].requiresCliente && !botellon.cliente_id) {
+      setNoClient({ id: botellon.id, codigo: botellon.codigo });
+      return;
+    }
+
+    // In-session dedupe: ignore a code already accumulated. The ref set is
+    // updated synchronously, so it is authoritative even when this closure
+    // is stale (rapid successive scans see the old `items` array). A
+    // duplicate beeps and rings the existing row; the scanner stays open.
+    if (scannedIdsRef.current.has(botellon.id)) {
+      playBeep();
+      setFlashId(botellon.id);
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+      flashTimeoutRef.current = setTimeout(() => setFlashId(null), 700);
+      return;
+    }
+    scannedIdsRef.current.add(botellon.id);
+
+    // `getBotellonByCodigo` is public-safe and carries no client PII, so the
+    // authenticated batch page resolves the owner name itself for display.
+    const cliente = botellon.cliente_id
+      ? await getCliente(botellon.cliente_id)
+      : null;
+
+    // A valid code clears any stale error overlay from a previous attempt.
+    setDecodeError(null);
+    setItems((prev) => [
+      ...prev,
+      {
+        id: botellon.id,
+        codigo: botellon.codigo,
+        cliente: botellon.cliente_id,
+        clienteNombre: cliente?.nombre ?? undefined,
+        estado: botellon.estado ?? undefined,
+      },
+    ]);
+  }
+
   const { videoRef, cameraError, decodeError, setDecodeError, stop } =
     useQrScanner({
       onDecode: async (raw: string): Promise<QrDecodeOutcome> => {
@@ -120,44 +175,9 @@ export default function CargaPage() {
           return { outcome: 'failure' };
         }
 
-        // Op-scoped no-client: only operations that require a client (recargar)
-        // block on a clientless botellon; pure ops accumulate it.
-        if (OPERACIONES[operacion].requiresCliente && !botellon.cliente_id) {
-          setNoClient({ id: botellon.id, codigo: botellon.codigo });
-          return { outcome: 'failure' };
-        }
-
-        // In-session dedupe: ignore a code already accumulated. The ref set is
-        // updated synchronously, so it is authoritative even when this closure
-        // is stale (rapid successive scans see the old `items` array). A
-        // duplicate beeps and rings the existing row; the scanner stays open.
-        if (scannedIdsRef.current.has(botellon.id)) {
-          playBeep();
-          setFlashId(botellon.id);
-          if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
-          flashTimeoutRef.current = setTimeout(() => setFlashId(null), 700);
-          return { outcome: 'failure' };
-        }
-        scannedIdsRef.current.add(botellon.id);
-
-        // `getBotellonByCodigo` is public-safe and carries no client PII, so the
-        // authenticated batch page resolves the owner name itself for display.
-        const cliente = botellon.cliente_id
-          ? await getCliente(botellon.cliente_id)
-          : null;
-
-        // A valid decode clears any stale error overlay from a previous scan.
-        setDecodeError(null);
-        setItems((prev) => [
-          ...prev,
-          {
-            id: botellon.id,
-            codigo: botellon.codigo,
-            cliente: botellon.cliente_id,
-            clienteNombre: cliente?.nombre ?? undefined,
-            estado: botellon.estado,
-          },
-        ]);
+        await acumularBotellon(botellon);
+        // Keep the failure outcome after accumulation: the hook treats it as
+        // "decode consumed" and resumes scanning for the next botellon.
         return { outcome: 'failure' };
       },
     });
@@ -192,6 +212,24 @@ export default function CargaPage() {
 
   const clientIdFor = (botellonId: string) =>
     items.find((i) => i.id === botellonId)?.cliente ?? null;
+
+  /**
+   * Manual entry submit: resolve a typed BOT code (or bare code) and run it
+   * through the same accumulation path as a scan. Unknown codes surface an
+   * inline error; empty submits are no-ops.
+   */
+  async function manejarIngresoManual() {
+    const codigo = codigoManual.trim();
+    if (codigo === '') return;
+    const botellon = await getBotellonByCodigo(codigo);
+    if (!botellon) {
+      setErrorManual('Botellón no encontrado');
+      return;
+    }
+    setErrorManual(null);
+    setCodigoManual('');
+    await acumularBotellon(botellon);
+  }
 
   const op = OPERACIONES[operacion];
 
@@ -355,6 +393,74 @@ export default function CargaPage() {
           </div>
         )}
       </div>
+
+      {/* Manual code entry — camera-less PC fallback. Lives OUTSIDE the camera
+          block so the input never overlaps the <video> element. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void manejarIngresoManual();
+        }}
+        className="mt-4"
+      >
+        <label
+          htmlFor="carga-manual-codigo"
+          className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        >
+          ¿Sin cámara? Ingresá el código manualmente
+        </label>
+        <div className="mt-1 flex gap-2">
+          <input
+            id="carga-manual-codigo"
+            type="text"
+            placeholder="BOT-00000"
+            value={codigoManual}
+            onChange={(e) => setCodigoManual(e.target.value)}
+            className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          />
+          <button
+            type="submit"
+            disabled={codigoManual.trim() === '' || pending}
+            className="shrink-0 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            Agregar a la sesión
+          </button>
+        </div>
+        {errorManual && (
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            {errorManual}
+          </p>
+        )}
+      </form>
+
+      {/* Manual-entry no-client feedback (camera-less PC): the video overlay
+          only renders when the camera is available, so a manual entry that
+          hits a clientless botellon must surface inline here. */}
+      {noClient && activeCameraError ? (
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            Sin cliente asignado
+          </p>
+          <p className="mt-0.5 font-mono text-sm text-amber-700 dark:text-amber-300">
+            {noClient.codigo}
+          </p>
+          <div className="mt-2 flex items-center gap-4">
+            <Link
+              href={`/botellones/${noClient.id}`}
+              className="text-sm font-medium text-zinc-900 underline dark:text-zinc-100"
+            >
+              Asignar cliente
+            </Link>
+            <button
+              type="button"
+              onClick={() => setNoClient(null)}
+              className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              Descartar
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Session items */}
       <div className="mt-4">

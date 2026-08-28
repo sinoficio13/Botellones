@@ -418,3 +418,105 @@ describe('ScannerModal — mode toggle (Recarga | Carga)', () => {
     expect(track.stop).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ScannerModal — manual fallback without a camera', () => {
+  const MANUAL_LABEL = '¿Sin cámara? Ingresá el código del botellón';
+
+  function botellonValido(): unknown {
+    return {
+      id: 'b1',
+      codigo: 'BOT-00001',
+      estado: 'entregado',
+      cliente_id: 'c1',
+      total_recargas: 1,
+      ultima_recarga: null,
+    };
+  }
+
+  it('navigates to the recarga confirm step when a valid bare code is typed', async () => {
+    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+    getBotellonByCodigoMock.mockResolvedValue(botellonValido());
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    await renderWithCamera(<ScannerModal onClose={onClose} />);
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00001');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00001');
+    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a full QR URL as manual input via the parseQrCode fallback', async () => {
+    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+    getBotellonByCodigoMock.mockResolvedValue(botellonValido());
+    const user = userEvent.setup();
+
+    await renderWithCamera();
+    await user.type(screen.getByLabelText(MANUAL_LABEL), VALID_QR);
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00001');
+    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
+  });
+
+  it('shows an error message for an unknown code and keeps the modal open', async () => {
+    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+    getBotellonByCodigoMock.mockResolvedValue(null);
+    const user = userEvent.setup();
+
+    await renderWithCamera();
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-99999');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(screen.getByText('Botellón no encontrado')).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks a clientless manual code with the sin-cliente state and no navigation', async () => {
+    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+    getBotellonByCodigoMock.mockResolvedValue({
+      id: 'b3',
+      codigo: 'BOT-00003',
+      estado: 'recibido',
+      cliente_id: null,
+      total_recargas: 0,
+      ultima_recarga: null,
+    });
+    const user = userEvent.setup();
+
+    await renderWithCamera();
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00003');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(screen.getByText('Sin cliente asignado')).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when submitted empty', async () => {
+    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+    const user = userEvent.setup();
+
+    await renderWithCamera();
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(getBotellonByCodigoMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('hands off to the batch terminal in Carga mode without validating the code', async () => {
+    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    await renderWithCamera(<ScannerModal onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: 'Carga' }));
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00001');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(getBotellonByCodigoMock).not.toHaveBeenCalled();
+    expect(pushMock).toHaveBeenCalledWith('/recargas/carga');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

@@ -4,14 +4,14 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Central de Operaciones — cola operativa agrupada por cliente (fase 3):
- * tabs + cards en mobile, secciones por estado en tablet, buscador, skeleton
- * y vacíos. El kanban viejo (operaciones-dashboard) se eliminó en el slice de
- * limpieza; rollback: restaurar el archivo desde git history.
+ * tabs + cards en mobile, secciones por estado en tablet, skeleton y vacíos.
+ * El kanban viejo (operaciones-dashboard) se eliminó en el slice de limpieza;
+ * rollback: restaurar el archivo desde git history. El h1 se quitó porque el
+ * título ahora vive en la barra de navegación del shell del dashboard.
  */
 export default async function DashboardPage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Central de Operaciones</h1>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
       <ColaOperaciones />
     </div>
   );

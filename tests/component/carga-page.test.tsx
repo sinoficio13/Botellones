@@ -657,3 +657,70 @@ describe('CargaPage - operation-scoped no-client handling', () => {
     expect(screen.queryByText('Sin cliente asignado')).not.toBeInTheDocument();
   });
 });
+
+describe('CargaPage - manual code entry (camera-less PC fallback)', () => {
+  const MANUAL_LABEL = '¿Sin cámara? Ingresá el código manualmente';
+
+  it('adds a manually typed code to the session', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    const user = userEvent.setup();
+    await renderPage();
+
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00001');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+
+    expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00001');
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText('BOT-00001')).toBeInTheDocument();
+  });
+
+  it('shows "Botellón no encontrado" for an unknown manual code and does not accumulate it', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(null);
+    const user = userEvent.setup();
+    await renderPage();
+
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-99999');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+
+    expect(screen.getByText('Botellón no encontrado')).toBeInTheDocument();
+    expect(screen.queryByText(/Sesión \(1\)/)).not.toBeInTheDocument();
+  });
+
+  it('does not double-row a duplicate manually entered code (beeps + flashes instead)', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    const user = userEvent.setup();
+    await renderPage();
+
+    const input = screen.getByLabelText(MANUAL_LABEL);
+    await user.type(input, 'BOT-00001');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+    await user.clear(input);
+    await user.type(input, 'BOT-00001');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('BOT-00001')).toHaveLength(1);
+    expect(playBeepMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a clientless manually entered bottle under Recargar with the no-client overlay', async () => {
+    getBotellonByCodigoMock.mockResolvedValue({
+      id: 'b9',
+      codigo: 'BOT-00009',
+      cliente_id: null,
+      estado: 'entregado',
+    });
+    const user = userEvent.setup();
+    await renderPage(); // default operation is recargar
+
+    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00009');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+
+    expect(screen.getByText('Sin cliente asignado')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Asignar cliente' })).toHaveAttribute(
+      'href',
+      '/botellones/b9'
+    );
+    expect(screen.queryByText(/Sesión \(1\)/)).not.toBeInTheDocument();
+  });
+});

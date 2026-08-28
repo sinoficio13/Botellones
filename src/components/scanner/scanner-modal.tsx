@@ -57,6 +57,9 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [mode, setMode] = useState<ScanMode>('recarga');
   const [noClient, setNoClient] = useState(false);
+  // Manual code entry — camera-less PC fallback on the camera-error branch.
+  const [codigoManual, setCodigoManual] = useState('');
+  const [errorManual, setErrorManual] = useState<string | null>(null);
 
   // The hook keeps `onDecode` in a ref updated every render, so we forward a
   // stable wrapper and point it at the latest handler. The handler reads
@@ -100,6 +103,45 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
     onClose();
     router.push('/recargas/carga');
   }, [stop, onClose, router]);
+
+  /**
+   * Manual fallback submit (camera-error branch). In `carga` mode there is no
+   * code to validate — the terminal owns the batch flow with its own manual
+   * entry, so the submit just hands off (same destination as handleCargaHandoff).
+   * In `recarga` mode the typed code (bare BOT-XXXXX or a full QR URL, via
+   * parseQrCode) is resolved and routed exactly like a camera decode.
+   */
+  async function manejarIngresoManual() {
+    const raw = codigoManual.trim();
+    if (raw === '') return;
+
+    if (mode === 'carga') {
+      setErrorManual(null);
+      setCodigoManual('');
+      stop();
+      onClose();
+      router.push('/recargas/carga');
+      return;
+    }
+
+    const parsed = parseQrCode(raw);
+    const codigo = parsed?.codigo ?? raw;
+    const botellon = await getBotellonByCodigo(codigo);
+    if (!botellon) {
+      setErrorManual('Botellón no encontrado');
+      return;
+    }
+    if (!botellon.cliente_id) {
+      setNoClient(true);
+      return;
+    }
+
+    setErrorManual(null);
+    setCodigoManual('');
+    stop();
+    onClose();
+    router.push(`/recargas/nueva?botellon_id=${botellon.id}`);
+  }
 
   const activeCameraError = cameraError ? ERROR_COPY[cameraError] : null;
   const activeDecodeError =
@@ -182,6 +224,62 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
             >
               Cerrar
             </button>
+
+            {/* Manual fallback so a PC without a camera can still continue.
+                A clientless code surfaces here (not over a video) with its own
+                dismiss so the staff can type another code. */}
+            {noClient ? (
+              <div className="mx-auto mt-5 max-w-xs">
+                <ScanLine className="mx-auto h-8 w-8 text-zinc-300 dark:text-zinc-600" />
+                <p className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  Sin cliente asignado
+                </p>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  Este botellón no tiene un cliente asignado. Probá con otro código.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setNoClient(false)}
+                  className="mt-4 w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                >
+                  Volver a intentar
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void manejarIngresoManual();
+                }}
+                className="mx-auto mt-5 max-w-xs"
+              >
+                <label
+                  htmlFor="scanner-manual-codigo"
+                  className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                >
+                  ¿Sin cámara? Ingresá el código del botellón
+                </label>
+                <input
+                  id="scanner-manual-codigo"
+                  type="text"
+                  placeholder="BOT-00000"
+                  value={codigoManual}
+                  onChange={(e) => setCodigoManual(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+                <button
+                  type="submit"
+                  className="mt-2 w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                >
+                  Continuar
+                </button>
+                {errorManual && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    {errorManual}
+                  </p>
+                )}
+              </form>
+            )}
           </div>
         ) : (
           <div className="relative aspect-square bg-black">

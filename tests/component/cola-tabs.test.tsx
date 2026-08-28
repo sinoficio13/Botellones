@@ -55,15 +55,15 @@ describe('BarraContexto — REQ-COS-17', () => {
 });
 
 describe('VacioPorEstado — REQ-COS-21 per-tab empty copy', () => {
+  // Non-recibido estados keep their "Ver X" tab-switch action.
   const CASOS: Array<[EstadoOperativo, string, string, string]> = [
-    ['recibido', 'Nada esperando lavado', 'Escanéá un botellón para sumarlo a la cola de lavado.', '📷 Escanear'],
     ['recarga', 'Nada llenándose', 'Pasá botellones desde Recibido para empezar el llenado.', 'Ver Recibido'],
     ['listo', 'Nada listo para salir', 'Cuando termine la recarga, los botellones listos aparecen acá.', 'Ver En recarga'],
     ['delivery', 'Nada en la calle', 'Los botellones en delivery aparecen acá hasta que vuelvan entregados.', 'Ver Listo'],
   ];
 
-  it('renders title, description, icon and action button for every estado', () => {
-    expect(CASOS).toHaveLength(ESTADOS_OPERATIVOS.length);
+  it('renders title, description, icon and action button for every non-recibido estado', () => {
+    expect(CASOS).toHaveLength(ESTADOS_OPERATIVOS.length - 1);
     for (const [estado, titulo, descripcion, accion] of CASOS) {
       const { container } = render(<VacioPorEstado estado={estado} />);
       expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
@@ -72,6 +72,20 @@ describe('VacioPorEstado — REQ-COS-21 per-tab empty copy', () => {
       expect(container.querySelector('svg')).not.toBeNull();
       container.remove();
     }
+  });
+
+  it('renders recibido as informational copy only (no action button)', () => {
+    const { container } = render(<VacioPorEstado estado="recibido" />);
+    expect(screen.getByRole('heading', { name: 'Nada esperando lavado' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Los botellones recibidos aparecen acá mientras esperan lavado. Usá 'Recibir botellón' para sumarlos."
+      )
+    ).toBeInTheDocument();
+    expect(container.querySelector('svg')).not.toBeNull();
+    // No entry-point buttons in the kanban/mobile empty states — the modal and
+    // the mobile nav QR are the entry points.
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 

@@ -137,40 +137,42 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'En recarga 1' }));
     await waitFor(() =>
-      expect(within(movil).getByRole('button', { name: '→ Pasar 1 a Listo' })).toBeInTheDocument()
+      expect(within(movil).getByRole('button', { name: '→ Pasar a Listo' })).toBeInTheDocument()
     );
   });
 
-  it('shows the first-use empty state with Escanear + Cargar manual on a fully empty queue (REQ-21 S2)', async () => {
+  it('shows the first-use empty state with a single Recibir botellón action on a fully empty queue (REQ-21 S2)', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones />);
 
     await waitFor(() => expect(screen.getByText('La cola está vacía')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: '📷 Escanear' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cargar manual' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '📷 Escanear' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cargar manual' })).not.toBeInTheDocument();
     // No tabs in the first-use state.
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 
-  it('opens the ScannerModal from the first-use empty state and closes it (REQ-21 S2)', async () => {
+  it('opens the Recibir botellón modal from the first-use empty state and closes it (REQ-21 S2)', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones />);
-    await waitFor(() => expect(screen.getByRole('button', { name: '📷 Escanear' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: '📷 Escanear' }));
-    expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Recibir botellón' }));
+    expect(screen.getByRole('dialog', { name: 'Recibir botellón' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('navigates to /recargas/carga from [Cargar manual] (REQ-21 S2)', async () => {
+  it('opens the Recibir botellón modal (no navigation) from the first-use empty state (REQ-21 S2)', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cargar manual' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cargar manual' }));
-    expect(pushMock).toHaveBeenCalledWith('/recargas/carga');
+    fireEvent.click(screen.getByRole('button', { name: 'Recibir botellón' }));
+    expect(screen.getByRole('dialog', { name: 'Recibir botellón' })).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('renders the tablet 2-col sections grid WITHOUT tabs (REQ-21 S1, D9)', async () => {
@@ -224,7 +226,7 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     await montar([botellon(1, { estado: 'recibido' })]);
 
     const movil = screen.getByTestId('cola-movil');
-    fireEvent.click(within(movil).getByRole('button', { name: '→ Pasar 1 a En recarga' }));
+    fireEvent.click(within(movil).getByRole('button', { name: '→ Pasar a En recarga' }));
 
     // The shell mounted ToastHost (toast store is module-level; without the host
     // nothing renders) and wired onAccion → mover with the forward machine.
@@ -254,13 +256,13 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
 
   // ── Realtime chip (REQ-COS-27, PR-A) ──
 
-  it('renders the floating chip "↑ N botellones nuevos" under the tabs and tap applies the queue (S1/S3)', async () => {
+  it('renders the floating chip "↑ N cambios nuevos — tocar para actualizar" under the tabs and tap applies the queue (S1/S3)', async () => {
     await montar([botellon(1, { estado: 'recibido' })]);
 
     // No chip at rest.
     expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument();
 
-    // Scroll (scrolleando=true) + a realtime change on the active tab → queued.
+    // Scroll (scrolleando=true) + a realtime change → queued (scroll-only gate).
     fireEvent.scroll(window);
     act(() => {
       fakeChannels[0]?.payloadHandler?.({
@@ -271,7 +273,7 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     });
 
     const chip = screen.getByTestId('chip-realtime');
-    expect(chip).toHaveTextContent('↑ 1 botellones nuevos');
+    expect(chip).toHaveTextContent('↑ 1 cambio nuevo — tocar para actualizar');
 
     // Tap applies: chip disappears, the mobile recibido list shows no cards
     // (the moved group lives in recarga now — visible on the tablet grid).
@@ -298,8 +300,8 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     fireEvent.click(screen.getByTestId('chip-realtime'));
     await waitFor(() => expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument());
 
-    // After the 150ms debounce the listener clears scrolleando → a NON-visible
-    // change (recarga→listo, fuera del tab activo) applies directly (no chip).
+    // After the 150ms debounce the listener clears scrolleando → a change
+    // while NOT scrolling applies directly (no chip) regardless of the tab.
     await new Promise((r) => setTimeout(r, 200));
     act(() => {
       fakeChannels[0]?.payloadHandler?.({
@@ -309,6 +311,27 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
       });
     });
     expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument();
+  });
+
+  it('applies directly (NO chip) when NOT scrolling even on the active tab (product decision: everyone sees changes instantly)', async () => {
+    await montar([botellon(1, { estado: 'recibido' })]);
+
+    // Active mobile tab is 'recibido'. No scroll. A realtime move of b-1 out of
+    // recibido must apply DIRECTLY: no chip, and the visible list empties.
+    act(() => {
+      fakeChannels[0]?.payloadHandler?.({
+        eventType: 'UPDATE',
+        new: { id: 'b-1', estado: 'recarga', cliente_id: 'cliente-a' },
+        old: { id: 'b-1' },
+      });
+    });
+
+    expect(screen.queryByTestId('chip-realtime')).not.toBeInTheDocument();
+    await waitFor(() => {
+      const movil = screen.getByTestId('cola-movil');
+      expect(within(movil).queryAllByTestId('grupo-card')).toHaveLength(0);
+    });
+    expect(screen.getByRole('tab', { name: /En recarga 1/ })).toBeInTheDocument();
   });
 
   it('tab counters stay LIVE while a change is queued behind the chip (MOD-17 S2)', async () => {
@@ -436,7 +459,7 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'En recarga 1' }));
     await waitFor(() =>
-      expect(within(screen.getByTestId('cola-movil')).getByRole('button', { name: '→ Pasar 1 a Listo' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('cola-movil')).getByRole('button', { name: '→ Pasar a Listo' })).toBeInTheDocument()
     );
 
     // Tab change re-rendered the queue; no sheet opened and no wa.me link exists.

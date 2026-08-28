@@ -111,7 +111,7 @@ export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp, onAbri
                 <span aria-hidden className={cn('h-0.5 w-2 rounded-full', ESTADO_DOT[estado])} />
                 <h3 className="text-sm font-semibold text-text-primary">
                   {ESTADO_LABELS[estado]}{' '}
-                  <span className="text-text-muted">{grupos.length}</span>
+                  <span className="tabular-nums text-text-muted">{grupos.length}</span>
                 </h3>
               </div>
               <p className="text-xs text-text-muted">{SUBTITULO_ESTADO[estado]}</p>
@@ -120,7 +120,7 @@ export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp, onAbri
             {cargando ? (
               <ListaSkeleton cantidad={1} />
             ) : grupos.length === 0 ? (
-              <div className="flex min-h-[120px] items-center justify-center rounded-md border border-dashed border-border-strong p-3">
+              <div className="flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border-strong p-3">
                 <EmptyState title="Vacío" description={SUBTITULO_ESTADO[estado]} />
               </div>
             ) : (
@@ -131,6 +131,7 @@ export function KanbanDesktop({ porEstado, cargando, onMover, onWhatsApp, onAbri
                     grupo={grupo}
                     estado={estado}
                     onAccion={(ids) => onMover(ids, DESTINO_ACCION[estado])}
+                    onEntregar={estado === 'listo' ? (ids) => onMover(ids, 'entregado') : undefined}
                     onWhatsApp={() => onWhatsApp?.(grupo, estado)}
                     onAbrirFicha={() => onAbrirFicha?.(grupo, estado)}
                     onDragStart={(idsStr) => setDragId(idsStr)}

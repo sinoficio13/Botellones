@@ -13,7 +13,8 @@ type CopiaVacio = { titulo: string; descripcion: string; accionLabel: string };
 const COPIA: Record<EstadoOperativo, CopiaVacio> = {
   recibido: {
     titulo: 'Nada esperando lavado',
-    descripcion: 'Escanéá un botellón para sumarlo a la cola de lavado.',
+    descripcion:
+      "Los botellones recibidos aparecen acá mientras esperan lavado. Usá 'Recibir botellón' para sumarlos.",
     accionLabel: '📷 Escanear',
   },
   recarga: {
@@ -38,18 +39,28 @@ export function VacioPorEstado({
   onAccion,
 }: {
   estado: EstadoOperativo;
-  /** Slice E wiring: recibido → Escanear (scanner), "Ver X" → tab switch. */
+  /** "Ver X" → tab switch; NOT rendered for recibido (informational copy only —
+   * entry points are the "Recibir botellón" modal and the mobile nav QR). */
   onAccion?: () => void;
 }) {
   const { titulo, descripcion, accionLabel } = COPIA[estado];
+
+  // Recibido empty is informational only: no action button (the modal + nav QR
+  // are the entry points). Other estados keep their "Ver X" tab-switch hint.
+  if (estado === 'recibido') {
+    return <EmptyState title={titulo} description={descripcion} />;
+  }
+
   return (
     <EmptyState
       title={titulo}
       description={descripcion}
       action={
-        <button type="button" onClick={onAccion} className="mt-2 text-sm font-medium text-marca">
-          {accionLabel}
-        </button>
+        <div className="mt-2">
+          <button type="button" onClick={onAccion} className="text-sm font-medium text-marca">
+            {accionLabel}
+          </button>
+        </div>
       }
     />
   );

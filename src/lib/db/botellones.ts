@@ -484,30 +484,3 @@ export async function moverBotellon(
     return { error: err instanceof Error ? err.message : 'Error al mover botellón' };
   }
 }
-
-// ── Historial de estados (movimientos) ──
-// The 0011 trigger appends one `movimientos` row on every estado change, so the
-// bottle ficha can show the full timeline of what happened (the "log that was
-// missing"). Recargas live in their own table and are shown separately.
-
-export type MovimientoBotellon = {
-  id: string;
-  estado_previo: string | null;
-  estado_nuevo: string | null;
-  created_at: string;
-};
-
-export async function getMovimientosBotellon(botellonId: string): Promise<MovimientoBotellon[]> {
-  try {
-    const supabase = await getSupabase();
-    const { data } = await supabase
-      .from('movimientos')
-      .select('id, estado_previo, estado_nuevo, created_at')
-      .eq('botellon_id', botellonId)
-      .order('created_at', { ascending: false })
-      .limit(100);
-    return (data as unknown as MovimientoBotellon[]) || [];
-  } catch {
-    return [];
-  }
-}

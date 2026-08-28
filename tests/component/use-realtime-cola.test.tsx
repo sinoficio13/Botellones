@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, renderHook } from '@testing-library/react';
 import { useRealtimeCola, normalizarEvento } from '@/hooks/useRealtimeCola';
-import { useColaOperaciones } from '@/hooks/useColaOperaciones';
+import { useColaOperaciones, mergeEvento } from '@/hooks/useColaOperaciones';
 import type { ColaBotellon } from '@/lib/db/botellones';
 
 // ── Supabase browser client mock (estado-en-vivo fake-channel pattern) ──
@@ -87,7 +87,7 @@ function botellon(o: Partial<ColaBotellon> & { id: string }): ColaBotellon {
 }
 
 /** Raw postgres_changes payload shape. */
-function payload(eventType: 'INSERT' | 'UPDATE' | 'DELETE', row: { id: string; estado?: string; cliente_id?: string | null }) {
+function payload(eventType: 'INSERT' | 'UPDATE' | 'DELETE', row: { id: string; estado?: string; cliente_id?: string | null; estado_desde?: string }) {
   return {
     eventType,
     schema: 'public',
@@ -138,21 +138,49 @@ describe('useRealtimeCola — channel lifecycle (REQ-COS-27)', () => {
     expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('normalizarEvento maps a payload to an id + estadoNuevo + clienteIdNuevo', () => {
-    expect(normalizarEvento(payload('UPDATE', { id: 'b1', estado: 'recarga', cliente_id: 'c1' }) as never)).toEqual({
+  it('normalizarEvento maps a payload to an id + estadoNuevo + clienteIdNuevo + estadoDesdeNuevo', () => {
+    expect(normalizarEvento(payload('UPDATE', { id: 'b1', estado: 'recarga', cliente_id: 'c1', estado_desde: '2026-08-28T12:00:00.000Z' }) as never)).toEqual({
       eventType: 'UPDATE',
       id: 'b1',
       estadoNuevo: 'recarga',
       clienteIdNuevo: 'c1',
+      estadoDesdeNuevo: '2026-08-28T12:00:00.000Z',
     });
     expect(normalizarEvento(payload('DELETE', { id: 'b1' }) as never)).toEqual({
       eventType: 'DELETE',
       id: 'b1',
       estadoNuevo: undefined,
       clienteIdNuevo: null,
+      estadoDesdeNuevo: undefined,
     });
     expect(normalizarEvento({ eventType: 'UNKNOWN', new: {} } as never)).toBeNull();
     expect(normalizarEvento(payload('UPDATE', {} as never) as never)).toBeNull();
+  });
+
+  it('mergeEvento patches estado_desde from the event (FIFO order + age match the DB)', () => {
+    const filas: ColaBotellon[] = [botellon({ id: 'b1' })];
+    const siguiente = mergeEvento(filas, {
+      eventType: 'UPDATE',
+      id: 'b1',
+      estadoNuevo: 'recarga',
+      clienteIdNuevo: 'cliente-a',
+      estadoDesdeNuevo: '2026-08-28T12:00:00.000Z',
+    });
+    expect(siguiente[0].estado).toBe('recarga');
+    expect(siguiente[0].estado_desde).toBe('2026-08-28T12:00:00.000Z');
+    expect(siguiente[0].clientes).toBe(filas[0].clientes); // join preserved
+  });
+
+  it('mergeEvento keeps the previous estado_desde when the event has none', () => {
+    const filas: ColaBotellon[] = [botellon({ id: 'b1' })];
+    const siguiente = mergeEvento(filas, {
+      eventType: 'UPDATE',
+      id: 'b1',
+      estadoNuevo: 'recarga',
+      clienteIdNuevo: 'cliente-a',
+      estadoDesdeNuevo: undefined,
+    });
+    expect(siguiente[0].estado_desde).toBe('2026-08-20T09:00:00.000Z');
   });
 });
 
@@ -179,21 +207,47 @@ describe('useColaOperaciones — realtime gate/queue (REQ-COS-27)', () => {
     expect(r.result.current.porEstado.recarga.map((g) => g.cliente_id)).toEqual(['cliente-a']);
   });
 
-  it('queues a reorder-affecting change (afectaTabActivo) at rest; applies a non-visible change directly (S2)', async () => {
+  it('applies MULTIPLE realtime events in ONE batch — every botellon moves, not just the last (regression: second screen showed 1 of 4)', async () => {
+    const r = await cargar([
+      botellon({ id: 'b1' }),
+      botellon({ id: 'b2', cliente_id: 'cliente-b', estado: 'recibido' }),
+      botellon({ id: 'b3', cliente_id: 'cliente-c', estado: 'recibido' }),
+      botellon({ id: 'b4', cliente_id: 'cliente-d', estado: 'recibido' }),
+    ]);
+
+    // 4 events dispatched synchronously in the same websocket batch (act block).
+    act(() => {
+      for (const id of ['b1', 'b2', 'b3', 'b4']) {
+        const clienteId = id === 'b1' ? 'cliente-a' : `cliente-${id.slice(1)}`;
+        fake.channels[0]?.payloadHandler?.(
+          payload('UPDATE', { id, estado: 'recarga', cliente_id: clienteId })
+        );
+      }
+    });
+
+    expect(r.result.current.porEstado.recibido).toEqual([]);
+    expect(r.result.current.porEstado.recarga.map((g) => g.cliente_id).sort()).toEqual([
+      'cliente-2',
+      'cliente-3',
+      'cliente-4',
+      'cliente-a',
+    ]);
+  });
+
+  it('applies a change at rest DIRECTLY even when it reorders the active tab; non-visible change also direct (scroll-only gate S2)', async () => {
     const r = await cargar([
       botellon({ id: 'b1' }),
       botellon({ id: 'b2', cliente_id: 'cliente-b', estado: 'recarga' }),
     ]);
-    // Active tab = recibido. b1 leaving recibido reorders the visible list → queued.
+    // Active tab = recibido. At rest (NO scroll): b1 leaving recibido applies
+    // DIRECTLY — product decision: every connected operator sees changes at once.
     emit(fake.channels[0], payload('UPDATE', { id: 'b1', estado: 'listo', cliente_id: 'cliente-a' }));
-    expect(r.result.current.pendientes).toBe(1);
-
-    // Apply the queue, then a change within the non-visible recarga applies directly.
-    act(() => r.result.current.aplicarPendientes());
     expect(r.result.current.pendientes).toBe(0);
+    expect(r.result.current.porEstado.recibido.map((g) => g.cliente_id)).toEqual([]);
+
+    // A non-visible change also applies directly at rest.
     emit(fake.channels[0], payload('UPDATE', { id: 'b2', estado: 'listo', cliente_id: 'cliente-b' }));
-    expect(r.result.current.pendientes).toBe(0); // direct, no chip
-    // b1 (queued earlier, now applied) + b2 both live in listo.
+    expect(r.result.current.pendientes).toBe(0);
     expect(r.result.current.porEstado.listo.map((g) => g.cliente_id).sort()).toEqual(['cliente-a', 'cliente-b']);
     expect(r.result.current.porEstado.recarga).toEqual([]);
   });

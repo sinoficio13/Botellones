@@ -617,23 +617,23 @@ Component tests MUST cover the compact card, the kanban columns, and the drag ha
 
 ### Requirement: REQ-COS-27 — Cola realtime + chip flotante
 
-The system MUST subscribe to `postgres_changes` on `botellones` via the existing browser client: `channel('cola-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'botellones' })`, and MUST `removeChannel` on unmount. Realtime events MUST degrade silently on `CHANNEL_ERROR`/`TIMED_OUT` (keep last rendered state). A change MUST apply directly to the list UNLESS the user is scrolling OR the change would reorder the visible list; in either case the change MUST be queued behind a floating chip under the tabs showing "↑ N botellones nuevos", and tapping the chip MUST apply all queued changes. Tab counters MUST update live on every event regardless of the gate. New cards MUST animate with a 2px solid `--marca` outline for 1.2s then fade — no slide, no layout jump, no reorder under the finger. The system MUST NOT poll.
+The system MUST subscribe to `postgres_changes` on `botellones` via the existing browser client: `channel('cola-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'botellones' })`, and MUST `removeChannel` on unmount. Realtime events MUST degrade silently on `CHANNEL_ERROR`/`TIMED_OUT` (keep last rendered state). A change MUST apply directly to the list for EVERY connected operator UNLESS the user is scrolling; only while scrolling MUST the change be queued behind a floating chip under the tabs showing "↑ N cambios nuevos — tocar para actualizar", and tapping the chip MUST apply all queued changes. Tab counters MUST update live on every event regardless of the gate. New cards MUST animate with a 2px solid `--marca` outline for 1.2s then fade — no slide, no layout jump, no reorder under the finger. The system MUST NOT poll.
 
 #### Scenario: Change while scrolling is queued, counters stay live
 
 - GIVEN the operator is scrolling the list on one device and another device moves a bottle
 - WHEN the `postgres_changes` event arrives
-- THEN the visible list does NOT reorder, a chip "↑ 1 botellones nuevos" appears under the tabs, and the tab counters update immediately
+- THEN the visible list does NOT reorder, a chip "↑ 1 cambio nuevo — tocar para actualizar" appears under the tabs, and the tab counters update immediately
 
-#### Scenario: Reorder-affecting change queued; non-visible change applies
+#### Scenario: Change while NOT scrolling applies instantly (all connected operators see it)
 
-- GIVEN a change that would reorder the active visible list and a change to a non-visible estado
-- WHEN both events arrive
-- THEN the reorder-affecting change is queued behind the chip and the non-visible change applies directly while its tab counter bumps
+- GIVEN an operator is NOT scrolling on any connected device and another device moves a bottle (even on the active tab)
+- WHEN the `postgres_changes` event arrives
+- THEN the change applies directly to the visible list, the chip does NOT appear, and the tab counters update
 
 #### Scenario: Chip tap applies the queue
 
-- GIVEN a queued chip showing "↑ N botellones nuevos"
+- GIVEN a queued chip showing "↑ N cambios nuevos — tocar para actualizar"
 - WHEN the operator taps it
 - THEN all queued changes apply at once and the chip disappears
 

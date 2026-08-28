@@ -15,6 +15,9 @@ export type EventoRealtime = {
   id: string;
   estadoNuevo: string | undefined;
   clienteIdNuevo: string | null;
+  /** Fresh `estado_desde` stamped by the DB trigger on estado change — lets the
+   *  queue patch FIFO order + card age so the live view matches a fresh read. */
+  estadoDesdeNuevo: string | undefined;
 };
 
 /**
@@ -36,6 +39,7 @@ export function normalizarEvento(
     id,
     estadoNuevo: nuevo?.estado as string | undefined,
     clienteIdNuevo: (nuevo?.cliente_id as string | null | undefined) ?? null,
+    estadoDesdeNuevo: nuevo?.estado_desde as string | undefined,
   };
 }
 

@@ -69,18 +69,19 @@ export const ENTRANDO_MS = 1200;
 
 /**
  * Gate de reordenamiento (REQ-COS-27, design D3) — puro y trivially testable.
- * Un cambio se encola (chip) si el operador está scrolleando O si el cambio
- * afecta el orden visible de la pestaña activa (el estado anterior o el nuevo
- * pertenecen al tab). En cualquier otro caso se aplica directo.
+ * Un cambio se encola (chip) SOLO si el operador está scrolleando; en cualquier
+ * otro caso se aplica directo para que todos los conectados vean el cambio al
+ * instante (decisión de producto: "si se hace un cambio, todos lo ven"). Los
+ * parámetros de estado/tab se conservan para estabilidad de API; el gate ya no
+ * los usa — scrolleando es la única condición.
  */
 export function decidirGate(
-  estadoAnterior: string | undefined,
-  estadoNuevo: string | undefined,
-  tab: EstadoOperativo,
+  _estadoAnterior: string | undefined,
+  _estadoNuevo: string | undefined,
+  _tab: EstadoOperativo,
   scrolleando: boolean
 ): boolean {
-  const afectaVisible = estadoAnterior === tab || estadoNuevo === tab;
-  return scrolleando || afectaVisible;
+  return scrolleando;
 }
 
 /**
@@ -103,6 +104,9 @@ export function mergeEvento(prev: ColaBotellon[], evento: EventoRealtime): ColaB
           ...b,
           estado: evento.estadoNuevo ?? b.estado,
           cliente_id: evento.clienteIdNuevo ?? b.cliente_id,
+          // The DB trigger stamps estado_desde on every estado change; patch it
+          // so FIFO order + card age in the live queue match a fresh read.
+          estado_desde: evento.estadoDesdeNuevo ?? b.estado_desde,
         }
       : b
   );
@@ -246,6 +250,17 @@ export function useColaOperaciones(opts: { tab?: EstadoOperativo } = {}): {
       });
   }, [marcarEntrando]);
 
+  // Foreground re-sync (product fix): a backgrounded tab can MISS realtime
+  // events (browser throttling the websocket); on visibilitychange to visible
+  // we refetch the queue so the view always matches the DB exactly.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') refetchear();
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refetchear]);
+
   /** Maneja un evento realtime normalizado (REQ-COS-27, D4/D5/D6). */
   const manejarEvento = useCallback(
     (evento: EventoRealtime) => {
@@ -276,6 +291,15 @@ export function useColaOperaciones(opts: { tab?: EstadoOperativo } = {}): {
         marcarEntrando(calcularEntrando(actual.botellones, siguiente, tabRef.current));
       }
       setBotellones(siguiente);
+
+      // Synchronous write-back into the ref. `estadoRef` is normally synced by
+      // an effect after the render commits, but N postgres_changes events for
+      // one batch (e.g. mover 4 botellones) arrive in a SINGLE websocket
+      // message and are dispatched back-to-back BEFORE any render/effect runs.
+      // Without this, every handler merges onto the same stale base and only
+      // the LAST event survives — a second screen would show just 1 moved
+      // botellon instead of all 4.
+      estadoRef.current = { ...actual, botellones: siguiente };
     },
     [refetchear, marcarEntrando]
   );

@@ -14,6 +14,10 @@ export type GrupoCardKanbanProps = {
   enAccion?: boolean;
   /** Whole-group action: ids = grupo.botellones.map(b => b.id) (REQ-23). */
   onAccion: (ids: string[]) => void | Promise<unknown>;
+  /** Manual pickup for estado `listo` (listo → entregado): a second "✓ Entregar
+   * N" whole-group button rendered ONLY when estado === 'listo'. Other estados
+   * render exactly one action regardless of this prop. */
+  onEntregar?: (ids: string[]) => void | Promise<unknown>;
   /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
    * the shell decides toast (no phone) vs sheet (D7). */
   onWhatsApp?: () => void;
@@ -44,6 +48,7 @@ export function GrupoCardKanban({
   estado,
   enAccion = false,
   onAccion,
+  onEntregar,
   onWhatsApp,
   onAbrirFicha,
   onDragStart,
@@ -80,7 +85,7 @@ export function GrupoCardKanban({
         onDragEnd?.();
       }}
       className={cn(
-        'rounded-lg border border-border-strong bg-surface-1 p-3',
+        'rounded-lg border border-border-strong bg-surface-1 p-4',
         urgencia === 'critica' && 'bg-urgencia/7'
       )}
     >
@@ -142,23 +147,52 @@ export function GrupoCardKanban({
           element in its own shrink-0 span, so it stays visible even when the
           codes line is clipped in a narrow container. */}
       <div className="mt-2 flex min-w-0 items-center gap-1">
-        <p className="truncate text-xs text-text-secondary">
+        <p className="truncate text-xs tabular-nums text-text-secondary">
           {visibles.map((b) => b.codigo).join(' · ')}
         </p>
         {ocultos > 0 ? (
-          <span className="shrink-0 text-xs text-text-muted">+{ocultos}</span>
+          <span className="shrink-0 text-xs tabular-nums text-text-muted">+{ocultos}</span>
         ) : null}
       </div>
 
-      <ActionButton
-        disabled={enAccion}
-        onClick={() => {
-          void onAccion(ids);
-        }}
-        className="mt-3 w-full"
-      >
-        {copiaAccion(estado, ids.length, primerNombre)}
-      </ActionButton>
+      {estado === 'listo' && onEntregar ? (
+        <div className="mt-3 flex flex-col gap-2">
+          <ActionButton
+            disabled={enAccion}
+            onClick={() => {
+              void onAccion(ids);
+            }}
+            className="w-full"
+          >
+            {copiaAccion(estado, ids.length, ids.length, primerNombre)}
+          </ActionButton>
+          {/* Manual pickup: listo → entregado (direct delivery) as a distinct
+              bordered/text button next to the forward action. Flat secondary:
+              surface + border, one-step hover darkening. */}
+          <button
+            type="button"
+            disabled={enAccion}
+            onClick={() => {
+              void onEntregar?.(ids);
+            }}
+            className="min-h-11 w-full rounded-lg border border-border-strong bg-surface-1 px-3 text-sm font-medium text-text-primary transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca/60 dark:hover:bg-zinc-800"
+          >
+            {primerNombre
+              ? `✓ Entregar a ${primerNombre}`
+              : `✓ Entregar`}
+          </button>
+        </div>
+      ) : (
+        <ActionButton
+          disabled={enAccion}
+          onClick={() => {
+            void onAccion(ids);
+          }}
+          className="mt-3 w-full"
+        >
+          {copiaAccion(estado, ids.length, ids.length, primerNombre)}
+        </ActionButton>
+      )}
     </article>
   );
 }

@@ -286,3 +286,34 @@ describe('KanbanDesktop — REQ-COS-23 WhatsApp wiring (PR-B)', () => {
     expect(onAbrirFicha).toHaveBeenCalledWith(expect.objectContaining({ cliente_id: 'cliente-1' }), 'recibido');
   });
 });
+
+describe('KanbanDesktop — listo dual actions (manual pickup)', () => {
+  afterEach(() => {
+    dismissToast();
+  });
+
+  it('shows both "→ En delivery" and "✓ Entregar" for a listo card; Entregar moves to entregado', () => {
+    const onMover = vi.fn();
+    const porEstado = porEstadoVacio();
+    porEstado.listo = [grupo([botellon(1), botellon(2)])];
+    render(<KanbanDesktop porEstado={porEstado} cargando={false} onMover={onMover} />);
+
+    const card = within(columnaDe('Listo')).getByTestId('grupo-card-kanban');
+    expect(within(card).getByRole('button', { name: '→ Pasar a En delivery' })).toBeInTheDocument();
+    const entregar = within(card).getByRole('button', { name: '✓ Entregar a María' });
+    expect(entregar).toBeInTheDocument();
+
+    fireEvent.click(entregar);
+    expect(onMover).toHaveBeenCalledWith(['b-1', 'b-2'], 'entregado');
+  });
+
+  it('renders exactly one action for non-listo cards', () => {
+    const porEstado = porEstadoVacio();
+    porEstado.recibido = [grupo([botellon(1)])];
+    render(<KanbanDesktop porEstado={porEstado} cargando={false} onMover={vi.fn()} />);
+
+    const card = within(columnaDe('Recibido')).getByTestId('grupo-card-kanban');
+    expect(within(card).getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: /✓ Entregar/ })).not.toBeInTheDocument();
+  });
+});

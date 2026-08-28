@@ -17,17 +17,18 @@ export type ActionButtonProps = {
  * ActionButton — primary action primitive (REQ-COS-11).
  * Always `--marca` in every estado and both modes; 44px touch target.
  * Disabled uses `--fill-disabled`/`--text-disabled` tokens (never opacity)
- * and stays non-interactive. Standalone cva: shadcn `buttonVariants`
- * disables with opacity-50, which conflicts with the locked disabled tokens.
- * Tokens only — no hex literals.
+ * and stays non-interactive. Flat modern primary: rounded-lg, one-step darker
+ * hover (bg-marca/90), 2px focus ring — no gradient/shadow/glow.
+ * Standalone cva: shadcn `buttonVariants` disables with opacity-50, which
+ * conflicts with the locked disabled tokens. Tokens only — no hex literals.
  */
 const actionButtonVariants = cva(
-  'inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors',
+  'inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca/60 focus-visible:ring-offset-2',
   {
     variants: {
       disabled: {
-        true: 'bg-fill-disabled text-text-disabled',
-        false: 'bg-marca text-white',
+        true: 'cursor-not-allowed bg-fill-disabled text-text-disabled',
+        false: 'bg-marca text-white hover:bg-marca/90',
       },
     },
     defaultVariants: {

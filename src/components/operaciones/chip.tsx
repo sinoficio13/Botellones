@@ -22,7 +22,7 @@ export function Chip({ label, pressed, onToggle, className }: ChipProps) {
       aria-pressed={pressed}
       onClick={() => onToggle(!pressed)}
       className={cn(
-        'font-mono min-h-11 rounded-md border px-2.5 text-sm transition-colors',
+        'font-mono min-h-11 rounded-md border px-2.5 text-sm tabular-nums transition-colors',
         pressed
           ? 'border-marca bg-marca text-white'
           : 'border-border-strong bg-surface-2 text-text-secondary hover:bg-surface-3',

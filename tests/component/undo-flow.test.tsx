@@ -94,9 +94,9 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
     let resolver!: (v: { data: unknown; error: null }) => void;
     rpcMock.mockReturnValue(new Promise((r) => (resolver = r)));
     const filas = [botellon(1), botellon(2), botellon(3)];
-    await montar(filas, '→ Pasar 3 a En recarga');
+    await montar(filas, '→ Pasar a En recarga');
 
-    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' }));
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar a En recarga' }));
 
     // Optimistic: the group leaves the list before the RPC resolves; the
     // success toast with Deshacer is already up; the RPC fired (2-arg move).
@@ -117,7 +117,7 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
 
     // D10: the group lands in the destino estado (age = fresh now() stamp).
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '→ Pasar 3 a Listo' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '→ Pasar a Listo' })).toBeInTheDocument()
     );
   });
 
@@ -134,11 +134,11 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
       data: filas.map((b) => filaRpc(b.id, 'recarga', new Date().toISOString())),
       error: null,
     });
-    await montar(filas, '→ Pasar 3 a En recarga');
+    await montar(filas, '→ Pasar a En recarga');
 
-    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' }));
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar a En recarga' }));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '→ Pasar 3 a Listo' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '→ Pasar a Listo' })).toBeInTheDocument()
     );
 
     rpcMock.mockResolvedValueOnce({
@@ -148,7 +148,7 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument()
     );
     expect(rpcMock).toHaveBeenLastCalledWith('mover_botellones', {
       p_ids: ['b-1', 'b-2', 'b-3'],
@@ -165,12 +165,12 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
   it('reverts the optimistic removal and shows a red toast without undo on RPC error (S3)', async () => {
     const filas = [botellon(1), botellon(2), botellon(3)];
     rpcMock.mockResolvedValue({ data: null, error: { message: 'Transición no permitida' } });
-    await montar(filas, '→ Pasar 3 a En recarga');
+    await montar(filas, '→ Pasar a En recarga');
 
-    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' }));
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar a En recarga' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument()
     );
     expect(screen.getByText('No se pudo mover. Reintentá.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument();
@@ -182,14 +182,14 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
     // the await must not throw out of mover() — D12 wraps it in try/catch and
     // converts to the existing error path.
     rpcMock.mockRejectedValue(new Error('network down'));
-    await montar(filas, '→ Pasar 2 a En recarga');
+    await montar(filas, '→ Pasar a En recarga');
 
-    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' }));
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar a En recarga' }));
 
     // Same error path as S3: the group reverts, red toast, no Deshacer —
     // and mover RESOLVES {ok:false} instead of rejecting/escaping the action.
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument()
     );
     expect(screen.getByText('No se pudo mover. Reintentá.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument();
@@ -197,7 +197,7 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
 
   it('disables the action with "Elegí al menos un botellón" when zero chips are marked (S4)', async () => {
     const filas = [botellon(1), botellon(2)];
-    await montar(filas, '→ Pasar 2 a En recarga');
+    await montar(filas, '→ Pasar a En recarga');
 
     fireEvent.click(screen.getByRole('button', { name: 'BOT-001' }));
     fireEvent.click(screen.getByRole('button', { name: 'BOT-002' }));
@@ -208,9 +208,9 @@ describe('Undo flow — REQ-COS-19 (Slice C)', () => {
   it('Entregar calls the RPC directly with entregado — no client selector (S5)', async () => {
     const filas = [botellon(1, { estado: 'delivery' })];
     rpcMock.mockResolvedValue({ data: [], error: null });
-    await montar(filas, '✓ Entregar 1 a María');
+    await montar(filas, '✓ Entregar a María');
 
-    fireEvent.click(screen.getByRole('button', { name: '✓ Entregar 1 a María' }));
+    fireEvent.click(screen.getByRole('button', { name: '✓ Entregar a María' }));
 
     expect(rpcMock).toHaveBeenCalledWith('mover_botellones', {
       p_ids: ['b-1'],

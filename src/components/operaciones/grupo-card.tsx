@@ -17,6 +17,10 @@ export type GrupoCardProps = {
   /** Card nueva por realtime (REQ-COS-27 D9): outline --marca 2px 1.2s → fade. */
   entrando?: boolean;
   onAccion: (ids: string[]) => void | Promise<unknown>;
+  /** Manual pickup for estado `listo` (listo → entregado, direct delivery): a
+   * second "✓ Entregar N" action rendered ONLY when estado === 'listo'. Other
+   * estados render exactly one action regardless of this prop. */
+  onEntregar?: (ids: string[]) => void | Promise<unknown>;
   /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
    * the shell decides toast (no phone) vs sheet (D7). */
   onWhatsApp?: () => void;
@@ -75,11 +79,25 @@ export const DESTINO_ACCION: Record<EstadoOperativo, DestinoAccion> = {
  * "→ Pasar N a En recarga|Listo|En delivery" / "✓ Entregar N a {PrimerNombre}".
  * El envío real (RPC + optimistic + undo) se cablea en PR-C; acá el card
  * entrega los ids marcados vía `onAccion`.
+ *
+ * Count rule (UX): the count is shown only when a SUBSET of the group is
+ * selected. When ALL bottles (n >= total) are selected, the label drops the
+ * count: "→ Pasar a En recarga" / "✓ Entregar a María".
  */
-export function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: string): string {
+export function copiaAccion(
+  estado: EstadoOperativo,
+  n: number,
+  total: number,
+  primerNombre: string
+): string {
+  const todos = n >= total;
   return estado === 'delivery'
-    ? `✓ Entregar ${n} a ${primerNombre}`
-    : `→ Pasar ${n} a ${ESTADO_LABELS[DESTINO_ACCION[estado]]}`;
+    ? todos
+      ? `✓ Entregar a ${primerNombre}`
+      : `✓ Entregar ${n} a ${primerNombre}`
+    : todos
+      ? `→ Pasar a ${ESTADO_LABELS[DESTINO_ACCION[estado]]}`
+      : `→ Pasar ${n} a ${ESTADO_LABELS[DESTINO_ACCION[estado]]}`;
 }
 
 /**
@@ -92,7 +110,7 @@ export function copiaAccion(estado: EstadoOperativo, n: number, primerNombre: st
  * >24h ▲ AlertTriangle + fondo ámbar 7% vía token; <6h normal. Edad con
  * `formatAntiguedad`. Solo tokens — sin hex (REQ-18).
  */
-export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion, onWhatsApp, onAbrirFicha }: GrupoCardProps) {
+export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, onAccion, onEntregar, onWhatsApp, onAbrirFicha }: GrupoCardProps) {
   // R1-001: the real clock only exists after mount — server render and the
   // first client render share the null clock (no hydration mismatch).
   const ahora = useEdadAhora();
@@ -148,12 +166,34 @@ export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, o
     }
   }
 
+  // Manual pickup action (estado 'listo' + onEntregar). Shares the card's own
+  // enVuelo state so both buttons disable together while a move is in flight.
+  async function ejecutarEntregar() {
+    setEnVuelo(true);
+    try {
+      await onEntregar?.([...marcadosValidos]);
+    } finally {
+      setEnVuelo(false);
+    }
+  }
+
+  // All-selected → no count (UX rule): "✓ Entregar a María"; subset → count.
+  const copiaEntregar = sinMarcados
+    ? 'Elegí al menos un botellón'
+    : marcadosValidos.size >= grupo.botellones.length
+      ? primerNombre
+        ? `✓ Entregar a ${primerNombre}`
+        : `✓ Entregar`
+      : primerNombre
+        ? `✓ Entregar ${marcadosValidos.size} a ${primerNombre}`
+        : `✓ Entregar ${marcadosValidos.size}`;
+
   return (
     <article
       data-testid="grupo-card"
       data-entrada={entrando || undefined}
       className={cn(
-        'rounded-lg border border-border-strong bg-surface-1 p-3',
+        'rounded-lg border border-border-strong bg-surface-1 p-4',
         urgencia === 'critica' && 'bg-urgencia/7',
         // REQ-COS-27 D9: card nueva por realtime → outline 2px --marca que
         // fadea (el hook limpia `entrando` a los 1.2s; sin slide ni salto).
@@ -235,17 +275,46 @@ export function GrupoCard({ grupo, estado, enAccion = false, entrando = false, o
         ) : null}
       </div>
 
-      <ActionButton
-        disabled={deshabilitada}
-        onClick={() => {
-          void ejecutarAccion();
-        }}
-        className="mt-3 w-full"
-      >
-        {sinMarcados
-          ? 'Elegí al menos un botellón'
-          : copiaAccion(estado, marcadosValidos.size, primerNombre)}
-      </ActionButton>
+      {estado === 'listo' && onEntregar ? (
+        <div className="mt-3 flex flex-col gap-2">
+          <ActionButton
+            disabled={deshabilitada}
+            onClick={() => {
+              void ejecutarAccion();
+            }}
+            className="w-full"
+          >
+            {sinMarcados
+              ? 'Elegí al menos un botellón'
+              : copiaAccion(estado, marcadosValidos.size, grupo.botellones.length, primerNombre)}
+          </ActionButton>
+          {/* Manual pickup: listo → entregado (direct delivery) as a distinct
+              bordered/text button next to the forward action. Flat secondary:
+              surface + border, one-step hover darkening. */}
+          <button
+            type="button"
+            disabled={deshabilitada}
+            onClick={() => {
+              void ejecutarEntregar();
+            }}
+            className="min-h-11 w-full rounded-lg border border-border-strong bg-surface-1 px-3 text-sm font-medium text-text-primary transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca/60 dark:hover:bg-zinc-800"
+          >
+            {copiaEntregar}
+          </button>
+        </div>
+      ) : (
+        <ActionButton
+          disabled={deshabilitada}
+          onClick={() => {
+            void ejecutarAccion();
+          }}
+          className="mt-3 w-full"
+        >
+          {sinMarcados
+            ? 'Elegí al menos un botellón'
+            : copiaAccion(estado, marcadosValidos.size, grupo.botellones.length, primerNombre)}
+        </ActionButton>
+      )}
     </article>
   );
 }

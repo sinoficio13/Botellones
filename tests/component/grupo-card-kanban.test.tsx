@@ -55,10 +55,10 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
   });
 
   it.each<[EstadoOperativo, string]>([
-    ['recibido', '→ Pasar 2 a En recarga'],
-    ['recarga', '→ Pasar 2 a Listo'],
-    ['listo', '→ Pasar 2 a En delivery'],
-    ['delivery', '✓ Entregar 2 a María'],
+    ['recibido', '→ Pasar a En recarga'],
+    ['recarga', '→ Pasar a Listo'],
+    ['listo', '→ Pasar a En delivery'],
+    ['delivery', '✓ Entregar a María'],
   ])('uses the per-estado whole-group action copy for %s', (estado, copia) => {
     render(<GrupoCardKanban grupo={grupo([botellon(1), botellon(2)])} estado={estado} onAccion={vi.fn()} />);
     expect(screen.getByRole('button', { name: copia })).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
     const onAccion = vi.fn();
     render(<GrupoCardKanban grupo={grupo([botellon(1), botellon(2), botellon(3)])} estado="recibido" onAccion={onAccion} />);
 
-    const accion = screen.getByRole('button', { name: '→ Pasar 3 a En recarga' });
+    const accion = screen.getByRole('button', { name: '→ Pasar a En recarga' });
     expect(accion).toHaveClass('min-h-11');
     fireEvent.click(accion);
     expect(onAccion).toHaveBeenCalledWith(['b-1', 'b-2', 'b-3']);
@@ -76,7 +76,7 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
 
   it('disables the whole-group action while an action is in flight (enAccion)', () => {
     render(<GrupoCardKanban grupo={grupo([botellon(1)])} estado="recibido" enAccion onAccion={vi.fn()} />);
-    expect(screen.getByRole('button', { name: '→ Pasar 1 a En recarga' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeDisabled();
   });
 
   it('shows amber urgency text for 6–24h and ▲ AlertTriangle + amber tint for >24h (REQ-23 S3)', async () => {

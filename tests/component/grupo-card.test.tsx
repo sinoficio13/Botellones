@@ -67,7 +67,7 @@ describe('GrupoCard — REQ-COS-18', () => {
     const onAccion = vi.fn();
     render(<GrupoCard grupo={grupo([botellon(1), botellon(2), botellon(3)])} estado="recibido" onAccion={onAccion} />);
 
-    expect(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'BOT-001' }));
     expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('GrupoCard — REQ-COS-18', () => {
   it('disables the action while an action is in flight (enAccion)', () => {
     render(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" enAccion onAccion={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: '→ Pasar 1 a En recarga' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeDisabled();
   });
 
   it('manages its own in-flight state: disables while an async onAccion runs, re-enables after (R2-001)', async () => {
@@ -112,14 +112,14 @@ describe('GrupoCard — REQ-COS-18', () => {
     );
     render(<GrupoCard grupo={grupo([botellon(1), botellon(2)])} estado="recibido" onAccion={onAccion} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' }));
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar a En recarga' }));
     expect(onAccion).toHaveBeenCalledWith(['b-1', 'b-2']);
-    expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeDisabled();
 
     await act(async () => {
       resolver();
     });
-    expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).not.toBeDisabled();
   });
 
   it('drops moved ids from marcados when the group membership shrinks (carried R2-001)', () => {
@@ -127,14 +127,14 @@ describe('GrupoCard — REQ-COS-18', () => {
     const { rerender } = render(
       <GrupoCard grupo={grupo([botellon(1), botellon(2), botellon(3)])} estado="recibido" onAccion={onAccion} />
     );
-    expect(screen.getByRole('button', { name: '→ Pasar 3 a En recarga' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument();
 
     // b-2 moved away: the group rerenders with two members (subset move). The
     // stale id must leave marcados so count/copy/ids stay in sync with the DOM.
     rerender(<GrupoCard grupo={grupo([botellon(1), botellon(3)])} estado="recibido" onAccion={onAccion} />);
 
-    expect(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 2 a En recarga' }));
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar a En recarga' }));
     expect(onAccion).toHaveBeenCalledWith(['b-1', 'b-3']);
   });
 
@@ -201,10 +201,10 @@ describe('GrupoCard — REQ-COS-18', () => {
   });
 
   it.each<[EstadoOperativo, string]>([
-    ['recibido', '→ Pasar 1 a En recarga'],
-    ['recarga', '→ Pasar 1 a Listo'],
-    ['listo', '→ Pasar 1 a En delivery'],
-    ['delivery', '✓ Entregar 1 a María'],
+    ['recibido', '→ Pasar a En recarga'],
+    ['recarga', '→ Pasar a Listo'],
+    ['listo', '→ Pasar a En delivery'],
+    ['delivery', '✓ Entregar a María'],
   ])('uses the per-estado action copy for %s', (estado, copia) => {
     render(<GrupoCard grupo={grupo([botellon(1)])} estado={estado} onAccion={vi.fn()} />);
     expect(screen.getByRole('button', { name: copia })).toBeInTheDocument();
@@ -275,5 +275,63 @@ it('marks a realtime-entering card with data-entrada and omits it otherwise (REQ
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('GrupoCard — listo dual actions (manual pickup)', () => {
+  it('shows both "→ En delivery" and "✓ Entregar" actions for a listo card when onEntregar is provided', () => {
+    render(<GrupoCard grupo={grupo([botellon(1)])} estado="listo" onAccion={vi.fn()} onEntregar={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: '→ Pasar a En delivery' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '✓ Entregar a María' })).toBeInTheDocument();
+  });
+
+  it('calls onEntregar with the marked ids when Entregar is clicked', () => {
+    const onEntregar = vi.fn();
+    render(<GrupoCard grupo={grupo([botellon(1), botellon(2)])} estado="listo" onAccion={vi.fn()} onEntregar={onEntregar} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '✓ Entregar a María' }));
+    expect(onEntregar).toHaveBeenCalledWith(['b-1', 'b-2']);
+    // The forward action is untouched.
+    expect(screen.getByRole('button', { name: '→ Pasar a En delivery' })).toBeInTheDocument();
+  });
+
+  it('respects chip selection: only marked ids go to Entregar', () => {
+    const onEntregar = vi.fn();
+    render(<GrupoCard grupo={grupo([botellon(1), botellon(2)])} estado="listo" onAccion={vi.fn()} onEntregar={onEntregar} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-001' }));
+    fireEvent.click(screen.getByRole('button', { name: '✓ Entregar 1 a María' }));
+    expect(onEntregar).toHaveBeenCalledWith(['b-2']);
+  });
+
+  it('falls back to "✓ Entregar N" when the client has no first name', () => {
+    render(
+      <GrupoCard
+        grupo={grupo([botellon(1, { clientes: { nombre: '', cedula: null, telefono_1: null, whatsapp: null } })])}
+        estado="listo"
+        onAccion={vi.fn()}
+        onEntregar={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: '✓ Entregar' })).toBeInTheDocument();
+  });
+
+  it('disables both actions when nothing is marked (Elegí al menos un botellón)', () => {
+    render(<GrupoCard grupo={grupo([botellon(1), botellon(2)])} estado="listo" onAccion={vi.fn()} onEntregar={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-001' }));
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-002' }));
+
+    const elegir = screen.getAllByRole('button', { name: 'Elegí al menos un botellón' });
+    expect(elegir).toHaveLength(2);
+    for (const boton of elegir) expect(boton).toBeDisabled();
+  });
+
+  it('renders exactly one action for non-listo estados even when onEntregar is present', () => {
+    render(<GrupoCard grupo={grupo([botellon(1)])} estado="recibido" onAccion={vi.fn()} onEntregar={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /✓ Entregar/ })).not.toBeInTheDocument();
   });
 });

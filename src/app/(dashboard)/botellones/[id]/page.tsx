@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { ESTADO_LABELS } from '@/lib/utils/estados';
+import { cn } from '@/lib/utils';
 import { BotellonForm } from './form';
 import { QrCodeDisplay } from './qr-code';
 
@@ -13,16 +14,6 @@ export const dynamic = 'force-dynamic';
 function formatHora12(d: Date): string {
   let h = d.getHours();
   const m = String(d.getMinutes()).padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h}:${m} ${ampm}`;
-}
-
-/** Same 12-hour conversion for stored "HH:MM[:SS]" strings (recargas.hora). */
-function formatHora12Str(hora: string): string {
-  const [hh, mm] = hora.split(':');
-  let h = parseInt(hh, 10) || 0;
-  const m = mm ?? '00';
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
   return `${h}:${m} ${ampm}`;
@@ -80,93 +71,96 @@ export default async function BotellonDetailPage({ params }: Props) {
           Avanzar/Deshacer selector derive from realtime state (form.tsx). */}
       <BotellonForm botellon={botellon} clientes={clientes} />
 
-      {/* Recarga history */}
-      <RecargasHistorial botellonId={botellon.id} />
-
-      {/* Estado-change history (movimientos, 0011 trigger) */}
-      <HistorialEstados botellonId={botellon.id} />
+      {/* Unified history: state changes + recargas as one timeline */}
+      <HistorialBotellon botellonId={botellon.id} />
     </div>
   );
 }
 
-async function RecargasHistorial({ botellonId }: { botellonId: string }) {
-  const { getRecargasBotellon } = await import('@/lib/db/recargas');
-  const { recargas, total } = await getRecargasBotellon(botellonId);
+/** Deterministic operation label for a transition (the batch ops + kanban moves). */
+const OPERACION_POR_TRANSICION: Record<string, string> = {
+  'entregado→recibido': 'Recibir',
+  'recibido→recarga': 'Recargar',
+  'recarga→listo': 'Listo',
+  'recarga→delivery': 'En delivery',
+  'delivery→entregado': 'Entregar',
+  'listo→delivery': 'En delivery',
+  'listo→entregado': 'Entregar',
+};
 
-  return (
-    <div className="mt-8 space-y-4">
-      <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-        Historial de recargas <span className="text-sm font-normal text-zinc-400">({total})</span>
-      </h2>
-      {recargas.length === 0 ? (
-        <p className="text-sm text-zinc-400">No hay recargas registradas.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 text-left dark:bg-zinc-900">
-              <tr>
-                <th className="px-3 py-2 font-medium text-zinc-500">Fecha</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Hora</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Registro</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Cliente</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {recargas.map((r: import('@/lib/db/recargas').RecargaConCliente) => (
-                <tr key={r.id}>
-                  <td className="px-3 py-2">{new Date(r.fecha).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-zinc-500">
-                    {r.hora ? formatHora12Str(r.hora) : '—'}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.numero_registro}</td>
-                  <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{r.clientes?.nombre || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
+type EventoHistorial =
+  | { id: string; fecha: Date; tipo: 'movimiento'; de: string; a: string; operacion: string }
+  | { id: string; fecha: Date; tipo: 'recarga'; numero: string; cliente: string };
 
-/** Estado-change timeline: every transition the 0011 trigger recorded. */
-async function HistorialEstados({ botellonId }: { botellonId: string }) {
+/**
+ * Unified bottle timeline: every estado change (movimientos, 0011 trigger) and
+ * every recarga (with its REC number) merged into one chronological history,
+ * so the process is visible as a story instead of two flat tables.
+ */
+async function HistorialBotellon({ botellonId }: { botellonId: string }) {
   const { getMovimientosBotellon } = await import('@/lib/db/botellones');
-  const movimientos = await getMovimientosBotellon(botellonId);
+  const { getRecargasBotellon } = await import('@/lib/db/recargas');
+  const [movimientos, recargasData] = await Promise.all([
+    getMovimientosBotellon(botellonId),
+    getRecargasBotellon(botellonId),
+  ]);
+
+  const eventos: EventoHistorial[] = [
+    ...movimientos.map((m) => ({
+      id: m.id,
+      fecha: new Date(m.created_at),
+      tipo: 'movimiento' as const,
+      de: m.estado_previo ?? '',
+      a: m.estado_nuevo ?? '',
+      operacion:
+        OPERACION_POR_TRANSICION[`${m.estado_previo}→${m.estado_nuevo}`] ?? 'Cambio de estado',
+    })),
+    ...recargasData.recargas.map((r) => ({
+      id: r.id,
+      fecha: new Date(`${r.fecha}T${r.hora ?? '00:00'}`),
+      tipo: 'recarga' as const,
+      numero: r.numero_registro,
+      cliente: r.clientes?.nombre ?? '—',
+    })),
+  ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
   return (
     <div className="mt-8 space-y-4">
       <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-        Historial de estados{' '}
-        <span className="text-sm font-normal text-zinc-400">({movimientos.length})</span>
+        Historial <span className="text-sm font-normal text-zinc-400">({eventos.length})</span>
       </h2>
-      {movimientos.length === 0 ? (
+      {eventos.length === 0 ? (
         <p className="text-sm text-zinc-400">No hay movimientos registrados.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 text-left dark:bg-zinc-900">
-              <tr>
-                <th className="px-3 py-2 font-medium text-zinc-500">Fecha</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Hora</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Cambio</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {movimientos.map((m) => (
-                <tr key={m.id}>
-                  <td className="px-3 py-2">{new Date(m.created_at).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-zinc-500">{formatHora12(new Date(m.created_at))}</td>
-                  <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                    {ESTADO_LABELS[m.estado_previo ?? ''] ?? m.estado_previo ?? '—'} →{' '}
-                    {ESTADO_LABELS[m.estado_nuevo ?? ''] ?? m.estado_nuevo}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ol className="relative space-y-4 border-l border-zinc-200 pl-4 dark:border-zinc-800">
+          {eventos.map((e) => (
+            <li key={`${e.tipo}-${e.id}`} className="relative">
+              <span
+                aria-hidden
+                className={cn(
+                  'absolute -left-[21px] top-1.5 size-2.5 rounded-full border-2 border-white dark:border-zinc-900',
+                  e.tipo === 'recarga' ? 'bg-green-500' : 'bg-zinc-400'
+                )}
+              />
+              <p className="text-xs text-zinc-500">
+                {e.fecha.toLocaleDateString()} · {formatHora12(e.fecha)}
+              </p>
+              {e.tipo === 'recarga' ? (
+                <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
+                  Recarga · <span className="font-mono text-xs font-medium">{e.numero}</span>
+                  <span className="text-zinc-500"> · {e.cliente}</span>
+                </p>
+              ) : (
+                <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
+                  {(ESTADO_LABELS[e.de] ?? e.de) || '—'} → {ESTADO_LABELS[e.a] ?? e.a}
+                  <span className="ml-2 inline-block rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
+                    {e.operacion}
+                  </span>
+                </p>
+              )}
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );

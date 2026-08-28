@@ -202,16 +202,11 @@ describe('KanbanDesktop — REQ-COS-25 drag & drop', () => {
     expect(onMover).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores an invalid drop (delivery→Recarga) with zero mover calls and a red toast (REQ-25 S3)', () => {
+  it('accepts a delivery→Recarga drop (now in getEstadosPermitidos) with a single mover call', () => {
     const onMover = vi.fn();
     const porEstado = porEstadoVacio();
     porEstado.delivery = [grupo([botellon(1)])];
-    render(
-      <>
-        <ToastHost />
-        <KanbanDesktop porEstado={porEstado} cargando={false} onMover={onMover} />
-      </>
-    );
+    render(<KanbanDesktop porEstado={porEstado} cargando={false} onMover={onMover} />);
 
     const card = within(columnaDe('En delivery')).getByTestId('grupo-card-kanban');
     arrastrarDesde(card, () => 'b-1');
@@ -219,9 +214,11 @@ describe('KanbanDesktop — REQ-COS-25 drag & drop', () => {
     const recarga = columnaDe('En recarga');
     fireEvent.drop(recarga, { dataTransfer: { getData: () => 'b-1' } });
 
-    // Delivery cannot move to Recarga (not in getEstadosPermitidos) → zero writes.
-    expect(onMover).not.toHaveBeenCalled();
-    expect(screen.getByText('No se pudo mover. Reintentá.')).toBeInTheDocument();
+    // EPIC-16: REVERSIONES.delivery now includes recarga, so delivery→Recarga
+    // is a valid manual move (no red toast, one mover call).
+    expect(onMover).toHaveBeenCalledTimes(1);
+    expect(onMover).toHaveBeenCalledWith(['b-1'], 'recarga');
+    expect(screen.queryByText('No se pudo mover. Reintentá.')).not.toBeInTheDocument();
   });
 
   it('is a no-op on a same-column drop (no mover call, no toast)', () => {

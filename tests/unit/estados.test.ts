@@ -8,6 +8,7 @@ import {
   getReversiones,
   getEstadosPermitidos,
   OPERACIONES,
+  OPERACION_LABELS,
   esTransicionValida,
   type Estado,
   type OperacionId,
@@ -58,7 +59,10 @@ describe('TRANSICIONES cycle contract', () => {
   it('advances one edge per transition on the linear cycle', () => {
     expect(getTransiciones('entregado')).toEqual(['recibido']);
     expect(getTransiciones('recibido')).toEqual(['recarga']);
-    expect(getTransiciones('recarga')).toEqual(['listo']);
+  });
+
+  it('splits recarga into listo and delivery (batch flow: recarga → delivery)', () => {
+    expect(getTransiciones('recarga')).toEqual(['listo', 'delivery']);
   });
 
   it('splits at listo into delivery and loops delivery back to entregado', () => {
@@ -104,12 +108,34 @@ describe('OPERACIONES', () => {
     });
   });
 
+  it('defines delivery → delivery requiring client (but no REC) with recarga as its only source', () => {
+    expect(OPERACIONES.delivery).toEqual({
+      target: 'delivery',
+      requiresCliente: true,
+      createsRec: false,
+      sources: ['recarga'],
+    });
+  });
+
   it('covers every operation id with a valid target estado', () => {
-    const ops: OperacionId[] = ['recibir', 'recargar', 'listo'];
+    const ops: OperacionId[] = ['recibir', 'recargar', 'listo', 'delivery'];
     for (const op of ops) {
       expect(ESTADOS).toContain(OPERACIONES[op].target);
       expect(OPERACIONES[op].sources.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('OPERACION_LABELS', () => {
+  it('provides a label for every operation id (single source of truth)', () => {
+    const ops: OperacionId[] = ['recibir', 'recargar', 'listo', 'delivery'];
+    for (const op of ops) {
+      expect(OPERACION_LABELS[op]).toBeDefined();
+    }
+    expect(OPERACION_LABELS.recibir).toBe('Recibir');
+    expect(OPERACION_LABELS.recargar).toBe('Recargar');
+    expect(OPERACION_LABELS.listo).toBe('Listo');
+    expect(OPERACION_LABELS.delivery).toBe('En delivery');
   });
 });
 
@@ -147,7 +173,10 @@ describe('REVERSIONES — undo one step (spec S1/S2)', () => {
 
   it('reverses entregado into both listo and delivery (spec S2 exact set)', () => {
     expect(getReversiones('entregado')).toEqual(['listo', 'delivery']);
-    expect(getReversiones('delivery')).toEqual(['listo']);
+  });
+
+  it('reverses delivery into both listo and recarga (batch flow reversion)', () => {
+    expect(getReversiones('delivery')).toEqual(['listo', 'recarga']);
   });
 
   it('gives every estado at least one reversion — nothing is terminal (spec R1)', () => {

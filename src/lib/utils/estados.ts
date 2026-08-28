@@ -3,7 +3,7 @@
  *
  * Ciclo físico del botellón (5 estados puros, sin planta ni excepciones):
  *   entregado → recibido → recarga → listo → entregado
- *   (+ listo → delivery → entregado)
+ *   (+ recarga → delivery → entregado, + listo → delivery → entregado)
  * Los botellones sin cliente en `recibido`/`listo` son stock.
  *
  * Cada arista tiene su inversa en `REVERSIONES`: ningún estado es terminal,
@@ -22,7 +22,7 @@ export type Estado = (typeof ESTADOS)[number];
 const TRANSICIONES: Record<Estado, Estado[]> = {
   entregado: ['recibido'],
   recibido: ['recarga'],
-  recarga: ['listo'],
+  recarga: ['listo', 'delivery'],
   listo: ['entregado', 'delivery'],
   delivery: ['entregado'],
 };
@@ -38,7 +38,7 @@ const REVERSIONES: Record<Estado, Estado[]> = {
   recibido: ['entregado'],
   recarga: ['recibido'],
   listo: ['recarga'],
-  delivery: ['listo'],
+  delivery: ['listo', 'recarga'],
 };
 
 export function getTransiciones(estado: Estado): Estado[] {
@@ -59,14 +59,15 @@ export function getEstadosPermitidos(estado: Estado): Estado[] {
 }
 
 /**
- * Terminal operations of the carga scanner. Each operation maps a set of
- * source estados to a single target estado and declares whether it needs a
- * cliente_id (only recarga writes `recargas` rows) and whether it creates a
- * REC number. The server-side `.in('estado', sources)` guard in
- * `registrarOperacion` is the source of truth; the UI mirrors it via
- * `esTransicionValida` for live green/red badges.
+ * Terminal operations of the batch flows (carga scanner + modal). Each
+ * operation maps a set of source estados to a single target estado and
+ * declares whether it needs a cliente_id (recarga and delivery) and whether
+ * it creates a REC number (only recarga writes `recargas` rows). The
+ * server-side `.in('estado', sources)` guard in `registrarOperacion` is the
+ * source of truth; the UI mirrors it via `esTransicionValida` for live
+ * green/red badges and via `destinosPosibles` for per-row destination hints.
  */
-export type OperacionId = 'recibir' | 'recargar' | 'listo';
+export type OperacionId = 'recibir' | 'recargar' | 'listo' | 'delivery';
 
 export const OPERACIONES: Record<
   OperacionId,
@@ -75,6 +76,18 @@ export const OPERACIONES: Record<
   recibir: { target: 'recibido', requiresCliente: false, createsRec: false, sources: ['entregado'] },
   recargar: { target: 'recarga', requiresCliente: true, createsRec: true, sources: ['recibido'] },
   listo: { target: 'listo', requiresCliente: false, createsRec: false, sources: ['recarga'] },
+  delivery: { target: 'delivery', requiresCliente: true, createsRec: false, sources: ['recarga'] },
+};
+
+/**
+ * Canonical human-readable labels for each batch operation. Single source of
+ * truth (moved from the per-page local copies in the terminal and modal).
+ */
+export const OPERACION_LABELS: Record<OperacionId, string> = {
+  recibir: 'Recibir',
+  recargar: 'Recargar',
+  listo: 'Listo',
+  delivery: 'En delivery',
 };
 
 /**

@@ -7,6 +7,7 @@ import { saveDireccion, getDireccion, resolveMapLink } from '@/lib/db/direccione
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
+import { formatFechaLocal, formatHora12Str } from '@/lib/utils/hora';
 import { FidelidadTab } from './fidelidad-tab';
 import { createClient } from '@/lib/supabase/client';
 import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
@@ -570,13 +571,13 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
 // ── HISTORIAL TAB ──
 
 function HistorialTab({ clienteId }: { clienteId: string }) {
-  const [recargas, setRecargas] = useState<Array<{ id: string; fecha: string; hora: string; botellones: { codigo: string } | null }>>([]);
+  const [recargas, setRecargas] = useState<Array<{ id: string; fecha: string; hora: string; numero_registro: string; botellones: { codigo: string } | null }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.from('recargas')
-      .select('id, fecha, hora, botellon_id, botellones(codigo), realizada_por')
+      .select('id, fecha, hora, numero_registro, botellon_id, botellones(codigo)')
       .eq('cliente_id', clienteId)
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false })
@@ -600,14 +601,16 @@ function HistorialTab({ clienteId }: { clienteId: string }) {
               <tr>
                 <th className="px-3 py-2 font-medium text-zinc-500">Fecha</th>
                 <th className="px-3 py-2 font-medium text-zinc-500">Hora</th>
+                <th className="px-3 py-2 font-medium text-zinc-500">Registro</th>
                 <th className="px-3 py-2 font-medium text-zinc-500">Botellón</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {recargas.map((r) => (
                 <tr key={r.id}>
-                  <td className="px-3 py-2">{new Date(r.fecha).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-zinc-500">{r.hora?.slice(0, 5)}</td>
+                  <td className="px-3 py-2">{formatFechaLocal(r.fecha)}</td>
+                  <td className="px-3 py-2 text-zinc-500">{r.hora ? formatHora12Str(r.hora) : '—'}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{r.numero_registro}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.botellones?.codigo || '—'}</td>
                 </tr>
               ))}

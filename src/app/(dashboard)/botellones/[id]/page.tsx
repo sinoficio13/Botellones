@@ -5,19 +5,11 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { ESTADO_LABELS } from '@/lib/utils/estados';
 import { cn } from '@/lib/utils';
+import { formatHora12 } from '@/lib/utils/hora';
 import { BotellonForm } from './form';
 import { QrCodeDisplay } from './qr-code';
 
 export const dynamic = 'force-dynamic';
-
-/** 12-hour clock display ("4:37 PM") — stored time stays 24h/ISO; only the UI converts. */
-function formatHora12(d: Date): string {
-  let h = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h}:${m} ${ampm}`;
-}
 
 interface Props {
   params: Promise<{ id: string }>;

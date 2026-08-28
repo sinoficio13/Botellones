@@ -8,6 +8,7 @@ import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import { FidelidadTab } from './fidelidad-tab';
+import { createClient } from '@/lib/supabase/client';
 import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -60,18 +61,13 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
 
   useEffect(() => {
     getDireccion(cliente.id).then((d) => setDireccion(d as unknown as Record<string, string | null>));
-    import('@supabase/supabase-js').then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-      );
-      supabase.from('botellones')
-        .select('id, codigo, estado')
-        .eq('cliente_id', cliente.id)
-        .order('fecha_creacion', { ascending: false })
-        .limit(3)
-        .then(({ data }) => setBotellones(data || []));
-    });
+    const supabase = createClient();
+    supabase.from('botellones')
+      .select('id, codigo, estado')
+      .eq('cliente_id', cliente.id)
+      .order('fecha_creacion', { ascending: false })
+      .limit(3)
+      .then(({ data }) => setBotellones((data as unknown as typeof botellones) || []));
   }, [cliente.id]);
 
   const whatsappNum = (cliente.whatsapp || cliente.telefono_1 || '')?.replace(/\D/g, '');
@@ -520,17 +516,12 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    import('@supabase/supabase-js').then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-      );
-      supabase.from('botellones')
-        .select('id, codigo, estado, fecha_creacion')
-        .eq('cliente_id', clienteId)
-        .order('fecha_creacion', { ascending: false })
-        .then(({ data }) => { setBotellones(data || []); setLoading(false); });
-    });
+    const supabase = createClient();
+    supabase.from('botellones')
+      .select('id, codigo, estado, fecha_creacion')
+      .eq('cliente_id', clienteId)
+      .order('fecha_creacion', { ascending: false })
+      .then(({ data }) => { setBotellones((data as unknown as typeof botellones) || []); setLoading(false); });
   }, [clienteId]);
 
   const estadoBadge = ESTADO_COLORS;
@@ -583,19 +574,14 @@ function HistorialTab({ clienteId }: { clienteId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    import('@supabase/supabase-js').then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-      );
-      supabase.from('recargas')
-        .select('id, fecha, hora, botellon_id, botellones(codigo), realizada_por')
-        .eq('cliente_id', clienteId)
-        .order('fecha', { ascending: false })
-        .order('hora', { ascending: false })
-        .limit(50)
-        .then(({ data }) => { setRecargas((data as unknown as typeof recargas) || []); setLoading(false); });
-    });
+    const supabase = createClient();
+    supabase.from('recargas')
+      .select('id, fecha, hora, botellon_id, botellones(codigo), realizada_por')
+      .eq('cliente_id', clienteId)
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: false })
+      .limit(50)
+      .then(({ data }) => { setRecargas((data as unknown as typeof recargas) || []); setLoading(false); });
   }, [clienteId]);
 
   return (

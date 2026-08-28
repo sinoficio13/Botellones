@@ -421,13 +421,24 @@ export async function getResumenesNegocio(): Promise<ResumenesNegocio> {
       tendenciaMensual.push({ mes: mesLabel, count: count ?? 0 });
     }
 
-    // zonas activas — by sector
-    const { data: clientes } = await supabase.from('clientes').select('sector');
+    // zonas activas — by sector (sector lives on direcciones, not clientes)
+    const { data: direcciones } = await supabase
+      .from('direcciones')
+      .select('sector, cliente_id')
+      .not('sector', 'is', null);
     const sectorMap = new Map<string, number>();
-    if (clientes) {
-      for (const c of clientes) {
-        const sector = c.sector ?? 'Sin sector';
-        sectorMap.set(sector, (sectorMap.get(sector) ?? 0) + 1);
+    if (direcciones) {
+      const clientesPorSector = new Map<string, Set<string>>();
+      for (const d of direcciones) {
+        const sector = d.sector?.trim();
+        if (!sector || !d.cliente_id) continue;
+        if (!clientesPorSector.has(sector)) {
+          clientesPorSector.set(sector, new Set());
+        }
+        clientesPorSector.get(sector)!.add(d.cliente_id);
+      }
+      for (const [sector, clientes] of clientesPorSector.entries()) {
+        sectorMap.set(sector, clientes.size);
       }
     }
     const zonasActivas = Array.from(sectorMap.entries())

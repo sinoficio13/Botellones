@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     title: 'Botellón',
   },
   other: {
+    'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'black-translucent',
   },
@@ -43,13 +44,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
-        <link rel="manifest" href="/manifest" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="black-translucent"
-        />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
       </head>
       <body className="min-h-full flex flex-col">
         <SkipLink />

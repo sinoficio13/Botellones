@@ -28,6 +28,7 @@ export default function NuevaRecargaPage() {
   const [selectedBotellon, setSelectedBotellon] = useState<Botellon | null>(null);
   const [state, formAction, pending] = useActionState(registrarRecarga, null);
   const [showToast, setShowToast] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -51,11 +52,19 @@ export default function NuevaRecargaPage() {
   }, [preselectCliente]);
 
   // Pre-select botellón if coming from the QR page — jump straight to confirm.
-  // Falls back to the client step when the botellón is missing or has no client.
+  // Falls back to the client step when the botellón is missing, has no client,
+  // or is not in the `entregado` estado (recargas are only allowed for delivered botellones).
   useEffect(() => {
     if (!preselectBotellon) return;
     getBotellon(preselectBotellon).then(async (b) => {
       if (!b || !b.cliente_id) {
+        setStep('cliente');
+        return;
+      }
+      if (b.estado !== 'entregado') {
+        setNotice(
+          'Este botellón no está entregado. Solo se puede registrar una recarga para un botellón entregado.'
+        );
         setStep('cliente');
         return;
       }
@@ -66,6 +75,7 @@ export default function NuevaRecargaPage() {
       }
       setSelectedCliente({ id: c.id, nombre: c.nombre, codigo: c.codigo, telefono_1: c.telefono_1 });
       setSelectedBotellon({ id: b.id, codigo: b.codigo, estado: b.estado });
+      setNotice(null);
       setStep('confirmar');
     });
   }, [preselectBotellon]);
@@ -91,6 +101,7 @@ export default function NuevaRecargaPage() {
     setSelectedCliente(null);
     setSelectedBotellon(null);
     setSearch('');
+    setNotice(null);
   }, []);
 
   if (showToast || state?.success) {
@@ -163,6 +174,13 @@ export default function NuevaRecargaPage() {
           </div>
         ))}
       </div>
+
+      {/* Inline notice (e.g. QR deep-link botellón not in `entregado` estado) */}
+      {notice && (
+        <div className="mb-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          {notice}
+        </div>
+      )}
 
       {/* Step 1: Search client */}
       {step === 'cliente' && (

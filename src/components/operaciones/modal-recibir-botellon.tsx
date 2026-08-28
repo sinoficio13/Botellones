@@ -27,7 +27,7 @@ type SessionItem = {
 /** A botellon with no client assigned that blocked the op-scoped accumulation. */
 type NoClient = { id: string; codigo: string };
 
-/** Format a Date as YYYY-MM-DD in local time (for <input type="date">). */
+/** Format a Date as YYYY-MM-DD in local time (for the record's fecha). */
 function formatFecha(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -35,7 +35,7 @@ function formatFecha(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Format a Date as HH:MM in local time (for <input type="time">). */
+/** Format a Date as HH:MM in local time (for the record's hora). */
 function formatHora(d: Date): string {
   const h = String(d.getHours()).padStart(2, '0');
   const min = String(d.getMinutes()).padStart(2, '0');
@@ -60,7 +60,7 @@ const BTN_PRIMARY =
 const BTN_SECONDARY =
   'w-full rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca/60 dark:hover:bg-zinc-800';
 
-/** Input classes shared by the manual code + fecha/hora fields. */
+/** Input classes for the manual code entry field. */
 const INPUT_CLS =
   'rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-text-primary';
 
@@ -72,9 +72,10 @@ const INPUT_CLS =
  * Self-contained accumulation (mirror of the terminal's acumularBotellon):
  * op-scoped no-client block, in-session dedupe via a ref Set (duplicate →
  * amber flash, no double-add), client name resolved via getCliente. Same
- * 3-operation selector (default `recibir`), manual code entry, shared
- * fecha/hora, and a useActionState confirm that posts the exact
- * `registrarOperacion({ botellonIds, operacion, fecha, hora })` payload.
+ * 3-operation selector (default `recibir`), manual code entry, and a
+ * useActionState confirm that posts the exact
+ * `registrarOperacion({ botellonIds, operacion, fecha, hora })` payload —
+ * fecha/hora always record the current moment, computed at submit time.
  *
  * Fixed overlay (scanner-modal pattern): `fixed inset-0 z-[60] bg-black/70`,
  * `max-w-md rounded-2xl`, click-outside + Escape close. Success renders a
@@ -88,12 +89,6 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
   // Authoritative in-session dedupe set, updated synchronously in
   // acumularBotellon so a repeated code can never double-count.
   const scannedIdsRef = useRef<Set<string>>(new Set());
-  const now = new Date();
-  const [fecha, setFecha] = useState(formatFecha(now));
-  const [hora, setHora] = useState(formatHora(now));
-  // Stop auto-refreshing a field once the staff manually edits it.
-  const fechaTouched = useRef(false);
-  const horaTouched = useRef(false);
   const [noClient, setNoClient] = useState<NoClient | null>(null);
   // Id of the session row currently showing the transient duplicate flash.
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -106,11 +101,12 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
   const [resultado, setResultado] = useState<CargaState | null>(null);
   const [, formAction, pending] = useActionState<CargaState | null>(
     async () => {
+      const ahora = new Date();
       const res = await registrarOperacion({
         botellonIds: items.map((i) => i.id),
         operacion,
-        fecha,
-        hora,
+        fecha: formatFecha(ahora),
+        hora: formatHora(ahora),
       });
       setResultado(res);
       return res;
@@ -126,17 +122,6 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  // Live-update fecha/hora so they never go stale, but never clobber a field
-  // the staff already edited.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const d = new Date();
-      if (!fechaTouched.current) setFecha(formatFecha(d));
-      if (!horaTouched.current) setHora(formatHora(d));
-    }, 30_000);
-    return () => clearInterval(id);
-  }, []);
 
   // Clear the pending flash timeout on unmount.
   useEffect(() => {
@@ -211,7 +196,7 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
 
   const op = OPERACIONES[operacion];
 
-  const canConfirm = items.length > 0 && fecha.trim() !== '' && hora.trim() !== '';
+  const canConfirm = items.length > 0;
 
   // ── Result bodies ──
 
@@ -427,48 +412,6 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
               })}
             </ul>
           )}
-        </div>
-
-        {/* Shared fecha/hora for the whole batch */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              htmlFor="modal-recibir-fecha"
-              className="text-sm font-medium text-text-primary"
-            >
-              Fecha
-            </label>
-            <input
-              id="modal-recibir-fecha"
-              name="fecha"
-              type="date"
-              value={fecha}
-              onChange={(e) => {
-                fechaTouched.current = true;
-                setFecha(e.target.value);
-              }}
-              className={cn('mt-1 w-full', INPUT_CLS)}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="modal-recibir-hora"
-              className="text-sm font-medium text-text-primary"
-            >
-              Hora
-            </label>
-            <input
-              id="modal-recibir-hora"
-              name="hora"
-              type="time"
-              value={hora}
-              onChange={(e) => {
-                horaTouched.current = true;
-                setHora(e.target.value);
-              }}
-              className={cn('mt-1 w-full', INPUT_CLS)}
-            />
-          </div>
         </div>
 
         {/* Confirm */}

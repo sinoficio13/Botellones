@@ -33,7 +33,7 @@ type SessionItem = {
 /** A decoded botellon that has no client assigned (op-scoped overlay). */
 type NoClient = { id: string; codigo: string };
 
-/** Format a Date as YYYY-MM-DD in local time (for <input type="date">). */
+/** Format a Date as YYYY-MM-DD in local time (for the record's fecha). */
 function formatFecha(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -41,7 +41,7 @@ function formatFecha(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Format a Date as HH:MM in local time (for <input type="time">). */
+/** Format a Date as HH:MM in local time (for the record's hora). */
 function formatHora(d: Date): string {
   const h = String(d.getHours()).padStart(2, '0');
   const min = String(d.getMinutes()).padStart(2, '0');
@@ -68,9 +68,9 @@ const BADGE_INVALID = 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-
  *
  * Accumulation is handler-driven (in `onDecode`), never `setState` in an
  * effect. The same code is deduped in-session; a repeat scan beeps and flashes
- * the existing row while keeping the scanner open. A shared fecha/hora applies
- * to every item, and confirm is disabled until the session is non-empty and
- * both fields are set.
+ * the existing row while keeping the scanner open. Confirm is disabled until
+ * the session is non-empty; fecha/hora are never edited — the record always
+ * gets the current timestamp, computed at submit time.
  */
 export default function CargaPage() {
   const [items, setItems] = useState<SessionItem[]>([]);
@@ -78,12 +78,6 @@ export default function CargaPage() {
   // Authoritative in-session dedupe set, updated synchronously in onDecode so a
   // repeated scan can never double-count even across stale closures.
   const scannedIdsRef = useRef<Set<string>>(new Set());
-  const now = new Date();
-  const [fecha, setFecha] = useState(formatFecha(now));
-  const [hora, setHora] = useState(formatHora(now));
-  // Stop auto-refreshing a field once the staff manually edits it.
-  const fechaTouched = useRef(false);
-  const horaTouched = useRef(false);
   const [noClient, setNoClient] = useState<NoClient | null>(null);
   // Id of the session row currently showing the transient duplicate-scan ring.
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -93,18 +87,21 @@ export default function CargaPage() {
   const [errorManual, setErrorManual] = useState<string | null>(null);
 
   // `registrarOperacion` takes a plain input object, but `useActionState` needs
-  // a (prevState, payload) action. The ids, operation, fecha, and hora are read
-  // from React state in the action closure: `useActionState` dispatches the
-  // LATEST action on submit, so this always reflects the current session
-  // without a stale closure. Accumulation itself stays handler-driven.
+  // a (prevState, payload) action. The ids and operation are read from React
+  // state in the action closure: `useActionState` dispatches the LATEST action
+  // on submit, so this always reflects the current session without a stale
+  // closure. Fecha/hora are the record's timestamp: computed fresh at submit
+  // time, never edited by the operator.
   const [state, formAction, pending] = useActionState<CargaState | null>(
-    async () =>
-      registrarOperacion({
+    async () => {
+      const ahora = new Date();
+      return registrarOperacion({
         botellonIds: items.map((i) => i.id),
         operacion,
-        fecha,
-        hora,
-      }),
+        fecha: formatFecha(ahora),
+        hora: formatHora(ahora),
+      });
+    },
     null
   );
 
@@ -189,17 +186,6 @@ export default function CargaPage() {
     if (state?.success) stop();
   }, [state?.success, stop]);
 
-  // Live-update fecha/hora so they never go stale, but stop auto-refreshing a
-  // field once the staff manually edits it.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const d = new Date();
-      if (!fechaTouched.current) setFecha(formatFecha(d));
-      if (!horaTouched.current) setHora(formatHora(d));
-    }, 30_000);
-    return () => clearInterval(id);
-  }, []);
-
   // Clear the pending flash timeout on unmount.
   useEffect(() => {
     return () => {
@@ -207,8 +193,7 @@ export default function CargaPage() {
     };
   }, []);
 
-  const canConfirm =
-    items.length > 0 && fecha.trim() !== '' && hora.trim() !== '';
+  const canConfirm = items.length > 0;
 
   const clientIdFor = (botellonId: string) =>
     items.find((i) => i.id === botellonId)?.cliente ?? null;
@@ -523,48 +508,6 @@ export default function CargaPage() {
             })}
           </ul>
         )}
-      </div>
-
-      {/* Shared fecha/hora for the whole batch */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div>
-          <label
-            htmlFor="carga-fecha"
-            className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            Fecha
-          </label>
-          <input
-            id="carga-fecha"
-            name="fecha"
-            type="date"
-            value={fecha}
-            onChange={(e) => {
-              fechaTouched.current = true;
-              setFecha(e.target.value);
-            }}
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="carga-hora"
-            className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            Hora
-          </label>
-          <input
-            id="carga-hora"
-            name="hora"
-            type="time"
-            value={hora}
-            onChange={(e) => {
-              horaTouched.current = true;
-              setHora(e.target.value);
-            }}
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
-        </div>
       </div>
 
       {/* Server validation error */}

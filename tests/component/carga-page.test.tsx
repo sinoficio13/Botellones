@@ -58,14 +58,6 @@ async function selectOperation(user: ReturnType<typeof userEvent.setup>, name: s
   await user.click(screen.getByRole('button', { name }));
 }
 
-/** Clear the auto-prefilled fecha/hora and type explicit deterministic values. */
-async function fillFechaHora(user: ReturnType<typeof userEvent.setup>, fecha: string, hora: string) {
-  await user.clear(screen.getByLabelText('Fecha'));
-  await user.type(screen.getByLabelText('Fecha'), fecha);
-  await user.clear(screen.getByLabelText('Hora'));
-  await user.type(screen.getByLabelText('Hora'), hora);
-}
-
 beforeEach(() => {
   useQrScannerMock.mockReset();
   currentDecodeError = null;
@@ -101,6 +93,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe('CargaPage - operation selector', () => {
@@ -127,14 +120,13 @@ describe('CargaPage - operation selector', () => {
     await renderPage();
 
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(registrarOperacionMock).toHaveBeenCalledWith({
       botellonIds: ['b1'],
       operacion: 'recargar',
-      fecha: '2026-08-20',
-      hora: '14:30',
+      fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
     });
   });
 
@@ -146,14 +138,13 @@ describe('CargaPage - operation selector', () => {
 
     await selectOperation(user, 'Recibir');
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(registrarOperacionMock).toHaveBeenCalledWith({
       botellonIds: ['b1'],
       operacion: 'recibir',
-      fecha: '2026-08-20',
-      hora: '14:30',
+      fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
     });
   });
 });
@@ -389,61 +380,17 @@ describe('CargaPage - confirm gating', () => {
     expect(getConfirmButton()).toBeDisabled();
   });
 
-  it('disables confirm when fecha or hora is missing', async () => {
+  it('enables confirm as soon as the session has at least one botellon (no fecha/hora gating)', async () => {
     getBotellonByCodigoMock.mockResolvedValue(BOT1);
-    const user = userEvent.setup();
     await renderPage();
     await decode(QR1);
 
-    await user.clear(screen.getByLabelText('Hora'));
-    expect(getConfirmButton()).toBeDisabled();
-
-    await user.type(screen.getByLabelText('Hora'), '14:30');
     expect(getConfirmButton()).toBeEnabled();
   });
 });
 
-describe('CargaPage - fecha/hora auto-prefill', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('prefills fecha and hora with the current local date/time on mount', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-20T14:30:45'));
-    await renderPage();
-
-    const fechaInput = screen.getByLabelText('Fecha') as HTMLInputElement;
-    const horaInput = screen.getByLabelText('Hora') as HTMLInputElement;
-
-    expect(fechaInput.value).toBe('2026-08-20');
-    expect(horaInput.value).toBe('14:30');
-  });
-
-  it('live-updates an untouched field but never clobbers a manually edited one', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-20T14:30:00'));
-    const { fireEvent } = await import('@testing-library/react');
-    const utils = await renderPage();
-
-    const fechaInput = utils.getByLabelText('Fecha') as HTMLInputElement;
-    const horaInput = utils.getByLabelText('Hora') as HTMLInputElement;
-
-    fireEvent.change(horaInput, { target: { value: '16:00' } });
-    expect(horaInput.value).toBe('16:00');
-
-    vi.setSystemTime(new Date('2026-08-20T15:30:00'));
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
-
-    expect(fechaInput.value).toBe('2026-08-20');
-    expect(horaInput.value).toBe('16:00');
-  });
-});
-
 describe('CargaPage - batch confirm', () => {
-  it('posts the accumulated ids with the shared fecha/hora for the selected op', async () => {
+  it('posts the accumulated ids with the current timestamp for the selected op', async () => {
     getBotellonByCodigoMock.mockImplementation((codigo: string) =>
       Promise.resolve(codigo === 'BOT-00001' ? BOT1 : BOT2)
     );
@@ -454,11 +401,31 @@ describe('CargaPage - batch confirm', () => {
     await decode(QR1);
     await decode(QR2);
 
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(registrarOperacionMock).toHaveBeenCalledWith({
       botellonIds: ['b1', 'b2'],
+      operacion: 'recargar',
+      fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
+    });
+  });
+
+  it('records the exact current date/time (frozen clock) computed at submit time', async () => {
+    // Freeze only `Date` (not timers) so React's scheduler and userEvent keep
+    // working on real time while `new Date()` in the action stays deterministic.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-20T14:30:45'));
+    getBotellonByCodigoMock.mockResolvedValue(BOT1);
+    registrarOperacionMock.mockResolvedValue({ success: true, items: [] });
+    const user = userEvent.setup();
+    await renderPage();
+
+    await decode(QR1);
+    await user.click(getConfirmButton());
+
+    expect(registrarOperacionMock).toHaveBeenCalledWith({
+      botellonIds: ['b1'],
       operacion: 'recargar',
       fecha: '2026-08-20',
       hora: '14:30',
@@ -476,7 +443,6 @@ describe('CargaPage - batch confirm', () => {
     await renderPage();
 
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(await screen.findByText('Fecha y hora requeridas')).toBeInTheDocument();
@@ -501,7 +467,6 @@ describe('CargaPage - per-item results', () => {
 
     await decode(QR1);
     await decode(QR2);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(await screen.findByText('Registrado: REC-000101')).toBeInTheDocument();
@@ -520,7 +485,6 @@ describe('CargaPage - per-item results', () => {
     await renderPage();
 
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     const assign = await screen.findByRole('link', { name: 'Asignar cliente' });
@@ -555,7 +519,6 @@ describe('CargaPage - success screen', () => {
     await renderPage();
 
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(await screen.findByText('Carga registrada')).toBeInTheDocument();
@@ -576,7 +539,6 @@ describe('CargaPage - success screen', () => {
     await renderPage();
 
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(await screen.findByText('Carga registrada')).toBeInTheDocument();
@@ -600,7 +562,6 @@ describe('CargaPage - success screen', () => {
 
     await selectOperation(user, 'Recibir');
     await decode(QR1);
-    await fillFechaHora(user, '2026-08-20', '14:30');
     await user.click(getConfirmButton());
 
     expect(await screen.findByText('Carga registrada')).toBeInTheDocument();

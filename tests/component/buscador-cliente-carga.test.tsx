@@ -157,7 +157,7 @@ describe('BuscadorClienteCarga — expanding a client', () => {
   it('shows a muted hint when the client has no actionable bottles', async () => {
     getClientesForSearchMock.mockResolvedValue([CLIENTE]);
     getBotellonesClienteMock.mockResolvedValue(
-      respuestaBotellones([{ id: 'b9', codigo: 'BOT-00009', estado: 'delivery' }])
+      respuestaBotellones([{ id: 'b9', codigo: 'BOT-00009', estado: 'listo' }])
     );
     montar();
 
@@ -166,6 +166,20 @@ describe('BuscadorClienteCarga — expanding a client', () => {
 
     expect(screen.getByText('Sin botellones accionables.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Agregar' })).not.toBeInTheDocument();
+  });
+
+  it('shows delivery bottles as actionable (En delivery → Entregar)', async () => {
+    getClientesForSearchMock.mockResolvedValue([CLIENTE]);
+    getBotellonesClienteMock.mockResolvedValue(
+      respuestaBotellones([{ id: 'b9', codigo: 'BOT-00009', estado: 'delivery' }])
+    );
+    montar();
+
+    await buscar('jua');
+    await expandirCliente();
+
+    expect(screen.getByText('BOT-00009')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Agregar' })).toBeInTheDocument();
   });
 });
 

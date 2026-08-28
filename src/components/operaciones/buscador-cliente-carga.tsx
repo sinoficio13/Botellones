@@ -9,7 +9,7 @@ import { ESTADO_LABELS } from '@/lib/utils/estados';
 const DEBOUNCE_MS = 250;
 const MIN_QUERY = 2;
 /** Estados whose bottles can be added to the batch session in this flow. */
-const ESTADOS_ACCIONABLES = new Set(['entregado', 'recibido', 'recarga']);
+const ESTADOS_ACCIONABLES = new Set(['entregado', 'recibido', 'recarga', 'delivery']);
 
 /** A botellon the operator adds to the session from the client search. */
 export type BotellonCargaBuscador = {

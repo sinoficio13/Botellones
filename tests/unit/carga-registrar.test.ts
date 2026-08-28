@@ -1180,6 +1180,63 @@ describe('registrarOperacion — delivery (recarga → delivery)', () => {
     ]);
     expect(supabase.from).toHaveBeenCalledTimes(1);
   });
+
+  it('entregar moves delivery bottles to entregado (pure branch, no REC)', async () => {
+    const partition = makeChain(async () => ({
+      data: [
+        { id: 'b1', codigo: 'BOT-00001', estado: 'delivery', cliente_id: 'c1' },
+        { id: 'b2', codigo: 'BOT-00002', estado: 'delivery', cliente_id: 'c2' },
+      ],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const { supabase, recorded } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b1', 'b2'],
+      operacion: 'entregar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([
+      { botellonId: 'b1', codigo: 'BOT-00001', ok: true },
+      { botellonId: 'b2', codigo: 'BOT-00002', ok: true },
+    ]);
+    // Pure branch: single .in() update guarded by the entregar sources.
+    expect(update.update).toHaveBeenCalledWith({ estado: 'entregado' });
+    expect(update.in).toHaveBeenCalledWith('id', ['b1', 'b2']);
+    expect(update.in).toHaveBeenCalledWith('estado', ['delivery']);
+    // No recargas write, no loyalty count queries.
+    expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
+    expect(countQueries(recorded)).toHaveLength(0);
+    expect(revalidatePath).toHaveBeenCalledWith('/botellones');
+  });
+
+  it('rejects a clientless delivery bottle for entregar with sin-cliente and writes zero rows', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b3', codigo: 'BOT-00003', estado: 'delivery', cliente_id: null }],
+      error: null,
+    }));
+    const { supabase } = makeSupabase([partition]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b3'],
+      operacion: 'entregar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.items).toEqual([
+      { botellonId: 'b3', codigo: 'BOT-00003', ok: false, reason: 'sin-cliente' },
+    ]);
+    expect(supabase.from).toHaveBeenCalledTimes(1); // only the partition select
+    expect(procesarLoyaltyMock).not.toHaveBeenCalled();
+  });
 });
 
 // ── Task 2.5: registrarCarga thin wrapper removed in commit 2 ──

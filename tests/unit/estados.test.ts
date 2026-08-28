@@ -117,8 +117,17 @@ describe('OPERACIONES', () => {
     });
   });
 
+  it('defines entregar → entregado requiring client (but no REC) with delivery as its only source', () => {
+    expect(OPERACIONES.entregar).toEqual({
+      target: 'entregado',
+      requiresCliente: true,
+      createsRec: false,
+      sources: ['delivery'],
+    });
+  });
+
   it('covers every operation id with a valid target estado', () => {
-    const ops: OperacionId[] = ['recibir', 'recargar', 'listo', 'delivery'];
+    const ops: OperacionId[] = ['recibir', 'recargar', 'listo', 'delivery', 'entregar'];
     for (const op of ops) {
       expect(ESTADOS).toContain(OPERACIONES[op].target);
       expect(OPERACIONES[op].sources.length).toBeGreaterThan(0);
@@ -128,7 +137,7 @@ describe('OPERACIONES', () => {
 
 describe('OPERACION_LABELS', () => {
   it('provides a label for every operation id (single source of truth)', () => {
-    const ops: OperacionId[] = ['recibir', 'recargar', 'listo', 'delivery'];
+    const ops: OperacionId[] = ['recibir', 'recargar', 'listo', 'delivery', 'entregar'];
     for (const op of ops) {
       expect(OPERACION_LABELS[op]).toBeDefined();
     }
@@ -136,6 +145,7 @@ describe('OPERACION_LABELS', () => {
     expect(OPERACION_LABELS.recargar).toBe('Recargar');
     expect(OPERACION_LABELS.listo).toBe('Listo');
     expect(OPERACION_LABELS.delivery).toBe('En delivery');
+    expect(OPERACION_LABELS.entregar).toBe('Entregar');
   });
 });
 

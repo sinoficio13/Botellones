@@ -35,9 +35,9 @@ function formatHora(d: Date): string {
 /**
  * Prefilled destination for a bottle given its CURRENT estado (the operator
  * never picks a global operation anymore):
- *   entregado → recibir, recibido → recargar, recarga → listo
+ *   entregado → recibir, recibido → recargar, recarga → listo, delivery → entregar
  *   ('listo' is the default of the recarga-row chooser; 'delivery' is an option)
- *   listo / delivery / unknown → null (no destination in this flow).
+ *   listo / unknown → null (no destination in this flow; manage on the kanban).
  */
 function prefillDestino(estado: string | null): OperacionId | null {
   switch (estado) {
@@ -47,6 +47,8 @@ function prefillDestino(estado: string | null): OperacionId | null {
       return 'recargar';
     case 'recarga':
       return 'listo';
+    case 'delivery':
+      return 'entregar';
     default:
       return null;
   }
@@ -55,8 +57,9 @@ function prefillDestino(estado: string | null): OperacionId | null {
 /**
  * Valid destination choices for a bottle's current estado, derived from the
  * OPERACIONES sources (e.g. 'recarga' → ['listo','delivery'], 'entregado' →
- * ['recibir'], 'recibido' → ['recargar'], others → []). Key order follows the
- * OPERACIONES declaration, so the recarga default ('listo') comes first.
+ * ['recibir'], 'recibido' → ['recargar'], 'delivery' → ['entregar'], others →
+ * []). Key order follows the OPERACIONES declaration, so the recarga default
+ * ('listo') comes first.
  */
 export function destinosPosibles(estado: string): OperacionId[] {
   const ops = Object.keys(OPERACIONES) as OperacionId[];

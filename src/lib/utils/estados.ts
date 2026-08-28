@@ -67,7 +67,7 @@ export function getEstadosPermitidos(estado: Estado): Estado[] {
  * source of truth; the UI mirrors it via `esTransicionValida` for live
  * green/red badges and via `destinosPosibles` for per-row destination hints.
  */
-export type OperacionId = 'recibir' | 'recargar' | 'listo' | 'delivery';
+export type OperacionId = 'recibir' | 'recargar' | 'listo' | 'delivery' | 'entregar';
 
 export const OPERACIONES: Record<
   OperacionId,
@@ -77,6 +77,7 @@ export const OPERACIONES: Record<
   recargar: { target: 'recarga', requiresCliente: true, createsRec: true, sources: ['recibido'] },
   listo: { target: 'listo', requiresCliente: false, createsRec: false, sources: ['recarga'] },
   delivery: { target: 'delivery', requiresCliente: true, createsRec: false, sources: ['recarga'] },
+  entregar: { target: 'entregado', requiresCliente: true, createsRec: false, sources: ['delivery'] },
 };
 
 /**
@@ -88,6 +89,7 @@ export const OPERACION_LABELS: Record<OperacionId, string> = {
   recargar: 'Recargar',
   listo: 'Listo',
   delivery: 'En delivery',
+  entregar: 'Entregar',
 };
 
 /**

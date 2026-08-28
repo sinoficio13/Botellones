@@ -10,6 +10,7 @@ import { useQrScanner, type QrDecodeOutcome } from '@/lib/scanner/use-qr-scanner
 import { useSesionCarga } from '@/hooks/useSesionCarga';
 import { SesionCarga } from '@/components/operaciones/sesion-carga';
 import { ResultadoCarga } from '@/components/operaciones/resultado-carga';
+import { BuscadorClienteCarga } from '@/components/operaciones/buscador-cliente-carga';
 
 /**
  * Batch scanning terminal. The operator scans or types bottle codes freely;
@@ -71,6 +72,7 @@ function CargaTerminal({ onListo }: { onListo: () => void }) {
 
   const accionables = items.filter((i) => i.destino !== null);
   const canConfirmar = accionables.length > 0 && !confirmando;
+  const enSesion = new Set(items.map((i) => i.id));
 
   async function manejarConfirmar() {
     if (confirmando) return;
@@ -200,6 +202,12 @@ function CargaTerminal({ onListo }: { onListo: () => void }) {
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errorManual}</p>
         )}
       </form>
+
+      {/* Client search — alternative to the digits-only entry. Adds the chosen
+          client's bottles to the SAME session (dedupe + flash via the hook). */}
+      <div className="mt-4">
+        <BuscadorClienteCarga onAgregar={agregar} enSesion={enSesion} />
+      </div>
 
       {/* Session */}
       <div className="mt-4">

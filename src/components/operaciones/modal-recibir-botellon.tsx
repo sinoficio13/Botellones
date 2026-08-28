@@ -7,6 +7,7 @@ import type { CargaState } from '@/lib/db/cargas';
 import { useSesionCarga } from '@/hooks/useSesionCarga';
 import { SesionCarga } from '@/components/operaciones/sesion-carga';
 import { ResultadoCarga } from '@/components/operaciones/resultado-carga';
+import { BuscadorClienteCarga } from '@/components/operaciones/buscador-cliente-carga';
 import { cn } from '@/lib/utils';
 
 /** Primary flat button classes (φ-consistent: rounded-lg, one-step darker hover). */
@@ -82,6 +83,7 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
 
   const accionables = items.filter((i) => i.destino !== null);
   const canConfirmar = accionables.length > 0 && !confirmando;
+  const enSesion = new Set(items.map((i) => i.id));
 
   let cuerpo: ReactNode;
 
@@ -139,6 +141,11 @@ export function ModalRecibirBotellon({ onClose }: { onClose: () => void }) {
             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errorManual}</p>
           )}
         </form>
+
+        {/* Client search — alternative path to the digits-only entry; adds the
+            chosen client's bottles to the SAME session (dedupe + flash via
+            the hook). */}
+        <BuscadorClienteCarga onAgregar={agregar} enSesion={enSesion} />
 
         {/* Session */}
         <div>

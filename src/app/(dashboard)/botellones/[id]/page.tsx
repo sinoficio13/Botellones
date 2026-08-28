@@ -9,6 +9,25 @@ import { QrCodeDisplay } from './qr-code';
 
 export const dynamic = 'force-dynamic';
 
+/** 12-hour clock display ("4:37 PM") — stored time stays 24h/ISO; only the UI converts. */
+function formatHora12(d: Date): string {
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+/** Same 12-hour conversion for stored "HH:MM[:SS]" strings (recargas.hora). */
+function formatHora12Str(hora: string): string {
+  const [hh, mm] = hora.split(':');
+  let h = parseInt(hh, 10) || 0;
+  const m = mm ?? '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -96,7 +115,9 @@ async function RecargasHistorial({ botellonId }: { botellonId: string }) {
               {recargas.map((r: import('@/lib/db/recargas').RecargaConCliente) => (
                 <tr key={r.id}>
                   <td className="px-3 py-2">{new Date(r.fecha).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-zinc-500">{r.hora?.slice(0, 5)}</td>
+                  <td className="px-3 py-2 text-zinc-500">
+                    {r.hora ? formatHora12Str(r.hora) : '—'}
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs">{r.numero_registro}</td>
                   <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{r.clientes?.nombre || '—'}</td>
                 </tr>
@@ -136,12 +157,7 @@ async function HistorialEstados({ botellonId }: { botellonId: string }) {
               {movimientos.map((m) => (
                 <tr key={m.id}>
                   <td className="px-3 py-2">{new Date(m.created_at).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-zinc-500">
-                    {new Date(m.created_at).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
+                  <td className="px-3 py-2 text-zinc-500">{formatHora12(new Date(m.created_at))}</td>
                   <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
                     {ESTADO_LABELS[m.estado_previo ?? ''] ?? m.estado_previo ?? '—'} →{' '}
                     {ESTADO_LABELS[m.estado_nuevo ?? ''] ?? m.estado_nuevo}

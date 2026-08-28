@@ -40,18 +40,16 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
     expect(screen.getByText('—')).toHaveClass('font-mono');
   });
 
-  it('renders 6 codes on one ·-line with a static +2 suffix for 8 and no chips', () => {
+  it('renders 6 code chips (all pressed by default) with a +2 expansion for 8', () => {
     const botellones = Array.from({ length: 8 }, (_, i) => botellon(i + 1));
     render(<GrupoCardKanban grupo={grupo(botellones)} estado="recibido" onAccion={vi.fn()} />);
 
-    expect(
-      screen.getByText('BOT-001 · BOT-002 · BOT-003 · BOT-004 · BOT-005 · BOT-006')
-    ).toBeInTheDocument();
-    expect(screen.getByText('+2')).toBeInTheDocument();
-    expect(screen.queryByText('BOT-007')).not.toBeInTheDocument();
-    // No chips on desktop (REQ-23: single ·-line of codes, no chip selection).
-    expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: /^BOT-/ })).not.toBeInTheDocument();
+    const chips = screen.getAllByRole('button', { name: /^BOT-00/ });
+    expect(chips).toHaveLength(6);
+    for (const chip of chips) expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: 'BOT-007' })).not.toBeInTheDocument();
+    // Expansion control (mirrors GrupoCard): +2 button, not a static suffix.
+    expect(screen.getByRole('button', { name: 'Mostrar 2 botellones más' })).toHaveTextContent('+2');
   });
 
   it.each<[EstadoOperativo, string]>([
@@ -77,6 +75,49 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
   it('disables the whole-group action while an action is in flight (enAccion)', () => {
     render(<GrupoCardKanban grupo={grupo([botellon(1)])} estado="recibido" enAccion onAccion={vi.fn()} />);
     expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeDisabled();
+  });
+
+  // ── per-bottle selection (mirrors GrupoCard: subset moves only the marked) ──
+
+  it('deselecting one chip of a 2-bottle group flips the forward label to the counted subset and moves only the selection', () => {
+    const onAccion = vi.fn();
+    render(<GrupoCardKanban grupo={grupo([botellon(1), botellon(2)])} estado="recibido" onAccion={onAccion} />);
+
+    // Default all-selected → whole-group copy.
+    expect(screen.getByRole('button', { name: '→ Pasar a En recarga' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-002' }));
+    expect(screen.getByRole('button', { name: '→ Pasar 1 a En recarga' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '→ Pasar 1 a En recarga' }));
+    expect(onAccion).toHaveBeenCalledWith(['b-1']);
+  });
+
+  it('deselecting ALL chips disables the action and shows "Elegí al menos un botellón"', () => {
+    const onAccion = vi.fn();
+    render(<GrupoCardKanban grupo={grupo([botellon(1), botellon(2)])} estado="recibido" onAccion={onAccion} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-001' }));
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-002' }));
+
+    const accion = screen.getByRole('button', { name: 'Elegí al menos un botellón' });
+    expect(accion).toBeDisabled();
+    fireEvent.click(accion);
+    expect(onAccion).not.toHaveBeenCalled();
+  });
+
+  it('listo card: deselecting one chip flips Entregar to the counted subset and onEntregar receives only the selection', () => {
+    const onEntregar = vi.fn();
+    render(<GrupoCardKanban grupo={grupo([botellon(1), botellon(2)])} estado="listo" onAccion={vi.fn()} onEntregar={onEntregar} />);
+
+    // Default all-selected → whole-group Entregar copy.
+    expect(screen.getByRole('button', { name: '✓ Entregar a María' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'BOT-002' }));
+    expect(screen.getByRole('button', { name: '✓ Entregar 1 a María' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '✓ Entregar 1 a María' }));
+    expect(onEntregar).toHaveBeenCalledWith(['b-1']);
   });
 
   it('shows amber urgency text for 6–24h and ▲ AlertTriangle + amber tint for >24h (REQ-23 S3)', async () => {
@@ -112,26 +153,17 @@ describe('GrupoCardKanban — REQ-COS-23', () => {
     expect(html).not.toContain('triangle-alert');
   });
 
-  it('keeps the +N suffix OUTSIDE the truncating codes line so it stays visible in a narrow container (carried R4-001)', () => {
+  it('expands the hidden chips when the +N button is tapped and removes it after (mirrors GrupoCard)', () => {
     const botellones = Array.from({ length: 8 }, (_, i) => botellon(i + 1));
-    const { container } = render(
-      <div style={{ width: 120 }}>
-        <GrupoCardKanban grupo={grupo(botellones)} estado="recibido" onAccion={vi.fn()} />
-      </div>
-    );
+    render(<GrupoCardKanban grupo={grupo(botellones)} estado="recibido" onAccion={vi.fn()} />);
 
-    // The +N is a separate shrink-0 span, NOT inside the truncate <p> (whose
-    // overflow clips) — so it is guaranteed visible even in a 120px container.
-    const codigos = [...container.querySelectorAll('p')].find((p) => p.className.includes('truncate'));
-    const plusN = [...container.querySelectorAll('span')].find((s) => s.textContent === '+2');
+    expect(screen.getAllByRole('button', { name: /^BOT-00/ })).toHaveLength(6);
+    const expandir = screen.getByRole('button', { name: 'Mostrar 2 botellones más' });
+    expect(expandir).toHaveTextContent('+2');
 
-    expect(codigos).not.toBeNull();
-    expect(codigos!.textContent).toContain('BOT-001');
-    expect(plusN).not.toBeNull();
-    // +N lives outside the truncate element (separate span, not its child).
-    expect(codigos!.contains(plusN as Node)).toBe(false);
-    expect(plusN!.className).toContain('shrink-0');
-    expect(screen.getByText('+2')).toBeInTheDocument();
+    fireEvent.click(expandir);
+    expect(screen.getAllByRole('button', { name: /^BOT-00/ })).toHaveLength(8);
+    expect(screen.queryByRole('button', { name: 'Mostrar 2 botellones más' })).not.toBeInTheDocument();
   });
 
   it('marks the WhatsApp target aria-disabled + opacity-40 without a phone, but the tap still fires onWhatsApp (D7, REQ-23 S4)', () => {

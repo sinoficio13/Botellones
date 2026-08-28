@@ -1,10 +1,13 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+
 import { AlertTriangle, MessageCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatAntiguedad, nivelUrgencia } from '@/lib/utils/cola';
 import { ActionButton } from '@/components/operaciones/action-button';
+import { Chip } from '@/components/operaciones/chip';
 import { copiaAccion, useEdadAhora } from '@/components/operaciones/grupo-card';
 import type { EstadoOperativo, GrupoCola } from '@/hooks/useColaOperaciones';
 
@@ -12,10 +15,10 @@ export type GrupoCardKanbanProps = {
   grupo: GrupoCola;
   estado: EstadoOperativo;
   enAccion?: boolean;
-  /** Whole-group action: ids = grupo.botellones.map(b => b.id) (REQ-23). */
+  /** Selection action: ids = currently marked bottles (all by default). */
   onAccion: (ids: string[]) => void | Promise<unknown>;
   /** Manual pickup for estado `listo` (listo → entregado): a second "✓ Entregar
-   * N" whole-group button rendered ONLY when estado === 'listo'. Other estados
+   * N" selection button rendered ONLY when estado === 'listo'. Other estados
    * render exactly one action regardless of this prop. */
   onEntregar?: (ids: string[]) => void | Promise<unknown>;
   /** REQ-COS-28: WhatsApp tap → shell opens the sheet (D8). Always fires —
@@ -29,18 +32,21 @@ export type GrupoCardKanbanProps = {
   onDragEnd?: () => void;
 };
 
-/** Codes visibles en la línea `·` antes del sufijo +N (REQ-23, D12 — sin expansor en desktop). */
+/** Chips visibles antes del botón expansor +N (REQ-23, D12 — mirrored from GrupoCard's CHIPS_VISIBLES). */
 const CODIGOS_VISIBLES = 6;
 
 /**
- * GrupoCardKanban — compact whole-group card for the desktop kanban (REQ-23,
- * D3: new component, GrupoCard's chips/selection stay untouched). Client name
- * + mono cédula ("—" NULL), age + 2-level urgency (6–24h text via
- * --urgencia-texto; >24h ▲ + amber tint via --urgencia; R4-001), bottle codes
- * on ONE ·-line truncated with a static "+N" (no chips), whole-group
- * ActionButton ≥44px with per-estado copy (DESTINO_ACCION/copiaAccion), and an
- * inert WhatsApp target (disabled + opacity-40 sin teléfono). R1-001: the
- * clock is client-only (useEdadAhora) — SSR-safe placeholder on the server.
+ * GrupoCardKanban — compact per-bottle-selection card for the desktop kanban
+ * (REQ-23, D3: new component, mirrors GrupoCard's chip/selection pattern so
+ * every device moves the same way). Client name + mono cédula ("—" NULL), age +
+ * 2-level urgency (6–24h text via --urgencia-texto; >24h ▲ + amber tint via
+ * --urgencia; R4-001), per-bottle toggle Chips in a grid (ALL marked on mount;
+ * subset moves only the marked bottles, same as GrupoCard), a +N expansion
+ * button for hidden codes, subset-aware ActionButton ≥44px with per-estado copy
+ * (DESTINO_ACCION/copiaAccion), the two `listo` buttons (forward + ✓ Entregar)
+ * respecting the selection, drag & drop that moves the selection, and an inert
+ * WhatsApp target (disabled + opacity-40 sin teléfono). R1-001: the clock is
+ * client-only (useEdadAhora) — SSR-safe placeholder on the server.
  * Tokens only, no hex.
  */
 export function GrupoCardKanban({
@@ -58,6 +64,23 @@ export function GrupoCardKanban({
   // first client render share the null clock (no hydration mismatch).
   const ahora = useEdadAhora();
 
+  // Selección local al card (design D6, mirrored from GrupoCard): todas
+  // marcadas al montar; el hook no expone API de selección. Sobrevive a
+  // movimientos de subconjuntos.
+  const [marcados, setMarcados] = useState<Set<string>>(
+    () => new Set(grupo.botellones.map((b) => b.id))
+  );
+  const [expandido, setExpandido] = useState(false);
+
+  // R2-001 carried fix (DERIVED, no effect): cuando el grupo se encoge
+  // (movimiento de subconjunto), el conteo/copy/ids deben descartar los ids
+  // que ya no pertenecen al grupo, aunque `marcados` (selección local, D6)
+  // conserve su estado para los chips restantes.
+  const marcadosValidos = useMemo(
+    () => new Set([...marcados].filter((id) => grupo.botellones.some((b) => b.id === id))),
+    [marcados, grupo.botellones]
+  );
+
   const cliente = grupo.botellones[0]?.clientes;
   const nombre = cliente?.nombre ?? '';
   const primerNombre = nombre.split(/\s+/)[0] ?? '';
@@ -66,19 +89,43 @@ export function GrupoCardKanban({
   const urgencia = ahora ? nivelUrgencia(grupo.estado_desde, ahora) : 'normal';
   const antiguedad = ahora ? formatAntiguedad(grupo.estado_desde, ahora) : '0m';
 
-  const visibles = grupo.botellones.slice(0, CODIGOS_VISIBLES);
+  const visibles = expandido ? grupo.botellones : grupo.botellones.slice(0, CODIGOS_VISIBLES);
   const ocultos = grupo.botellones.length - visibles.length;
-  const ids = grupo.botellones.map((b) => b.id);
+  const sinMarcados = marcadosValidos.size === 0;
+  const deshabilitada = sinMarcados || enAccion;
+
+  function toggle(id: string, siguiente: boolean) {
+    setMarcados((prev) => {
+      const proximo = new Set(prev);
+      if (siguiente) proximo.add(id);
+      else proximo.delete(id);
+      return proximo;
+    });
+  }
+
+  // All-selected → no count (UX rule): "✓ Entregar a María"; subset → count.
+  const copiaEntregar = sinMarcados
+    ? 'Elegí al menos un botellón'
+    : marcadosValidos.size >= grupo.botellones.length
+      ? primerNombre
+        ? `✓ Entregar a ${primerNombre}`
+        : `✓ Entregar`
+      : primerNombre
+        ? `✓ Entregar ${marcadosValidos.size} a ${primerNombre}`
+        : `✓ Entregar ${marcadosValidos.size}`;
 
   return (
     <article
       data-testid="grupo-card-kanban"
       draggable
       onDragStart={(e) => {
-        // REQ-25: set dataTransfer with the whole group's ids + effectAllowed.
-        e.dataTransfer.setData('text/plain', ids.join(','));
+        // REQ-25: the dragged payload is the SELECTION (consistent with the
+        // buttons) — all ids by default, only the marked subset otherwise.
+        const seleccion = [...marcadosValidos];
+        if (seleccion.length === 0) return;
+        e.dataTransfer.setData('text/plain', seleccion.join(','));
         e.dataTransfer.effectAllowed = 'move';
-        onDragStart?.(ids.join(','));
+        onDragStart?.(seleccion.join(','));
       }}
       onDragEnd={() => {
         // REQ-25 S4: clear the parent dragId fallback.
@@ -142,55 +189,67 @@ export function GrupoCardKanban({
         </div>
       </div>
 
-      {/* Codes: ONE ·-line, 6 visibles + static +N (REQ-23, D12 — no chips, no
-          expansor). R4-001 (carried): the +N suffix lives OUTSIDE the truncate
-          element in its own shrink-0 span, so it stays visible even when the
-          codes line is clipped in a narrow container. */}
-      <div className="mt-2 flex min-w-0 items-center gap-1">
-        <p className="truncate text-xs tabular-nums text-text-secondary">
-          {visibles.map((b) => b.codigo).join(' · ')}
-        </p>
+      {/* Codes: per-bottle toggle Chips in a grid, +N expansion (mirrors
+          GrupoCard, REQ-23 D12 — all selected by default). */}
+      <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-1.5">
+        {visibles.map((b) => (
+          <Chip
+            key={b.id}
+            label={b.codigo}
+            pressed={marcadosValidos.has(b.id)}
+            onToggle={(siguiente) => toggle(b.id, siguiente)}
+          />
+        ))}
         {ocultos > 0 ? (
-          <span className="shrink-0 text-xs tabular-nums text-text-muted">+{ocultos}</span>
+          <button
+            type="button"
+            aria-label={`Mostrar ${ocultos} botellones más`}
+            onClick={() => setExpandido(true)}
+            className="min-h-11 rounded-md border border-border-strong px-2.5 text-sm text-text-secondary"
+          >
+            +{ocultos}
+          </button>
         ) : null}
       </div>
 
       {estado === 'listo' && onEntregar ? (
         <div className="mt-3 flex flex-col gap-2">
           <ActionButton
-            disabled={enAccion}
+            disabled={deshabilitada}
             onClick={() => {
-              void onAccion(ids);
+              void onAccion([...marcadosValidos]);
             }}
             className="w-full"
           >
-            {copiaAccion(estado, ids.length, ids.length, primerNombre)}
+            {sinMarcados
+              ? 'Elegí al menos un botellón'
+              : copiaAccion(estado, marcadosValidos.size, grupo.botellones.length, primerNombre)}
           </ActionButton>
           {/* Manual pickup: listo → entregado (direct delivery) as a distinct
               bordered/text button next to the forward action. Flat secondary:
               surface + border, one-step hover darkening. */}
           <button
             type="button"
-            disabled={enAccion}
+            disabled={deshabilitada}
             onClick={() => {
-              void onEntregar?.(ids);
+              void onEntregar?.([...marcadosValidos]);
             }}
             className="min-h-11 w-full rounded-lg border border-border-strong bg-surface-1 px-3 text-sm font-medium text-text-primary transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca/60 dark:hover:bg-zinc-800"
           >
-            {primerNombre
-              ? `✓ Entregar a ${primerNombre}`
-              : `✓ Entregar`}
+            {copiaEntregar}
           </button>
         </div>
       ) : (
         <ActionButton
-          disabled={enAccion}
+          disabled={deshabilitada}
           onClick={() => {
-            void onAccion(ids);
+            void onAccion([...marcadosValidos]);
           }}
           className="mt-3 w-full"
         >
-          {copiaAccion(estado, ids.length, ids.length, primerNombre)}
+          {sinMarcados
+            ? 'Elegí al menos un botellón'
+            : copiaAccion(estado, marcadosValidos.size, grupo.botellones.length, primerNombre)}
         </ActionButton>
       )}
     </article>

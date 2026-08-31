@@ -129,3 +129,15 @@ export const ESTADO_COLORS: Record<string, string> = {
   listo: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   delivery: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
 };
+
+/**
+ * Dot colors for status badges (same hues as `ESTADO_COLORS`, just the solid
+ * foreground shade used by the small round indicator in pills and boxes).
+ */
+export const ESTADO_DOT_COLORS: Record<string, string> = {
+  entregado: 'bg-purple-600',
+  recibido: 'bg-slate-500',
+  recarga: 'bg-cyan-500',
+  listo: 'bg-green-500',
+  delivery: 'bg-amber-500',
+};

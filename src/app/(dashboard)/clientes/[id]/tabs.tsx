@@ -7,8 +7,8 @@ import { saveDireccion, getDireccion, resolveMapLink } from '@/lib/db/direccione
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
-import { formatFechaLocal, formatHora12Str } from '@/lib/utils/hora';
 import { FidelidadTab } from './fidelidad-tab';
+import { HistorialCliente } from '@/components/clientes/historial-cliente';
 import { createClient } from '@/lib/supabase/client';
 import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -44,7 +44,7 @@ export function ClienteTabs({ cliente }: { cliente: ClienteRow }) {
         {activeTab === 'Datos' && <DatosTab cliente={cliente} />}
         {activeTab === 'Dirección' && <DireccionTab clienteId={cliente.id} />}
         {activeTab === 'Botellones' && <BotellonesTab clienteId={cliente.id} />}
-        {activeTab === 'Historial' && <HistorialTab clienteId={cliente.id} />}
+        {activeTab === 'Historial' && <HistorialCliente clienteId={cliente.id} />}
         {activeTab === 'Fidelidad' && (
           <FidelidadTab clienteId={cliente.id} totalRecargas={cliente.total_recargas} />
         )}
@@ -558,60 +558,6 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
                   <td className="px-3 py-2 text-xs text-zinc-500">
                     {b.fecha_creacion ? new Date(b.fecha_creacion).toLocaleDateString() : '—'}
                   </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── HISTORIAL TAB ──
-
-function HistorialTab({ clienteId }: { clienteId: string }) {
-  const [recargas, setRecargas] = useState<Array<{ id: string; fecha: string; hora: string; numero_registro: string; botellones: { codigo: string } | null }>>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.from('recargas')
-      .select('id, fecha, hora, numero_registro, botellon_id, botellones(codigo)')
-      .eq('cliente_id', clienteId)
-      .order('fecha', { ascending: false })
-      .order('hora', { ascending: false })
-      .limit(50)
-      .then(({ data }) => { setRecargas((data as unknown as typeof recargas) || []); setLoading(false); });
-  }, [clienteId]);
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-        Historial de recargas {!loading && <span className="text-sm font-normal text-zinc-400">({recargas.length})</span>}
-      </h2>
-      {loading ? (
-        <p className="text-sm text-zinc-400">Cargando…</p>
-      ) : recargas.length === 0 ? (
-        <p className="text-sm text-zinc-400">No hay recargas registradas para este cliente.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 text-left dark:bg-zinc-900">
-              <tr>
-                <th className="px-3 py-2 font-medium text-zinc-500">Fecha</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Hora</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Registro</th>
-                <th className="px-3 py-2 font-medium text-zinc-500">Botellón</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {recargas.map((r) => (
-                <tr key={r.id}>
-                  <td className="px-3 py-2">{formatFechaLocal(r.fecha)}</td>
-                  <td className="px-3 py-2 text-zinc-500">{r.hora ? formatHora12Str(r.hora) : '—'}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.numero_registro}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.botellones?.codigo || '—'}</td>
                 </tr>
               ))}
             </tbody>

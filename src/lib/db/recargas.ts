@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { procesarLoyalty, REALIZADA_POR_PLACEHOLDER } from '@/lib/db/loyalty';
+import { hoyZona, horaAhoraZona } from '@/lib/utils/hora';
 
 // ── Types ──
 
@@ -41,8 +42,8 @@ export async function getClientesForSearch(query: string) {
     const supabase = await getSupabase();
     const { data } = await supabase
       .from('clientes')
-      .select('id, nombre, codigo, telefono_1')
-      .or(`nombre.ilike.%${query}%,codigo.ilike.%${query}%,telefono_1.ilike.%${query}%`)
+      .select('id, nombre, codigo, cedula, telefono_1')
+      .or(`nombre.ilike.%${query}%,codigo.ilike.%${query}%,cedula.ilike.%${query}%,telefono_1.ilike.%${query}%`)
       .limit(10);
     return data || [];
   } catch {
@@ -101,8 +102,8 @@ export async function registrarRecarga(
       numero_registro,
       cliente_id,
       botellon_id,
-      fecha: new Date().toISOString().slice(0, 10),
-      hora: new Date().toTimeString().slice(0, 8),
+      fecha: hoyZona(),
+      hora: horaAhoraZona(),
       realizada_por,
     });
 
@@ -177,7 +178,7 @@ export async function getRecargasBotellon(botellonId: string): Promise<{ recarga
 export async function getContadores() {
   try {
     const supabase = await getSupabase();
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyZona();
     const mes = hoy.slice(0, 7);
 
     const { count: hoy_count } = await supabase

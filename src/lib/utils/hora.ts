@@ -33,3 +33,49 @@ export function formatFechaLocal(fecha: string): string {
   if (!y || !m || !d) return fecha;
   return `${d}/${m}/${y}`;
 }
+
+// ── Business-timezone helpers ──
+// Venezuela is UTC-4 year-round (no DST since 2007). Every date/time the
+// business stores as a string (`recargas.fecha`, `recargas.hora`,
+// `premios.fecha_alcanzado`) is computed in `America/Caracas`, and every
+// timestamptz is displayed in that same zone. Using `Intl` with an explicit
+// timeZone keeps the output deterministic regardless of the server or browser
+// zone — never `toISOString()`/`toTimeString()`, which are host-zone based.
+
+/** Canonical business timezone (Venezuela, fixed UTC-4). */
+export const ZONA_NEGOCIO = 'America/Caracas';
+
+/** Date → 'YYYY-MM-DD' in the business zone. */
+export function formatFechaZona(d: Date, zona = ZONA_NEGOCIO): string {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zona,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return p.format(d); // en-CA renders YYYY-MM-DD
+}
+
+/** Date → 'HH:MM:SS' in the business zone. */
+export function formatHoraZona(d: Date, zona = ZONA_NEGOCIO): string {
+  const p = new Intl.DateTimeFormat('en-GB', {
+    timeZone: zona,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const h = p.format(d); // en-GB renders HH:MM:SS (24h clock)
+  // Some locales format midnight as "24:xx:xx"; normalize to 00:xx:xx.
+  return h.startsWith('24:') ? `00${h.slice(2)}` : h;
+}
+
+/** Today's date ('YYYY-MM-DD') in the business zone. */
+export function hoyZona(zona = ZONA_NEGOCIO): string {
+  return formatFechaZona(new Date(), zona);
+}
+
+/** Current time ('HH:MM:SS') in the business zone. */
+export function horaAhoraZona(zona = ZONA_NEGOCIO): string {
+  return formatHoraZona(new Date(), zona);
+}

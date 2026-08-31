@@ -3,6 +3,8 @@
 // Runs premio (every 100 recargas) + premio_cerca (5 before next level) checks
 // once per distinct client, with unique-index idempotency on premios.
 
+import { hoyZona } from '@/lib/utils/hora';
+
 export const REALIZADA_POR_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
 
 export type PremioGenerado = { nivel: number; id: string };
@@ -48,7 +50,7 @@ export async function procesarLoyalty(
           cliente_id: clienteId,
           nivel_recargas: totalRecargas,
           estado: 'pendiente',
-          fecha_alcanzado: new Date().toISOString().slice(0, 10),
+          fecha_alcanzado: hoyZona(),
         })
         .select('id')
         .single();
@@ -171,7 +173,7 @@ export async function procesarLoyaltyConCompensacion(
             cliente_id: clienteId,
             nivel_recargas: nivel,
             estado: 'pendiente',
-            fecha_alcanzado: new Date().toISOString().slice(0, 10),
+            fecha_alcanzado: hoyZona(),
           })
           .select('id')
           .single();

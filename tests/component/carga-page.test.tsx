@@ -232,13 +232,13 @@ describe('CargaPage — confirm (per-destino groups)', () => {
       botellonIds: ['b1'],
       operacion: 'recibir',
       fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
     });
     expect(registrarOperacionMock).toHaveBeenCalledWith({
       botellonIds: ['b2'],
       operacion: 'listo',
       fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
     });
   });
 
@@ -262,7 +262,9 @@ describe('CargaPage — confirm (per-destino groups)', () => {
 
   it('records the exact current date/time computed at submit time', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-08-20T14:30:45'));
+    // UTC instant that maps to 14:30:45 in America/Caracas (fixed UTC-4) so the
+    // assertion is deterministic in any runner timezone.
+    vi.setSystemTime(new Date('2026-08-20T18:30:45Z'));
     getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
     registrarOperacionMock.mockResolvedValue({ success: true, items: [] });
     const user = userEvent.setup();
@@ -276,7 +278,7 @@ describe('CargaPage — confirm (per-destino groups)', () => {
       botellonIds: ['b1'],
       operacion: 'recibir',
       fecha: '2026-08-20',
-      hora: '14:30',
+      hora: '14:30:45',
     });
   });
 });

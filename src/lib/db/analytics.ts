@@ -1,5 +1,7 @@
 'use server';
 
+import { hoyZona, formatFechaZona } from '@/lib/utils/hora';
+
 // ── DB join result types ──
 
 type ClienteJoin = {
@@ -82,17 +84,20 @@ function getSupabase() {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hoyZona();
 }
 
 function firstDayOfMonth(date: Date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+  const f = formatFechaZona(date);
+  return `${f.slice(0, 7)}-01`;
 }
 
 function firstDayOfPrevMonth(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  return firstDayOfMonth(d);
+  const hoy = hoyZona();
+  const y = Number(hoy.slice(0, 4));
+  const m = Number(hoy.slice(5, 7));
+  const prev = m === 1 ? [y - 1, 12] : [y, m - 1];
+  return `${prev[0]}-${String(prev[1]).padStart(2, '0')}-01`;
 }
 
 // ── KPI Aggregation ──
@@ -177,9 +182,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
 export async function getRecargasPorDia(days = 30): Promise<RecargaPorDia[]> {
   try {
     const supabase = await getSupabase();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    const desde = startDate.toISOString().slice(0, 10);
+    const desde = formatFechaZona(new Date(Date.now() - days * 86400000));
 
     const { data } = await supabase
       .from('recargas')
@@ -277,12 +280,8 @@ export async function getAlertas(): Promise<AlertasPanel> {
       .limit(20);
 
     // Inactive clients (30+ days since last recarga)
-    const since30 = new Date();
-    since30.setDate(since30.getDate() - 30);
-    const since60 = new Date();
-    since60.setDate(since60.getDate() - 60);
-    const fecha30 = since30.toISOString().slice(0, 10);
-    const fecha60 = since60.toISOString().slice(0, 10);
+    const fecha30 = formatFechaZona(new Date(Date.now() - 30 * 86400000));
+    const fecha60 = formatFechaZona(new Date(Date.now() - 60 * 86400000));
 
     // Get all clientes and their last recarga date in batch
     const { data: clientes } = await supabase.from('clientes').select('id, nombre');
@@ -315,17 +314,22 @@ export async function getAlertas(): Promise<AlertasPanel> {
 
     const inactivos30: AlertaItem[] = [];
     const inactivos60: AlertaItem[] = [];
-    const ahora = new Date();
+    const hoyStr = hoyZona();
 
     for (const c of clientes) {
       const lastFecha = lastRecargaMap.get(c.id) ?? null;
 
-      // Compute days inactive from last recarga date
+      // Compute days inactive from last recarga date (pure calendar-day
+      // difference between the business-zone today and the stored date).
       let daysText: string;
       if (!lastFecha) {
         daysText = 'Sin recargas';
       } else {
-        const dias = Math.floor((ahora.getTime() - new Date(lastFecha).getTime()) / 86400000);
+        const [hy, hm, hd] = hoyStr.split('-').map(Number);
+        const [ly, lm, ld] = lastFecha.split('-').map(Number);
+        const dias = Math.round(
+          (Date.UTC(hy, hm - 1, hd) - Date.UTC(ly, lm - 1, ld)) / 86400000
+        );
         daysText = dias === 0 ? 'Hoy' : dias === 1 ? '1d inactivo' : `${dias}d inactivo`;
       }
 
@@ -404,13 +408,19 @@ export async function getResumenesNegocio(): Promise<ResumenesNegocio> {
 
     // tendencia mensual — last 6 months
     const tendenciaMensual: { mes: string; count: number }[] = [];
+    const [hoyY, hoyM] = hoyZona().split('-').map(Number);
     for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const mesInicio = firstDayOfMonth(d);
-      const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-      const mesFin = new Date(nextMonth.getTime() - 86400000).toISOString().slice(0, 10);
-      const mesLabel = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      let y = hoyY;
+      let m = hoyM - i;
+      while (m <= 0) {
+        m += 12;
+        y -= 1;
+      }
+      const mesLabel = `${y}-${String(m).padStart(2, '0')}`;
+      const mesInicio = `${mesLabel}-01`;
+      // Last day of the month via UTC day-0 arithmetic (DST-free).
+      const diasMes = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const mesFin = `${mesLabel}-${String(diasMes).padStart(2, '0')}`;
 
       const { count } = await supabase
         .from('recargas')

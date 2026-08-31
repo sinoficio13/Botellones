@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { registrarOperacion, type CargaState } from '@/lib/db/cargas';
 import { getCliente } from '@/lib/db/clientes';
 import { OPERACIONES, type Estado, type OperacionId } from '@/lib/utils/estados';
+import { formatFechaZona, formatHoraZona } from '@/lib/utils/hora';
 
 /** A botellon accumulated in the transient batch session (terminal + modal). */
 export type ItemSesion = {
@@ -16,21 +17,6 @@ export type ItemSesion = {
   /** Per-row destination; null = not actionable in this flow (manage in dashboard). */
   destino: OperacionId | null;
 };
-
-/** Format a Date as YYYY-MM-DD in local time (for the record's fecha). */
-function formatFecha(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-/** Format a Date as HH:MM in local time (for the record's hora). */
-function formatHora(d: Date): string {
-  const h = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${min}`;
-}
 
 /**
  * Prefilled destination for a bottle given its CURRENT estado (the operator
@@ -157,8 +143,8 @@ export function useSesionCarga() {
       grupos.set(it.destino, filas);
     }
     const ahora = new Date();
-    const fecha = formatFecha(ahora);
-    const hora = formatHora(ahora);
+    const fecha = formatFechaZona(ahora);
+    const hora = formatHoraZona(ahora);
     const results: CargaState[] = [];
     for (const [operacion, filas] of grupos) {
       results.push(

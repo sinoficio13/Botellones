@@ -208,13 +208,13 @@ describe('ModalRecibirBotellon — confirm and results', () => {
       botellonIds: ['b1'],
       operacion: 'recibir',
       fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
     });
     expect(registrarOperacionMock).toHaveBeenCalledWith({
       botellonIds: ['b3'],
       operacion: 'listo',
       fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      hora: expect.stringMatching(/^\d{2}:\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
     });
   });
 

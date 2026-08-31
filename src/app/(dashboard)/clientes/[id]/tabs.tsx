@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useActionState } from 'react';
+import { useState, useEffect, startTransition } from 'react';
+import { useActionState, type ChangeEvent, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateCliente } from '@/lib/db/clientes';
 import { subirFotosCliente, eliminarFotoCliente } from '@/lib/db/fotos';
 import { saveDireccion, getDireccion, resolveMapLink } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
+import { comprimirImagen, validarImagen, MAX_LADO } from '@/lib/client/imagen';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import { FidelidadTab } from './fidelidad-tab';
@@ -380,28 +381,97 @@ function FotosTab({
 function SubirFotos({ clienteId }: { clienteId: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(subirFotosCliente.bind(null, clienteId), null);
+  const [blobs, setBlobs] = useState<Blob[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [comprimiendo, setComprimiendo] = useState(false);
 
   useEffect(() => {
-    if (state?.success) router.refresh();
+    if (state?.success) {
+      router.refresh();
+      startTransition(() => {
+        setBlobs([]);
+        setError(null);
+      });
+    }
   }, [state, router]);
 
+  async function handleFilesChange(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    const nuevos: Blob[] = [];
+    let algunError = false;
+
+    for (const f of files) {
+      const mensaje = validarImagen(f);
+      if (mensaje) {
+        setError(mensaje);
+        algunError = true;
+        continue;
+      }
+      try {
+        setComprimiendo(true);
+        const blob = await comprimirImagen(f);
+        nuevos.push(blob);
+      } catch {
+        setError('No se pudo comprimir una de las fotos.');
+        algunError = true;
+      }
+    }
+    setComprimiendo(false);
+
+    if (nuevos.length > 0) {
+      setBlobs((prev) => [...prev, ...nuevos]);
+      if (!algunError) setError(null);
+    }
+  }
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    fd.delete('fotos');
+    blobs.forEach((b, i) => fd.append('fotos', b, `fachada-${i}.jpg`));
+    // useActionState exige llamar la acción dentro de una transición (React
+    // lo advierte y `pending` no se actualizaría correctamente).
+    startTransition(() => formAction(fd));
+  }
+
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-8 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600">
         <Upload size={32} className="text-zinc-400 dark:text-zinc-500" />
         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Elegir fotos</span>
         <span className="text-xs text-zinc-400 dark:text-zinc-500">JPG, PNG o WebP · hasta 2.5 MB c/u</span>
-        <input type="file" name="fotos" multiple accept="image/*" className="sr-only" />
+        <input
+          type="file"
+          name="fotos"
+          multiple
+          accept="image/*"
+          onChange={handleFilesChange}
+          className="sr-only"
+        />
       </label>
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || blobs.length === 0}
           className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
-          {pending ? 'Subiendo…' : 'Subir fotos'}
+          {pending ? 'Subiendo…' : blobs.length > 0 ? `Subir fotos (${blobs.length})` : 'Subir fotos'}
         </button>
       </div>
+      {blobs.length > 0 && (
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          {blobs.length} foto(s) lista(s) para subir · se comprimen automáticamente (máx {MAX_LADO}px)
+        </p>
+      )}
+      {comprimiendo && (
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">Comprimiendo fotos…</p>
+      )}
+      {error && (
+        <p className="w-full text-sm text-red-700 dark:text-red-400">{error}</p>
+      )}
       {state?.error && (
         <p className="w-full text-sm text-red-700 dark:text-red-400">{state.error}</p>
       )}

@@ -1,16 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { comprimirImagen, validarImagen, MAX_LADO } from '@/lib/client/imagen';
 
 interface Props {
   value: Blob[];
   onChange: (blobs: Blob[]) => void;
   initialFotos?: string[];
 }
-
-const TIPOS_VALIDOS = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_SOURCE_BYTES = 5 * 1024 * 1024; // 5 MB por foto original
-const MAX_LADO = 1280; // px en el lado más largo tras comprimir
 
 /**
  * Subida opcional de fotos de fachada con compresión CLIENT-SIDE.
@@ -35,51 +32,15 @@ export function FachadaUploader({ value, onChange, initialFotos = [] }: Props) {
     };
   }, []);
 
-  function comprimirImagen(file: File): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const escala = Math.min(1, MAX_LADO / Math.max(img.naturalWidth, img.naturalHeight));
-          const w = Math.max(1, Math.round(img.naturalWidth * escala));
-          const h = Math.max(1, Math.round(img.naturalHeight * escala));
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            reject(new Error('canvas no disponible'));
-            return;
-          }
-          ctx.drawImage(img, 0, 0, w, h);
-          canvas.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(new Error('toBlob falló'))),
-            'image/jpeg',
-            0.7
-          );
-        };
-        img.onerror = () => reject(new Error('no se pudo leer la imagen'));
-        img.src = reader.result as string;
-      };
-      reader.onerror = () => reject(new Error('no se pudo leer el archivo'));
-      reader.readAsDataURL(file);
-    });
-  }
-
   async function handleFiles(files: File[]) {
     const nuevos: Blob[] = [];
     const nuevasUrls: string[] = [];
     let algunError = false;
 
     for (const f of files) {
-      if (!TIPOS_VALIDOS.includes(f.type)) {
-        setError('Solo se aceptan fotos JPG, PNG o WebP.');
-        algunError = true;
-        continue;
-      }
-      if (f.size > MAX_SOURCE_BYTES) {
-        setError(`La foto "${f.name}" supera los 5 MB.`);
+      const mensaje = validarImagen(f);
+      if (mensaje) {
+        setError(mensaje);
         algunError = true;
         continue;
       }
@@ -139,7 +100,7 @@ export function FachadaUploader({ value, onChange, initialFotos = [] }: Props) {
         className="block w-full text-sm text-zinc-500 file:mr-4 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
       />
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
-        Las fotos se comprimen automáticamente (máx 1280px) para que no ocupen espacio de más.
+        Las fotos se comprimen automáticamente (máx {MAX_LADO}px) para que no ocupen espacio de más.
       </p>
 
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}

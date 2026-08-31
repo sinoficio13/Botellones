@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, startTransition, useState } from 'react';
 import { useActionState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -84,7 +84,9 @@ function NuevoClienteForm() {
     fotosComprimidas.forEach((blob, i) => {
       fd.append('fotos', blob, `fachada-${i}.jpg`);
     });
-    formAction(fd);
+    // useActionState exige llamar la acción dentro de una transición (React
+    // lo advierte y `pending` no se actualizaría correctamente).
+    startTransition(() => formAction(fd));
   }
 
   return (

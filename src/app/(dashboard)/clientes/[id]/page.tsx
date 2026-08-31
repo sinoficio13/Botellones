@@ -1,4 +1,6 @@
 import { getCliente } from '@/lib/db/clientes';
+import { getFotosCliente, fotoFachadaPublicUrl } from '@/lib/db/fotos';
+import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
 import { notFound } from 'next/navigation';
 import { ClienteTabs } from './tabs';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
@@ -14,9 +16,11 @@ interface Props {
 
 export default async function ClienteDetailPage({ params }: Props) {
   const { id } = await params;
-  const cliente = await getCliente(id);
+  const [cliente, fotos] = await Promise.all([getCliente(id), getFotosCliente(id)]);
 
   if (!cliente) notFound();
+
+  const whatsapp = normalizeWhatsAppPhone(cliente.whatsapp ?? cliente.telefono_1);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -43,9 +47,9 @@ export default async function ClienteDetailPage({ params }: Props) {
                 Nivel {Math.floor(cliente.total_recargas / 10) + 1}
               </span>
             )}
-            {cliente.telefono_1 && (
+            {whatsapp && (
               <a
-                href={`https://wa.me/${cliente.telefono_1.replace(/\D/g, '')}`}
+                href={`https://wa.me/${whatsapp}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-green-600 hover:underline dark:text-green-400"
@@ -62,6 +66,28 @@ export default async function ClienteDetailPage({ params }: Props) {
       </div>
 
       <ClienteTabs cliente={cliente} />
+
+      {fotos.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Fotos de fachada
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {fotos.map((f) => {
+              const url = fotoFachadaPublicUrl(f.ruta_storage);
+              if (!url) return null;
+              return (
+                <img
+                  key={f.id}
+                  src={url}
+                  alt="Foto de fachada del cliente"
+                  className="aspect-square w-full rounded-md border border-zinc-200 object-cover dark:border-zinc-700"
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

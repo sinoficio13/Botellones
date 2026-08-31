@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
 
 // ── Types ──
 
@@ -8,6 +9,7 @@ export type ClienteState = {
   success?: boolean;
   error?: string;
   clienteId?: string;
+  avisoFotos?: string;
 };
 
 export type ClienteRow = {
@@ -19,6 +21,7 @@ export type ClienteRow = {
   telefono_1: string | null;
   telefono_2: string | null;
   whatsapp: string | null;
+  direccion_entrega: string | null;
   tipo_cliente: string | null;
   horario_preferido: string | null;
   dias_preferidos: string | null;
@@ -42,16 +45,17 @@ export type ClienteListRow = {
 
 // ── Helpers ──
 
-function getSupabase() {
-  // Dynamic import so it only runs on server
-  return import('@supabase/supabase-js').then(async ({ createClient }) => {
-    // In dev mode without service_role, fall back to anon key
-    const key =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      '';
-    return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key);
-  });
+const FOTO_TIPOS_VALIDOS = ['image/jpeg', 'image/png', 'image/webp'];
+const FOTO_MAX_BYTES = 2.5 * 1024 * 1024; // ~2.5 MB por foto (ya comprimida en cliente)
+
+export async function getSupabase() {
+  const { createClient } = await import('@supabase/supabase-js');
+  // In dev mode without service_role, fall back to anon key
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    '';
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key);
 }
 
 // ── Create ──
@@ -65,7 +69,10 @@ export async function createCliente(
   const negocio = (formData.get('negocio') as string)?.trim() || null;
   const cedula = (formData.get('cedula') as string)?.trim() || null;
   const telefono_2 = (formData.get('telefono_2') as string)?.trim() || null;
-  const whatsapp = (formData.get('whatsapp') as string)?.trim() || telefono_1;
+  // WhatsApp se guarda SIEMPRE en formato internacional 58… (normalizado).
+  const whatsappRaw = (formData.get('whatsapp') as string)?.trim() || telefono_1;
+  const whatsapp = normalizeWhatsAppPhone(whatsappRaw) || null;
+  const direccion_entrega = (formData.get('direccion_entrega') as string)?.trim() || null;
   const tipo_cliente = (formData.get('tipo_cliente') as string) || null;
   const horario_preferido = (formData.get('horario_preferido') as string) || null;
   const dias_preferidos = (formData.get('dias_preferidos') as string)?.trim() || null;
@@ -95,6 +102,7 @@ export async function createCliente(
         cedula,
         telefono_2,
         whatsapp,
+        direccion_entrega,
         tipo_cliente,
         horario_preferido,
         dias_preferidos,
@@ -119,8 +127,61 @@ export async function createCliente(
       revalidatePath('/botellones');
     }
 
+    // Fotos de fachada (opcional): subida best-effort al bucket público
+    // 'fotos-clientes'. Una foto inválida o fallida se salta sin tumbar la
+    // creación; si alguna falla se avisa vía `avisoFotos` (no bloqueante).
+    const archivos = formData
+      .getAll('fotos')
+      .filter((f): f is File => f instanceof File && f.size > 0);
+
+    let avisoFotos: string | undefined;
+    if (archivos.length > 0) {
+      let subidas = 0;
+      let fallidas = 0;
+      const storage = supabase.storage.from('fotos-clientes');
+      for (let i = 0; i < archivos.length; i++) {
+        const archivo = archivos[i];
+        if (!FOTO_TIPOS_VALIDOS.includes(archivo.type) || archivo.size > FOTO_MAX_BYTES) {
+          fallidas++;
+          continue;
+        }
+        const ext =
+          archivo.type === 'image/png'
+            ? 'png'
+            : archivo.type === 'image/webp'
+              ? 'webp'
+              : 'jpg';
+        const ruta = `fachadas/${data.id}/${Date.now()}-${i}.${ext}`;
+        const { error: uploadError } = await storage.upload(ruta, archivo, {
+          contentType: archivo.type,
+        });
+        if (uploadError) {
+          fallidas++;
+          continue;
+        }
+        const { error: insertError } = await supabase
+          .from('fotos_clientes')
+          .insert({ cliente_id: data.id, tipo: 'fachada', ruta_storage: ruta });
+        if (insertError) {
+          fallidas++;
+        } else {
+          subidas++;
+        }
+      }
+      if (fallidas > 0) {
+        avisoFotos =
+          subidas > 0
+            ? `El cliente se creó, pero ${fallidas} foto(s) no se pudieron subir.`
+            : 'El cliente se creó, pero las fotos no se pudieron subir.';
+      }
+    }
+
     revalidatePath('/clientes');
-    return { clienteId: data.id, success: true };
+    return {
+      clienteId: data.id,
+      success: true,
+      ...(avisoFotos ? { avisoFotos } : {}),
+    };
   } catch (err) {
     return {
       error:
@@ -257,7 +318,7 @@ export async function updateCliente(
     negocio: (formData.get('negocio') as string)?.trim() || null,
     cedula: (formData.get('cedula') as string)?.trim() || null,
     telefono_2: (formData.get('telefono_2') as string)?.trim() || null,
-    whatsapp: (formData.get('whatsapp') as string)?.trim() || telefono_1,
+    whatsapp: normalizeWhatsAppPhone((formData.get('whatsapp') as string)?.trim() || telefono_1) || null,
     tipo_cliente: (formData.get('tipo_cliente') as string) || null,
     horario_preferido: (formData.get('horario_preferido') as string) || null,
     dias_preferidos: (formData.get('dias_preferidos') as string)?.trim() || null,

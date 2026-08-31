@@ -56,7 +56,7 @@ function makeChain(result: () => Promise<Record<string, unknown>>): Chain {
   return q;
 }
 
-function makeSupabase(queue: Chain[]) {
+function makeSupabase(queue: Chain[], storage?: ReturnType<typeof makeStorage>) {
   const supabase = {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     from: vi.fn((_table: string) => {
@@ -64,8 +64,27 @@ function makeSupabase(queue: Chain[]) {
       if (!chain) throw new Error(`Unexpected from() call — queue exhausted`);
       return chain;
     }),
+    ...(storage ? { storage } : {}),
   };
   return supabase;
+}
+
+/**
+ * Mock de `supabase.storage.from(bucket).upload(...)`. Registra las rutas para
+ * poder asertar el prefijo `fachadas/{clienteId}/`. Cada llamada consume un
+ * resultado de `uploadResults` (default: éxito).
+ */
+function makeStorage(uploadResults: Array<{ error: unknown }> = [{ error: null }]) {
+  const rutas: string[] = [];
+  const upload = vi.fn(async (_ruta: string) => {
+    rutas.push(_ruta);
+    return uploadResults.shift() ?? { error: null };
+  });
+  return {
+    rutas,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    from: vi.fn((_bucket: string) => ({ upload })),
+  };
 }
 
 function formBasico() {
@@ -150,5 +169,149 @@ describe('createCliente — asignación del botellón en un solo paso', () => {
     fd2.append('nombre', 'Ana');
     expect(await createCliente(null, fd2)).toEqual({ error: 'El teléfono es requerido' });
     expect(createClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('createCliente — normalización de WhatsApp y dirección de entrega', () => {
+  it('guarda WhatsApp en formato internacional 58…', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('whatsapp', '04141234567');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: '584141234567' })
+    );
+  });
+
+  it('deja intacto un WhatsApp ya normalizado (58…)', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('whatsapp', '584141234567');
+
+    await createCliente(null, fd);
+
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: '584141234567' })
+    );
+  });
+
+  it('cae al teléfono_1 normalizado cuando no llega WhatsApp', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    // formBasico() no envía whatsapp → el fallback usa telefono_1 normalizado.
+    await createCliente(null, formBasico());
+
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: '584141234567' })
+    );
+  });
+
+  it('guarda direccion_entrega recortada', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('direccion_entrega', '  Av. Principal, Edif. Ríos, Piso 2  ');
+
+    await createCliente(null, fd);
+
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ direccion_entrega: 'Av. Principal, Edif. Ríos, Piso 2' })
+    );
+  });
+
+  it('guarda direccion_entrega null cuando no llega', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    await createCliente(null, formBasico());
+
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({ direccion_entrega: null }));
+  });
+});
+
+describe('createCliente — fotos de fachada (subida best-effort)', () => {
+  it('sube cada foto a fachadas/{clienteId}/ y registra la fila en fotos_clientes', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const fotosInsert = makeChain(async () => ({ data: null, error: null }));
+    const storage = makeStorage([{ error: null }]);
+    const supabase = makeSupabase([insert, fotosInsert], storage);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('fotos', new File(['data'], 'fachada.jpg', { type: 'image/jpeg' }));
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(storage.from).toHaveBeenCalledWith('fotos-clientes');
+    expect(storage.rutas[0]).toMatch(/^fachadas\/c1\//);
+    expect(storage.from('fotos-clientes').upload).toHaveBeenCalledWith(
+      storage.rutas[0],
+      expect.any(File),
+      { contentType: 'image/jpeg' }
+    );
+    expect(supabase.from).toHaveBeenNthCalledWith(1, 'clientes');
+    expect(supabase.from).toHaveBeenNthCalledWith(2, 'fotos_clientes');
+    expect(fotosInsert.insert).toHaveBeenCalledWith({
+      cliente_id: 'c1',
+      tipo: 'fachada',
+      ruta_storage: storage.rutas[0],
+    });
+  });
+
+  it('salta un archivo con tipo inválido sin tumbar la creación', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const storage = makeStorage();
+    const supabase = makeSupabase([insert], storage);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('fotos', new File(['nota'], 'nota.txt', { type: 'text/plain' }));
+
+    const result = await createCliente(null, fd);
+
+    // El archivo inválido se salta: la creación sigue exitosa (aviso no bloqueante).
+    expect(result).toEqual({
+      clienteId: 'c1',
+      success: true,
+      avisoFotos: 'El cliente se creó, pero las fotos no se pudieron subir.',
+    });
+    expect(storage.from('fotos-clientes').upload).not.toHaveBeenCalled();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('una subida fallida no falla la creación (y avisa via avisoFotos)', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const storage = makeStorage([{ error: new Error('upload boom') }]);
+    const supabase = makeSupabase([insert], storage);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('fotos', new File(['data'], 'fachada.jpg', { type: 'image/jpeg' }));
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({
+      clienteId: 'c1',
+      success: true,
+      avisoFotos: 'El cliente se creó, pero las fotos no se pudieron subir.',
+    });
+    expect(storage.from('fotos-clientes').upload).toHaveBeenCalledTimes(1);
+    // No hubo insert en fotos_clientes (la subida falló).
+    expect(supabase.from).toHaveBeenCalledTimes(1);
   });
 });

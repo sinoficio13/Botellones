@@ -1,4 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignored": "exit 0"
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }

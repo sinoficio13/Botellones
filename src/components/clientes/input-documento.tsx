@@ -41,7 +41,7 @@ export function InputDocumento() {
   return (
     <div>
       <label htmlFor="cedula" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        Cédula
+        Tipo de documento
       </label>
       <div className="mt-1 flex gap-2">
         <div ref={rootRef} className="relative w-24 shrink-0">
@@ -76,12 +76,9 @@ export function InputDocumento() {
                     setAbierto(false);
                   }}
                   className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  title={t.nombre}
                 >
-                  <span>
-                    <span className="font-mono font-semibold">{t.letra}</span>
-                    {' · '}
-                    {t.nombre}
-                  </span>
+                  <span className="font-mono font-semibold">{t.letra}</span>
                 </li>
               ))}
             </ul>

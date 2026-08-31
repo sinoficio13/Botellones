@@ -18,7 +18,7 @@ describe('InputDocumento — combobox de tipo de documento + dígitos', () => {
 
     expect(tipoDocumentoHidden(container).value).toBe('V');
 
-    const digits = screen.getByLabelText('Cédula');
+    const digits = screen.getByLabelText('Tipo de documento');
     expect(digits).toHaveAttribute('inputMode', 'numeric');
     expect(digits).toHaveAttribute('pattern', '[0-9]{6,12}');
     expect(screen.getByText('Cédula: entre 6 y 8 dígitos')).toBeInTheDocument();
@@ -31,11 +31,11 @@ describe('InputDocumento — combobox de tipo de documento + dígitos', () => {
     await user.click(screen.getByRole('button', { name: 'V' }));
 
     expect(screen.getByRole('listbox')).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'V · Venezolano' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'E · Extranjero' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'J · Jurídico' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'G · Gobierno' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'P · Pasaporte' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'V' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'E' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'J' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'G' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'P' })).toBeInTheDocument();
   });
 
   it('seleccionar J actualiza el hidden tipo_documento y el texto de ayuda', async () => {
@@ -43,7 +43,7 @@ describe('InputDocumento — combobox de tipo de documento + dígitos', () => {
     const { container } = render(<InputDocumento />);
 
     await user.click(screen.getByRole('button', { name: 'V' }));
-    await user.click(screen.getByRole('option', { name: 'J · Jurídico' }));
+    await user.click(screen.getByRole('option', { name: 'J' }));
 
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(tipoDocumentoHidden(container).value).toBe('J');
@@ -55,7 +55,7 @@ describe('InputDocumento — combobox de tipo de documento + dígitos', () => {
     const user = userEvent.setup();
     render(<InputDocumento />);
 
-    const digits = screen.getByLabelText('Cédula');
+    const digits = screen.getByLabelText('Tipo de documento');
     await user.type(digits, '123456789');
     expect(digits).toHaveValue('123456789');
   });

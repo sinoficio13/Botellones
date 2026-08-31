@@ -1066,7 +1066,7 @@ describe('registrarOperacion — delivery (recarga → delivery)', () => {
     // Pure branch: single .in() update guarded by the delivery sources.
     expect(update.update).toHaveBeenCalledWith({ estado: 'delivery' });
     expect(update.in).toHaveBeenCalledWith('id', ['b1', 'b2']);
-    expect(update.in).toHaveBeenCalledWith('estado', ['recarga']);
+    expect(update.in).toHaveBeenCalledWith('estado', ['recarga', 'listo']);
     // No recargas write, no loyalty count queries.
     expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
     expect(countQueries(recorded)).toHaveLength(0);
@@ -1096,9 +1096,33 @@ describe('registrarOperacion — delivery (recarga → delivery)', () => {
     expect(procesarLoyaltyMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a recarga → delivery bottle that is not in the delivery sources', async () => {
+  it('accepts a listo bottle with a client for delivery (listo → delivery, no REC)', async () => {
     const partition = makeChain(async () => ({
-      data: [{ id: 'b4', codigo: 'BOT-00004', estado: 'listo', cliente_id: 'c1' }],
+      data: [{ id: 'b5', codigo: 'BOT-00005', estado: 'listo', cliente_id: 'c1' }],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const { supabase, recorded } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b5'],
+      operacion: 'delivery',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([{ botellonId: 'b5', codigo: 'BOT-00005', ok: true }]);
+    expect(update.update).toHaveBeenCalledWith({ estado: 'delivery' });
+    expect(update.in).toHaveBeenCalledWith('estado', ['recarga', 'listo']);
+    expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
+    expect(countQueries(recorded)).toHaveLength(0);
+  });
+
+  it('rejects a bottle outside the delivery sources with the estado reason', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b4', codigo: 'BOT-00004', estado: 'recibido', cliente_id: 'c1' }],
       error: null,
     }));
     const { supabase } = makeSupabase([partition]);
@@ -1113,7 +1137,7 @@ describe('registrarOperacion — delivery (recarga → delivery)', () => {
 
     expect(result.success).toBe(false);
     expect(result.items).toEqual([
-      { botellonId: 'b4', codigo: 'BOT-00004', ok: false, reason: 'estado-listo' },
+      { botellonId: 'b4', codigo: 'BOT-00004', ok: false, reason: 'estado-recibido' },
     ]);
     expect(supabase.from).toHaveBeenCalledTimes(1);
   });
@@ -1145,7 +1169,7 @@ describe('registrarOperacion — delivery (recarga → delivery)', () => {
     // Pure branch: single .in() update guarded by the entregar sources.
     expect(update.update).toHaveBeenCalledWith({ estado: 'entregado' });
     expect(update.in).toHaveBeenCalledWith('id', ['b1', 'b2']);
-    expect(update.in).toHaveBeenCalledWith('estado', ['delivery']);
+    expect(update.in).toHaveBeenCalledWith('estado', ['delivery', 'listo']);
     // No recargas write, no loyalty count queries.
     expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
     expect(countQueries(recorded)).toHaveLength(0);
@@ -1173,6 +1197,30 @@ describe('registrarOperacion — delivery (recarga → delivery)', () => {
     ]);
     expect(supabase.from).toHaveBeenCalledTimes(1); // only the partition select
     expect(procesarLoyaltyMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a listo bottle with a client for entregar (listo → entregado, no REC)', async () => {
+    const partition = makeChain(async () => ({
+      data: [{ id: 'b6', codigo: 'BOT-00006', estado: 'listo', cliente_id: 'c1' }],
+      error: null,
+    }));
+    const update = makeChain(async () => ({ error: null }));
+    const { supabase, recorded } = makeSupabase([partition, update]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await registrarOperacion({
+      botellonIds: ['b6'],
+      operacion: 'entregar',
+      fecha: '2026-08-20',
+      hora: '14:30',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items).toEqual([{ botellonId: 'b6', codigo: 'BOT-00006', ok: true }]);
+    expect(update.update).toHaveBeenCalledWith({ estado: 'entregado' });
+    expect(update.in).toHaveBeenCalledWith('estado', ['delivery', 'listo']);
+    expect(supabase.from.mock.calls.some(([table]) => table === 'recargas')).toBe(false);
+    expect(countQueries(recorded)).toHaveLength(0);
   });
 });
 

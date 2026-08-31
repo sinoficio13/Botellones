@@ -1,7 +1,8 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useActionState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createCliente } from '@/lib/db/clientes';
 
@@ -9,16 +10,24 @@ const TIPOS_CLIENTE = ['casa', 'negocio', 'oficina', 'otro'];
 const HORARIOS = ['mañana', 'tarde', 'noche'];
 const CONTACTOS = ['telefono_1', 'telefono_2', 'whatsapp'];
 
-export default function NuevoClientePage() {
+function NuevoClienteForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Opcional: ?botellon_id=… cuando el flujo viene de una sesión de carga sin
+  // cliente asignado — tras crear el cliente se vuelve a la ficha del botellón.
+  const botellonId = searchParams.get('botellon_id');
   const [state, formAction, pending] = useActionState(createCliente, null);
 
   // Redirect on success — useActionState doesn't propagate server-side redirect()
   useEffect(() => {
     if (state?.clienteId) {
-      router.push(`/clientes/${state.clienteId}`);
+      if (botellonId) {
+        router.push(`/botellones/${botellonId}`);
+      } else {
+        router.push(`/clientes/${state.clienteId}`);
+      }
     }
-  }, [state?.clienteId, router]);
+  }, [state?.clienteId, botellonId, router]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -140,6 +149,11 @@ export default function NuevoClientePage() {
         {state?.success && (
           <div className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-300">
             ✅ Cliente creado. Redirigiendo…
+            {botellonId && (
+              <p className="mt-1 text-xs text-green-700 dark:text-green-300">
+                El cliente se creó; ahora asignalo al botellón.
+              </p>
+            )}
           </div>
         )}
 
@@ -155,5 +169,17 @@ export default function NuevoClientePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NuevoClientePage() {
+  // useSearchParams must live under a Suspense boundary in this Next version
+  // or the static prerender of this client page fails the production build.
+  return (
+    <Suspense
+      fallback={<div className="mx-auto max-w-2xl px-4 py-8 text-sm text-zinc-400">Cargando…</div>}
+    >
+      <NuevoClienteForm />
+    </Suspense>
   );
 }

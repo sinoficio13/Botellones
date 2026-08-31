@@ -21,9 +21,10 @@ export type ItemSesion = {
 /**
  * Prefilled destination for a bottle given its CURRENT estado (the operator
  * never picks a global operation anymore):
- *   entregado → recibir, recibido → recargar, recarga → listo, delivery → entregar
- *   ('listo' is the default of the recarga-row chooser; 'delivery' is an option)
- *   listo / unknown → null (no destination in this flow; manage on the kanban).
+ *   entregado → recibir, recibido → recargar, recarga → listo, listo → entregar,
+ *   delivery → entregar
+ *   ('entregar' is the default of the listo-row chooser; 'delivery' is an option)
+ *   unknown → null (no destination in this flow; manage on the kanban).
  */
 function prefillDestino(estado: string | null): OperacionId | null {
   switch (estado) {
@@ -33,6 +34,8 @@ function prefillDestino(estado: string | null): OperacionId | null {
       return 'recargar';
     case 'recarga':
       return 'listo';
+    case 'listo':
+      return 'entregar';
     case 'delivery':
       return 'entregar';
     default:
@@ -42,10 +45,10 @@ function prefillDestino(estado: string | null): OperacionId | null {
 
 /**
  * Valid destination choices for a bottle's current estado, derived from the
- * OPERACIONES sources (e.g. 'recarga' → ['listo','delivery'], 'entregado' →
- * ['recibir'], 'recibido' → ['recargar'], 'delivery' → ['entregar'], others →
- * []). Key order follows the OPERACIONES declaration, so the recarga default
- * ('listo') comes first.
+ * OPERACIONES sources (e.g. 'recarga' → ['listo','delivery'], 'listo' →
+ * ['delivery','entregar'], 'entregado' → ['recibir'], 'recibido' →
+ * ['recargar'], 'delivery' → ['entregar'], others → []). Key order follows the
+ * OPERACIONES declaration, so the recarga default ('listo') comes first.
  */
 export function destinosPosibles(estado: string): OperacionId[] {
   const ops = Object.keys(OPERACIONES) as OperacionId[];
@@ -133,8 +136,8 @@ export function useSesionCarga() {
 
   const confirmar = useCallback(async (): Promise<CargaState[]> => {
     // Group the session by each row's OWN destination; rows without a
-    // destination (listo/delivery stock, "Gestionar en el dashboard") are
-    // skipped and never sent.
+    // destination (unknown estados, "Gestionar en el dashboard") are skipped
+    // and never sent.
     const grupos = new Map<OperacionId, ItemSesion[]>();
     for (const it of items) {
       if (it.destino === null) continue;

@@ -136,7 +136,7 @@ describe('BuscadorClienteCarga — expanding a client', () => {
     expect(screen.getAllByRole('button', { name: '+ Agregar' })).toHaveLength(2);
   });
 
-  it('filters out non-actionable estados (listo/delivery) — no add button for them', async () => {
+  it('treats listo bottles as actionable (listo → En delivery/Entregar chooser)', async () => {
     getClientesForSearchMock.mockResolvedValue([CLIENTE]);
     getBotellonesClienteMock.mockResolvedValue(
       respuestaBotellones([
@@ -149,16 +149,15 @@ describe('BuscadorClienteCarga — expanding a client', () => {
     await buscar('jua');
     await expandirCliente();
 
-    expect(screen.queryByText('BOT-00001')).not.toBeInTheDocument();
+    expect(screen.getByText('BOT-00001')).toBeInTheDocument();
+    expect(screen.getByText('Listo')).toBeInTheDocument();
     expect(screen.getByText('BOT-00002')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '+ Agregar' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '+ Agregar' })).toHaveLength(2);
   });
 
-  it('shows a muted hint when the client has no actionable bottles', async () => {
+  it('shows a muted hint when the client has no bottles to add', async () => {
     getClientesForSearchMock.mockResolvedValue([CLIENTE]);
-    getBotellonesClienteMock.mockResolvedValue(
-      respuestaBotellones([{ id: 'b9', codigo: 'BOT-00009', estado: 'listo' }])
-    );
+    getBotellonesClienteMock.mockResolvedValue(respuestaBotellones([]));
     montar();
 
     await buscar('jua');
@@ -217,5 +216,22 @@ describe('BuscadorClienteCarga — adding bottles', () => {
 
     expect(screen.getByText('Agregado')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Agregar' })).not.toBeInTheDocument();
+  });
+
+  it('shows a transient hint when onAgregar returns false (entry blocked while confirming)', async () => {
+    getClientesForSearchMock.mockResolvedValue([CLIENTE]);
+    getBotellonesClienteMock.mockResolvedValue(
+      respuestaBotellones([{ id: 'b1', codigo: 'BOT-00001', estado: 'recibido' }])
+    );
+    const onAgregar = vi.fn().mockResolvedValue(false);
+    montar(onAgregar);
+
+    await buscar('jua');
+    await expandirCliente();
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar' }));
+    await act(async () => {});
+
+    expect(onAgregar).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Confirmando… esperá un momento')).toBeInTheDocument();
   });
 });

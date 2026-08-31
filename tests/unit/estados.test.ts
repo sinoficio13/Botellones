@@ -108,21 +108,21 @@ describe('OPERACIONES', () => {
     });
   });
 
-  it('defines delivery → delivery requiring client (but no REC) with recarga as its only source', () => {
+  it('defines delivery → delivery requiring client (but no REC) with recarga and listo as sources', () => {
     expect(OPERACIONES.delivery).toEqual({
       target: 'delivery',
       requiresCliente: true,
       createsRec: false,
-      sources: ['recarga'],
+      sources: ['recarga', 'listo'],
     });
   });
 
-  it('defines entregar → entregado requiring client (but no REC) with delivery as its only source', () => {
+  it('defines entregar → entregado requiring client (but no REC) with delivery and listo as sources', () => {
     expect(OPERACIONES.entregar).toEqual({
       target: 'entregado',
       requiresCliente: true,
       createsRec: false,
-      sources: ['delivery'],
+      sources: ['delivery', 'listo'],
     });
   });
 

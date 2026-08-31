@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { getClientesForSearch } from '@/lib/db/recargas';
 import { getBotellonesCliente } from '@/lib/db/botellones';
@@ -9,7 +9,7 @@ import { ESTADO_LABELS } from '@/lib/utils/estados';
 const DEBOUNCE_MS = 250;
 const MIN_QUERY = 2;
 /** Estados whose bottles can be added to the batch session in this flow. */
-const ESTADOS_ACCIONABLES = new Set(['entregado', 'recibido', 'recarga', 'delivery']);
+const ESTADOS_ACCIONABLES = new Set(['entregado', 'recibido', 'recarga', 'listo', 'delivery']);
 
 /** A botellon the operator adds to the session from the client search. */
 export type BotellonCargaBuscador = {
@@ -20,7 +20,7 @@ export type BotellonCargaBuscador = {
 };
 
 export type BuscadorClienteCargaProps = {
-  onAgregar: (b: BotellonCargaBuscador) => void;
+  onAgregar: (b: BotellonCargaBuscador) => Promise<boolean> | void;
   /** Ids already in the session — those bottles render as "Agregado". */
   enSesion: Set<string>;
 };
@@ -50,6 +50,17 @@ export function BuscadorClienteCarga({ onAgregar, enSesion }: BuscadorClienteCar
   const [resultado, setResultado] = useState<{ q: string; clientes: ClienteBusqueda[] } | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
   const [botellones, setBotellones] = useState<{ clienteId: string; filas: BotellonFila[] } | null>(null);
+  // Transient hint when an add is blocked (e.g. a confirm is in flight): the
+  // "+ Agregar" click is swallowed by the modal gate, so the operator needs to
+  // know the entry was NOT silently dropped.
+  const [aviso, setAviso] = useState<string | null>(null);
+  const avisoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function mostrarAviso(msg: string) {
+    setAviso(msg);
+    if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
+    avisoTimeoutRef.current = setTimeout(() => setAviso(null), 1500);
+  }
 
   const debounced = useDebounce(termino, DEBOUNCE_MS);
   const terminoLimpio = debounced.trim();
@@ -84,6 +95,13 @@ export function BuscadorClienteCarga({ onAgregar, enSesion }: BuscadorClienteCar
       activo = false;
     };
   }, [expandido]);
+
+  // Clear the transient hint timeout on unmount.
+  useEffect(() => {
+    return () => {
+      if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
+    };
+  }, []);
 
   const accionables = botellonesActuales?.filter((b) => ESTADOS_ACCIONABLES.has(b.estado)) ?? [];
 
@@ -159,14 +177,17 @@ export function BuscadorClienteCarga({ onAgregar, enSesion }: BuscadorClienteCar
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      onAgregar({
+                                    onClick={async () => {
+                                      const ok = await onAgregar({
                                         id: b.id,
                                         codigo: b.codigo,
                                         cliente_id: c.id,
                                         estado: b.estado,
-                                      })
-                                    }
+                                      });
+                                      if (ok === false) {
+                                        mostrarAviso('Confirmando… esperá un momento');
+                                      }
+                                    }}
                                     className="shrink-0 rounded-md border border-border-strong bg-surface-3 px-2.5 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-1"
                                   >
                                     + Agregar
@@ -176,6 +197,11 @@ export function BuscadorClienteCarga({ onAgregar, enSesion }: BuscadorClienteCar
                             );
                           })}
                         </ul>
+                      )}
+                      {aviso && (
+                        <p role="status" className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                          {aviso}
+                        </p>
                       )}
                     </div>
                   ) : null}

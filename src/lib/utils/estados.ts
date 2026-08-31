@@ -76,8 +76,10 @@ export const OPERACIONES: Record<
   recibir: { target: 'recibido', requiresCliente: false, createsRec: false, sources: ['entregado'] },
   recargar: { target: 'recarga', requiresCliente: true, createsRec: true, sources: ['recibido'] },
   listo: { target: 'listo', requiresCliente: false, createsRec: false, sources: ['recarga'] },
-  delivery: { target: 'delivery', requiresCliente: true, createsRec: false, sources: ['recarga'] },
-  entregar: { target: 'entregado', requiresCliente: true, createsRec: false, sources: ['delivery'] },
+  // delivery y entregar aceptan listo como fuente: un botellón listo puede
+  // salir a delivery o entregarse directo en el batch, no solo por el kanban.
+  delivery: { target: 'delivery', requiresCliente: true, createsRec: false, sources: ['recarga', 'listo'] },
+  entregar: { target: 'entregado', requiresCliente: true, createsRec: false, sources: ['delivery', 'listo'] },
 };
 
 /**

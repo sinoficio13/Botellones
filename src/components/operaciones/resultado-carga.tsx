@@ -26,11 +26,13 @@ export type ResultadoCargaProps = {
 
 /**
  * ResultadoCarga — shared per-row outcome list for a completed batch, rendered
- * by both the /recargas/carga terminal and the "Recibir botellón" modal.
- * Every submitted row shows success (REC# when the op creates one) or its
- * rejection reason; "Sin cliente" rejections carry an "Asignar cliente" link.
- * The header is a green "Carga registrada" card when every group succeeded, or
- * the server error(s) otherwise, and the footer is "Listo" / "Seguir editando".
+ * by the "Recibir botellón" modal. Every submitted row shows success ("Registrado:
+ * REC#…" when the op creates a REC, otherwise "Registrado · sin recibo") or its
+ * rejection reason; "Sin cliente" rejections carry "Asignar cliente" and
+ * "Crear cliente" links. When any ok row has no REC, a muted footer note
+ * explains that only recargas generate a receipt. The header is a green "Carga
+ * registrada" card when every group succeeded, or the server error(s)
+ * otherwise, and the footer is "Listo" / "Seguir editando".
  */
 export function ResultadoCarga({
   resultado,
@@ -40,6 +42,7 @@ export function ResultadoCarga({
 }: ResultadoCargaProps) {
   const todoOk = resultado.length > 0 && resultado.every((r) => r.success);
   const filas = resultado.flatMap((r) => r.items);
+  const haySinRecibo = filas.some((i) => i.ok && !i.numeroRegistro);
   const premios = resultado.flatMap((r) => r.premios ?? []);
   const avisos = resultado.flatMap((r) => (r.loyaltyWarning ? [r.loyaltyWarning] : []));
   const errores = resultado.flatMap((r) => (r.error ? [r.error] : []));
@@ -80,17 +83,25 @@ export function ResultadoCarga({
                   {item.ok
                     ? item.numeroRegistro
                       ? `Registrado: ${item.numeroRegistro}`
-                      : 'Registrado'
+                      : 'Registrado · sin recibo'
                     : `Rechazado: ${item.reason}`}
                 </p>
               </div>
               {!item.ok && item.reason === 'sin-cliente' ? (
-                <Link
-                  href={`/botellones/${item.botellonId}`}
-                  className="text-sm font-medium text-marca hover:underline"
-                >
-                  Asignar cliente
-                </Link>
+                <span className="flex items-center gap-3">
+                  <Link
+                    href={`/botellones/${item.botellonId}`}
+                    className="text-sm font-medium text-marca hover:underline"
+                  >
+                    Asignar cliente
+                  </Link>
+                  <Link
+                    href={`/clientes/nuevo?botellon_id=${item.botellonId}`}
+                    className="text-sm font-medium text-marca hover:underline"
+                  >
+                    Crear cliente
+                  </Link>
+                </span>
               ) : item.ok && clienteId ? (
                 <Link
                   href={`/clientes/${clienteId}`}
@@ -103,6 +114,10 @@ export function ResultadoCarga({
           );
         })}
       </ul>
+
+      {haySinRecibo && (
+        <p className="text-xs text-text-muted">Solo las recargas generan recibo.</p>
+      )}
 
       {premios.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">

@@ -69,6 +69,8 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
   // Local pending state for the async confirm (one call per destino group).
   const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<CargaState[] | null>(null);
+  // Transient notice for blocked entries (scan/manual/add while confirming).
+  const [aviso, setAviso] = useState<string | null>(null);
 
   // The hook keeps `onDecode` in a ref updated every render, so we forward a
   // stable wrapper and point it at the latest handler. The handler reads
@@ -84,6 +86,17 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
 
   const resultadoOk = resultado !== null && resultado.every((r) => r.success);
 
+  // Pending count for the discard prompt: only bottles NOT yet successfully
+  // registered. On a partial-failure result the ok rows are counted out, so
+  // the prompt never overstates how many are at risk. Computed in render and
+  // mirrored via a ref so `manejarCerrar` reads the latest value.
+  const okIds = resultado
+    ? new Set(
+        resultado.flatMap((r) => r.items.filter((i) => i.ok).map((i) => i.botellonId))
+      )
+    : null;
+  const pendientes = okIds ? items.filter((i) => !okIds.has(i.id)).length : items.length;
+
   // Refs espejo (actualizados en efectos, patrón react-hooks) para los handlers
   // que corren fuera del render y necesitan el estado AL MOMENTO de la llamada:
   //  - resultadoRef: la cámara sigue decodificando mientras la vista de
@@ -91,9 +104,9 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
   //    cortocircuita para no acumular detrás del resultado.
   //  - confirmandoRef: un escaneo DURANTE confirmar() se descartaría en
   //    silencio con "Listo" → limpiar(); el gate de agregado lo bloquea.
-  //  - itemsRef / resultadoOkRef: cierre con guardia — una sesión con
+  //  - resultadoOkRef / pendientesRef: cierre con guardia — una sesión con
   //    botellones sin confirmar (o un fallo parcial) no se descarta sin
-  //    confirmación previa.
+  //    confirmación previa, y el conteo refleja solo lo no registrado.
   const resultadoRef = useRef(resultado !== null);
   useEffect(() => {
     resultadoRef.current = resultado !== null;
@@ -104,15 +117,28 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
     confirmandoRef.current = confirmando;
   }, [confirmando]);
 
-  const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
   const resultadoOkRef = useRef(resultadoOk);
   useEffect(() => {
     resultadoOkRef.current = resultadoOk;
   }, [resultadoOk]);
+
+  const pendientesRef = useRef(pendientes);
+  useEffect(() => {
+    pendientesRef.current = pendientes;
+  }, [pendientes]);
+
+  const avisoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
+    };
+  }, []);
+
+  function mostrarAviso(msg: string) {
+    setAviso(msg);
+    if (avisoTimeoutRef.current) clearTimeout(avisoTimeoutRef.current);
+    avisoTimeoutRef.current = setTimeout(() => setAviso(null), 1500);
+  }
 
   // Único gate de entrada a la sesión: todas las vías (cámara, manual, cliente)
   // pasan por acá. Mientras confirmar() está en vuelo no se agrega nada — un
@@ -135,11 +161,17 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
   // éxito total no se alcanzó, pregunta antes de descartar. "Listo" en el éxito
   // total cierra directo (limpiar() ya vació la sesión).
   const manejarCerrar = useCallback(() => {
-    if (!resultadoOkRef.current && itemsRef.current.length > 0) {
+    // R4-001 — while confirmar() is in flight the batch is being committed;
+    // closing now would silently discard it, so ignore backdrop/Escape/X.
+    if (confirmandoRef.current) return;
+    const pendientesActuales = pendientesRef.current;
+    if (!resultadoOkRef.current && pendientesActuales > 0) {
       const confirmarCierre = window.confirm(
-        'La sesión tiene ' +
-          itemsRef.current.length +
-          ' botellón(es) sin confirmar. ¿Cerrar y descartarlos?'
+        pendientesActuales === 1
+          ? 'La sesión tiene 1 botellón sin confirmar. ¿Cerrar y descartarlos?'
+          : 'La sesión tiene ' +
+            pendientesActuales +
+            ' botellón(es) sin confirmar. ¿Cerrar y descartarlos?'
       );
       if (!confirmarCierre) return;
     }
@@ -159,6 +191,15 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
       // resolving the botellón (the <video> stays mounted, just hidden).
       if (resultadoRef.current) {
         setDecodeError(null);
+        return { outcome: 'failure' };
+      }
+
+      // R2-001/R4-002 — entry while confirmar() is in flight is blocked with a
+      // transient notice (NO beep): the scan would be dropped by the gate
+      // anyway, so the operator sees why nothing happened.
+      if (confirmandoRef.current) {
+        setDecodeError(null);
+        mostrarAviso('Confirmando… esperá un momento');
         return { outcome: 'failure' };
       }
 
@@ -205,6 +246,12 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
   }
 
   async function manejarIngresoManual() {
+    // R2-001/R4-002 — blocked manual entry while confirming: transient notice,
+    // no beep (the input stays intact for after the confirm).
+    if (confirmandoRef.current) {
+      mostrarAviso('Confirmando… esperá un momento');
+      return;
+    }
     const digits = codigoManual.trim();
     if (digits === '') return;
     const botellon = await getBotellonByCodigo(`BOT-${digits}`);
@@ -372,6 +419,14 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
               ? 'Confirmando…'
               : `Confirmar (${accionables.length} botellones)`}
           </button>
+          {aviso && (
+            <p
+              role="status"
+              className="mt-2 text-center text-xs font-medium text-amber-700 dark:text-amber-300"
+            >
+              {aviso}
+            </p>
+          )}
         </>
       )}
     </div>

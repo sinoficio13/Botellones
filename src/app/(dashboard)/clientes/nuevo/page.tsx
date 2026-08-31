@@ -4,15 +4,30 @@ import { Suspense, useState } from 'react';
 import { useActionState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { createCliente } from '@/lib/db/clientes';
+import { resolveMapLink } from '@/lib/db/direcciones';
+import { parseWhatsAppLocation } from '@/lib/utils/location';
 import { FachadaUploader } from '@/components/clientes/fachada-uploader';
+import { InputWhatsapp } from '@/components/clientes/input-whatsapp';
 
-const TIPOS_CLIENTE = ['casa', 'negocio', 'oficina', 'otro'];
-const HORARIOS = ['mañana', 'tarde', 'noche'];
-const CONTACTOS = ['telefono_1', 'telefono_2', 'whatsapp'];
+const MapaPreview = dynamic(() => import('@/components/clientes/mapa-preview'), { ssr: false });
 
 const INPUT_CLASS =
   'mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50';
+
+function Card({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+      <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{titulo}</h2>
+      <div className="mt-4 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function Grid2({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>;
+}
 
 function NuevoClienteForm() {
   const router = useRouter();
@@ -22,6 +37,7 @@ function NuevoClienteForm() {
   const botellonId = searchParams.get('botellon_id');
   const [state, formAction, pending] = useActionState(createCliente, null);
   const [fotosComprimidas, setFotosComprimidas] = useState<Blob[]>([]);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Redirect on success — useActionState doesn't propagate server-side redirect()
   useEffect(() => {
@@ -34,9 +50,32 @@ function NuevoClienteForm() {
     }
   }, [state?.clienteId, botellonId, router]);
 
+  // Link de Google Maps/WhatsApp → coordenadas (para el mapa preview y los
+  // hidden latitud/longitud). Primero parseo directo; si es short link
+  // (maps.app.goo.gl) se resuelve server-side.
+  async function handleLinkChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const link = e.target.value;
+    if (!link.trim()) {
+      setCoords(null);
+      return;
+    }
+    const parsed = parseWhatsAppLocation(link);
+    if (parsed) {
+      setCoords(parsed);
+      return;
+    }
+    if (/maps\.app\.goo\.gl|goo\.gl|g\.co\/maps/.test(link)) {
+      const resolved = await resolveMapLink(link);
+      setCoords(resolved);
+      return;
+    }
+    setCoords(null);
+  }
+
   // Las fotos viajan COMPRIMIDAS (blobs del FachadaUploader), no los archivos
   // originales del input. Por eso interceptamos el submit y reconstruimos el
-  // FormData con los blobs bajo `fotos`.
+  // FormData con los blobs bajo `fotos`. Los demás campos (pais_whatsapp,
+  // link_mapa, latitud, longitud) son inputs comunes y viajan intactos.
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -48,7 +87,7 @@ function NuevoClienteForm() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-8">
       <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
         Nuevo Cliente
       </h1>
@@ -57,9 +96,8 @@ function NuevoClienteForm() {
         <p className="text-xs text-zinc-400 dark:text-zinc-500">* obligatorio</p>
 
         {/* Datos básicos */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Datos básicos</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card titulo="Datos básicos">
+          <Grid2>
             <div>
               <label htmlFor="nombre" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Nombre *
@@ -72,7 +110,7 @@ function NuevoClienteForm() {
               </label>
               <input id="negocio" name="negocio" type="text" className={INPUT_CLASS} />
             </div>
-          </div>
+          </Grid2>
 
           <div>
             <label htmlFor="cedula" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -83,47 +121,27 @@ function NuevoClienteForm() {
               name="cedula"
               type="text"
               pattern="[VE]-?[0-9]{6,8}"
-              title="Ej: V-12345678"
+              title="Formato venezolano: V-12345678"
               className={`${INPUT_CLASS} md:max-w-sm`}
             />
             <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-              Ej: V-12345678
+              Formato venezolano: V-12345678
             </p>
           </div>
-        </section>
+        </Card>
 
         {/* Contacto (WhatsApp primero) */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Contacto</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label htmlFor="whatsapp" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                WhatsApp
-              </label>
-              <input
-                id="whatsapp"
-                name="whatsapp"
-                type="tel"
-                placeholder="0412… o 58414…"
-                minLength={7}
-                maxLength={15}
-                pattern="[0-9]{7,15}"
-                title="Solo dígitos, entre 7 y 15"
-                className={INPUT_CLASS}
-              />
-              <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                La comunicación es por WhatsApp. Se guarda en formato internacional 58…
-              </p>
-            </div>
+        <Card titulo="Contacto">
+          <Grid2>
+            <InputWhatsapp />
             <div>
               <label htmlFor="telefono_1" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Teléfono 1 *
+                Teléfono (opcional)
               </label>
               <input
                 id="telefono_1"
                 name="telefono_1"
                 type="tel"
-                required
                 minLength={7}
                 maxLength={15}
                 pattern="\d{7,15}"
@@ -131,29 +149,11 @@ function NuevoClienteForm() {
                 className={INPUT_CLASS}
               />
             </div>
-            <div>
-              <label htmlFor="telefono_2" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Teléfono 2
-              </label>
-              <input
-                id="telefono_2"
-                name="telefono_2"
-                type="tel"
-                minLength={7}
-                maxLength={15}
-                pattern="\d{7,15}"
-                title="Solo dígitos, entre 7 y 15"
-                className={INPUT_CLASS}
-              />
-            </div>
-          </div>
-        </section>
+          </Grid2>
+        </Card>
 
         {/* Dirección de entrega */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Dirección de entrega
-          </h2>
+        <Card titulo="Dirección de entrega">
           <div>
             <label htmlFor="direccion_entrega" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Dirección de entrega
@@ -163,71 +163,50 @@ function NuevoClienteForm() {
               La dirección que mandás por WhatsApp para que el repartidor llegue.
             </p>
           </div>
-        </section>
-
-        {/* Preferencias */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Preferencias</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label htmlFor="tipo_cliente" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Tipo de cliente
-              </label>
-              <select id="tipo_cliente" name="tipo_cliente" className={INPUT_CLASS}>
-                <option value="">Seleccionar</option>
-                {TIPOS_CLIENTE.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="horario_preferido" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Horario preferido
-              </label>
-              <select id="horario_preferido" name="horario_preferido" className={INPUT_CLASS}>
-                <option value="">Seleccionar</option>
-                {HORARIOS.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="contacto_preferido" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Contacto preferido
-              </label>
-              <select id="contacto_preferido" name="contacto_preferido" className={INPUT_CLASS}>
-                <option value="">Seleccionar</option>
-                {CONTACTOS.map(c => <option key={c} value={c}>{c === 'telefono_1' ? 'Teléfono 1' : c === 'telefono_2' ? 'Teléfono 2' : 'WhatsApp'}</option>)}
-              </select>
-            </div>
-          </div>
 
           <div>
-            <label htmlFor="dias_preferidos" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Días preferidos
+            <label htmlFor="link_mapa" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Link de Google Maps (opcional)
             </label>
-            <input id="dias_preferidos" name="dias_preferidos" type="text" placeholder="Lunes, Miércoles, Viernes"
-              className={`${INPUT_CLASS} md:max-w-sm`} />
+            <input
+              id="link_mapa"
+              name="link_mapa"
+              type="text"
+              onChange={handleLinkChange}
+              placeholder="Pega un link de Google Maps o WhatsApp"
+              className={INPUT_CLASS}
+            />
+            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+              Se muestra un mapa con la ubicación
+            </p>
           </div>
-        </section>
+
+          {coords && (
+            <>
+              <MapaPreview lat={coords.lat} lng={coords.lng} />
+              <input type="hidden" name="latitud" value={coords.lat} />
+              <input type="hidden" name="longitud" value={coords.lng} />
+            </>
+          )}
+        </Card>
 
         {/* Fotos de fachada */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Fotos de fachada
-          </h2>
+        <Card titulo="Fotos de fachada · opcional">
           <FachadaUploader value={fotosComprimidas} onChange={setFotosComprimidas} />
           <p className="text-xs text-zinc-400 dark:text-zinc-500">
             Fotos referenciales de la fachada/dirección para que el repartidor ubique el lugar.
           </p>
-        </section>
+        </Card>
 
         {/* Observaciones */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Observaciones</h2>
+        <Card titulo="Observaciones · opcional">
           <div>
             <label htmlFor="observaciones" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Observaciones
             </label>
             <textarea id="observaciones" name="observaciones" rows={3} className={INPUT_CLASS} />
           </div>
-        </section>
+        </Card>
 
         {/* Asignación en un solo paso: llega con ?botellon_id=… desde la sesión */}
         {botellonId && (
@@ -286,7 +265,7 @@ export default function NuevoClientePage() {
   // or the static prerender of this client page fails the production build.
   return (
     <Suspense
-      fallback={<div className="mx-auto max-w-2xl px-4 py-8 text-sm text-zinc-400">Cargando…</div>}
+      fallback={<div className="mx-auto max-w-4xl px-4 py-8 text-sm text-zinc-400">Cargando…</div>}
     >
       <NuevoClienteForm />
     </Suspense>

@@ -243,6 +243,130 @@ describe('createCliente — normalización de WhatsApp y dirección de entrega',
   });
 });
 
+describe('createCliente — composición de WhatsApp con país (InputWhatsapp)', () => {
+  it.each([
+    ['58', '04141234567', '584141234567'],
+    ['58', '04121234567', '584121234567'],
+    ['57', '3001234567', '573001234567'],
+    ['57', '573001234567', '573001234567'],
+  ])('compone país %s + número %s → %s', async (pais, numero, esperado) => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('pais_whatsapp', pais);
+    fd.append('whatsapp', numero);
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: esperado })
+    );
+  });
+
+  it('asume país 58 cuando no llega pais_whatsapp', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('whatsapp', '04141234567');
+
+    await createCliente(null, fd);
+
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: '584141234567' })
+    );
+  });
+});
+
+describe('createCliente — link de Google Maps + coordenadas → fila en direcciones', () => {
+  it('inserta en direcciones cuando llegan link_mapa y coordenadas ocultas', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const dirInsert = makeChain(async () => ({ data: null, error: null }));
+    const supabase = makeSupabase([insert, dirInsert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('link_mapa', 'https://maps.app.goo.gl/xyz');
+    fd.append('latitud', '10.4806');
+    fd.append('longitud', '-66.9036');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(supabase.from).toHaveBeenNthCalledWith(1, 'clientes');
+    expect(supabase.from).toHaveBeenNthCalledWith(2, 'direcciones');
+    expect(dirInsert.insert).toHaveBeenCalledWith({
+      cliente_id: 'c1',
+      link_mapa: 'https://maps.app.goo.gl/xyz',
+      latitud: 10.4806,
+      longitud: -66.9036,
+    });
+  });
+
+  it('parsea las coordenadas del link server-side cuando no llegan lat/lng ocultos', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const dirInsert = makeChain(async () => ({ data: null, error: null }));
+    const supabase = makeSupabase([insert, dirInsert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('link_mapa', 'https://www.google.com/maps?q=10.4806,-66.9036');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(dirInsert.insert).toHaveBeenCalledWith({
+      cliente_id: 'c1',
+      link_mapa: 'https://www.google.com/maps?q=10.4806,-66.9036',
+      latitud: 10.4806,
+      longitud: -66.9036,
+    });
+  });
+
+  it('no inserta en direcciones cuando falta link_mapa', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    await createCliente(null, formBasico());
+
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('no inserta en direcciones cuando el link no tiene coordenadas parseables', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('link_mapa', 'https://example.com/ubicacion-no-parseable');
+
+    await createCliente(null, fd);
+
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('un error al insertar en direcciones NO falla la creación del cliente', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const dirInsert = makeChain(async () => ({ data: null, error: new Error('boom') }));
+    const supabase = makeSupabase([insert, dirInsert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('link_mapa', 'https://maps.app.goo.gl/xyz');
+    fd.append('latitud', '10.4806');
+    fd.append('longitud', '-66.9036');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+  });
+});
+
 describe('createCliente — fotos de fachada (subida best-effort)', () => {
   it('sube cada foto a fachadas/{clienteId}/ y registra la fila en fotos_clientes', async () => {
     const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));

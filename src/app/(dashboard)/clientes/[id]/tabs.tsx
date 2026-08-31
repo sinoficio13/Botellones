@@ -77,6 +77,9 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
         .filter(Boolean)
         .join(', ')
     : '';
+  // Línea principal: la dirección libre del form de creación tiene prioridad;
+  // la estructurada de la tab Dirección queda como secundaria.
+  const direccionPrincipal = cliente.direccion_entrega || dirCompuesta;
 
   const mapsUrl = direccion?.link_mapa ||
     (direccion?.latitud != null && direccion?.longitud != null
@@ -119,15 +122,22 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
           <div className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             <MapPin size={14} /> Dirección de entrega
           </div>
-          {dirCompuesta ? (
+          {direccionPrincipal ? (
             <div className="mt-2 space-y-1">
-              <p className="text-sm text-zinc-900 dark:text-zinc-100">{dirCompuesta}</p>
+              {cliente.direccion_entrega && (
+                <p className="text-sm text-zinc-900 dark:text-zinc-100">{cliente.direccion_entrega}</p>
+              )}
+              {dirCompuesta && (
+                <p className={cliente.direccion_entrega ? 'text-xs text-zinc-500' : 'text-sm text-zinc-900 dark:text-zinc-100'}>
+                  {dirCompuesta}
+                </p>
+              )}
               {direccion?.referencia && (
                 <p className="text-xs text-zinc-500">{direccion.referencia}</p>
               )}
-              {dirCompuesta && (
+              {direccionPrincipal && (
                 <a
-                  href={direccion?.link_mapa || `https://www.google.com/maps/search/${encodeURIComponent(dirCompuesta)}`}
+                  href={direccion?.link_mapa || `https://www.google.com/maps/search/${encodeURIComponent(direccionPrincipal)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"

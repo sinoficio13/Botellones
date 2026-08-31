@@ -1,15 +1,25 @@
 /**
- * Normalize a stored phone number into the international WhatsApp format
- * used by `https://wa.me/`. Venezuelan numbers only (assumed by contract):
- * strip non-digits, drop leading zeros, and prepend `58` unless already present.
- *
- * Non-VE international numbers are out of scope.
+ * Compose a national phone number into the international WhatsApp format used
+ * by `https://wa.me/` for an arbitrary country: strip non-digits, drop leading
+ * zeros, and prepend the country code unless the number already starts with it.
+ * If the country code is empty the national digits are returned as-is.
+ */
+export function componerWhatsApp(pais: string, numero: string): string {
+  const digits = (numero ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  const codigo = (pais ?? '').replace(/\D/g, '');
+  const nacional = digits.replace(/^0+/, '');
+  return codigo && nacional.startsWith(codigo) ? nacional : `${codigo}${nacional}`;
+}
+
+/**
+ * Normalize a stored phone number into the international WhatsApp format.
+ * Venezuelan numbers (assumed by contract for existing callers): same as
+ * `componerWhatsApp('58', raw)` — strip non-digits, drop leading zeros, and
+ * prepend `58` unless already present.
  */
 export function normalizeWhatsAppPhone(raw?: string | null): string {
-  const digits = (raw ?? '').replace(/\D/g, '');
-  if (!digits) return '';
-  const noLeadingZero = digits.replace(/^0+/, '');
-  return noLeadingZero.startsWith('58') ? noLeadingZero : `58${noLeadingZero}`;
+  return componerWhatsApp('58', raw ?? '');
 }
 
 /**

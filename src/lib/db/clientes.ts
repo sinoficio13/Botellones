@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
+import { normalizeWhatsAppPhone, componerWhatsApp } from '@/lib/utils/whatsapp';
+import { parseWhatsAppLocation } from '@/lib/utils/location';
 
 // ── Types ──
 
@@ -48,6 +49,11 @@ export type ClienteListRow = {
 const FOTO_TIPOS_VALIDOS = ['image/jpeg', 'image/png', 'image/webp'];
 const FOTO_MAX_BYTES = 2.5 * 1024 * 1024; // ~2.5 MB por foto (ya comprimida en cliente)
 
+function parseFloatOrNull(v: string | null): number | null {
+  const n = parseFloat(v ?? '');
+  return isNaN(n) ? null : n;
+}
+
 export async function getSupabase() {
   const { createClient } = await import('@supabase/supabase-js');
   // In dev mode without service_role, fall back to anon key
@@ -69,9 +75,11 @@ export async function createCliente(
   const negocio = (formData.get('negocio') as string)?.trim() || null;
   const cedula = (formData.get('cedula') as string)?.trim() || null;
   const telefono_2 = (formData.get('telefono_2') as string)?.trim() || null;
-  // WhatsApp se guarda SIEMPRE en formato internacional 58… (normalizado).
+  // WhatsApp se guarda SIEMPRE en formato internacional, con el código de país
+  // elegido en el form (`pais_whatsapp`, default 58 para Venezuela).
   const whatsappRaw = (formData.get('whatsapp') as string)?.trim() || telefono_1;
-  const whatsapp = normalizeWhatsAppPhone(whatsappRaw) || null;
+  const paisWhatsapp = (formData.get('pais_whatsapp') as string)?.trim() || '58';
+  const whatsapp = componerWhatsApp(paisWhatsapp, whatsappRaw) || null;
   const direccion_entrega = (formData.get('direccion_entrega') as string)?.trim() || null;
   const tipo_cliente = (formData.get('tipo_cliente') as string) || null;
   const horario_preferido = (formData.get('horario_preferido') as string) || null;
@@ -173,6 +181,35 @@ export async function createCliente(
           subidas > 0
             ? `El cliente se creó, pero ${fallidas} foto(s) no se pudieron subir.`
             : 'El cliente se creó, pero las fotos no se pudieron subir.';
+      }
+    }
+
+    // Link de Google Maps + coordenadas → fila en `direcciones` (best-effort).
+    // Solo cuando llega un link_mapa y hay coords (hidden latitud/longitud del
+    // form, o parseadas del link acá en el server). Un fallo no tumba la
+    // creación: la dirección se puede completar después desde la ficha.
+    const linkMapa = (formData.get('link_mapa') as string)?.trim() || null;
+    if (linkMapa) {
+      let latitud: number | null = parseFloatOrNull(formData.get('latitud') as string);
+      let longitud: number | null = parseFloatOrNull(formData.get('longitud') as string);
+      if (latitud == null || longitud == null) {
+        const parsed = parseWhatsAppLocation(linkMapa);
+        if (parsed) {
+          latitud = parsed.lat;
+          longitud = parsed.lng;
+        }
+      }
+      if (latitud != null && longitud != null) {
+        try {
+          await supabase.from('direcciones').insert({
+            cliente_id: data.id,
+            link_mapa: linkMapa,
+            latitud,
+            longitud,
+          });
+        } catch {
+          // Best-effort: no falla la creación del cliente.
+        }
       }
     }
 

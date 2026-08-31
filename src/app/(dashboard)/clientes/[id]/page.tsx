@@ -16,9 +16,13 @@ interface Props {
 
 export default async function ClienteDetailPage({ params }: Props) {
   const { id } = await params;
-  const [cliente, fotos] = await Promise.all([getCliente(id), getFotosCliente(id)]);
+  const [cliente, fotosCliente] = await Promise.all([getCliente(id), getFotosCliente(id)]);
 
   if (!cliente) notFound();
+
+  const fotos = fotosCliente
+    .map((f) => ({ id: f.id, url: fotoFachadaPublicUrl(f.ruta_storage) }))
+    .filter((f) => f.url);
 
   const whatsapp = normalizeWhatsAppPhone(cliente.whatsapp ?? cliente.telefono_1);
 
@@ -65,29 +69,7 @@ export default async function ClienteDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <ClienteTabs cliente={cliente} />
-
-      {fotos.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Fotos de fachada
-          </h2>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {fotos.map((f) => {
-              const url = fotoFachadaPublicUrl(f.ruta_storage);
-              if (!url) return null;
-              return (
-                <img
-                  key={f.id}
-                  src={url}
-                  alt="Foto de fachada del cliente"
-                  className="aspect-square w-full rounded-md border border-zinc-200 object-cover dark:border-zinc-700"
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
+      <ClienteTabs cliente={cliente} fotos={fotos} />
     </div>
   );
 }

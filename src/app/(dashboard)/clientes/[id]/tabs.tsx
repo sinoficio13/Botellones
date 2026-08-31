@@ -9,6 +9,7 @@ import type { ClienteRow } from '@/lib/db/clientes';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import { FidelidadTab } from './fidelidad-tab';
 import { HistorialCliente } from '@/components/clientes/historial-cliente';
+import { GaleriaFotos, type FotoGaleria } from '@/components/clientes/galeria-fotos';
 import { createClient } from '@/lib/supabase/client';
 import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -16,11 +17,18 @@ import dynamic from 'next/dynamic';
 const MapaEditable = dynamic(() => import('./mapa-editable'), { ssr: false });
 const MapaLeaflet = dynamic(() => import('./mapa'), { ssr: false });
 
-const TABS = ['Resumen', 'Datos', 'Dirección', 'Botellones', 'Historial', 'Fidelidad'] as const;
+const TABS = ['Resumen', 'Datos', 'Dirección', 'Fotos', 'Botellones', 'Historial', 'Fidelidad'] as const;
 type Tab = (typeof TABS)[number];
 
-export function ClienteTabs({ cliente }: { cliente: ClienteRow }) {
+export function ClienteTabs({
+  cliente,
+  fotos,
+}: {
+  cliente: ClienteRow;
+  fotos: FotoGaleria[];
+}) {
   const [activeTab, setActiveTab] = useState<Tab>('Resumen');
+  const [galeria, setGaleria] = useState<number | null>(null);
 
   return (
     <div className="mt-6">
@@ -40,22 +48,34 @@ export function ClienteTabs({ cliente }: { cliente: ClienteRow }) {
         ))}
       </div>
       <div className="mt-6">
-        {activeTab === 'Resumen' && <ResumenTab cliente={cliente} />}
+        {activeTab === 'Resumen' && <ResumenTab cliente={cliente} fotos={fotos} onAbrirGaleria={setGaleria} />}
         {activeTab === 'Datos' && <DatosTab cliente={cliente} />}
         {activeTab === 'Dirección' && <DireccionTab clienteId={cliente.id} />}
+        {activeTab === 'Fotos' && <FotosTab fotos={fotos} onAbrirGaleria={setGaleria} />}
         {activeTab === 'Botellones' && <BotellonesTab clienteId={cliente.id} />}
         {activeTab === 'Historial' && <HistorialCliente clienteId={cliente.id} />}
         {activeTab === 'Fidelidad' && (
           <FidelidadTab clienteId={cliente.id} totalRecargas={cliente.total_recargas} />
         )}
       </div>
+      {galeria !== null && (
+        <GaleriaFotos fotos={fotos} indiceInicial={galeria} onClose={() => setGaleria(null)} />
+      )}
     </div>
   );
 }
 
 // ── RESUMEN TAB ──
 
-function ResumenTab({ cliente }: { cliente: ClienteRow }) {
+function ResumenTab({
+  cliente,
+  fotos,
+  onAbrirGaleria,
+}: {
+  cliente: ClienteRow;
+  fotos: FotoGaleria[];
+  onAbrirGaleria: (i: number) => void;
+}) {
   const [direccion, setDireccion] = useState<Record<string, string | null> | null>(null);
   const [botellones, setBotellones] = useState<Array<{ id: string; codigo: string; estado: string }>>([]);
   const [copied, setCopied] = useState(false);
@@ -116,6 +136,41 @@ function ResumenTab({ cliente }: { cliente: ClienteRow }) {
 
   return (
     <div className="space-y-4">
+      {fotos.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Fotos de fachada
+          </h2>
+          <div className="mt-2 flex items-center gap-2">
+            {fotos.slice(0, 5).map((f, i) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => onAbrirGaleria(i)}
+                className="block h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md border border-zinc-200 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:hover:ring-zinc-500"
+                aria-label={`Abrir foto de fachada ${i + 1}`}
+              >
+                <img
+                  src={f.url}
+                  alt={`Foto de fachada ${i + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+            {fotos.length > 5 && (
+              <button
+                type="button"
+                onClick={() => onAbrirGaleria(5)}
+                className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-xs font-semibold text-zinc-600 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:ring-zinc-500"
+                aria-label={`Ver ${fotos.length - 5} fotos más`}
+              >
+                +{fotos.length - 5}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Dirección + Contacto */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
@@ -261,6 +316,52 @@ function MiniCard({ icon, label, value }: { icon: React.ReactNode; label: string
       </div>
       <div className="mt-1 font-medium text-zinc-900 dark:text-zinc-100 text-sm">
         {value}
+      </div>
+    </div>
+  );
+}
+
+// ── FOTOS TAB ──
+
+function FotosTab({
+  fotos,
+  onAbrirGaleria,
+}: {
+  fotos: FotoGaleria[];
+  onAbrirGaleria: (i: number) => void;
+}) {
+  if (fotos.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+          Fotos de fachada
+        </h2>
+        <p className="text-sm text-zinc-400">Sin fotos de fachada todavía.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+        Fotos de fachada ({fotos.length})
+      </h2>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+        {fotos.map((f, i) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => onAbrirGaleria(i)}
+            className="block cursor-pointer overflow-hidden rounded-md border border-zinc-200 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:hover:ring-zinc-500"
+            aria-label={`Abrir foto de fachada ${i + 1}`}
+          >
+            <img
+              src={f.url}
+              alt={`Foto de fachada ${i + 1}`}
+              className="aspect-square w-full object-cover"
+            />
+          </button>
+        ))}
       </div>
     </div>
   );

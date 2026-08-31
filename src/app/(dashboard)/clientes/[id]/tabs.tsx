@@ -245,8 +245,8 @@ function ResumenTab({
           <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
             <Camera size={12} /> Fotos de fachada
           </p>
-          <div className="mt-2 flex items-center gap-2">
-            {fotos.slice(0, 5).map((f, i) => (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {fotos.slice(0, 3).map((f, i) => (
               <button
                 key={f.id}
                 type="button"
@@ -261,14 +261,14 @@ function ResumenTab({
                 />
               </button>
             ))}
-            {fotos.length > 5 && (
+            {fotos.length > 3 && (
               <button
                 type="button"
-                onClick={() => onAbrirGaleria(5)}
+                onClick={() => onAbrirGaleria(3)}
                 className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-xs font-semibold text-zinc-600 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:ring-zinc-500"
-                aria-label={`Ver ${fotos.length - 5} fotos más`}
+                aria-label={`Ver ${fotos.length - 3} fotos más`}
               >
-                +{fotos.length - 5}
+                +{fotos.length - 3}
               </button>
             )}
           </div>
@@ -353,7 +353,7 @@ function FotosTab({
           <p className="text-xs text-zinc-400 dark:text-zinc-500">Subí la primera foto desde arriba.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
           {fotos.map((f, i) => (
             <div key={f.id} className="relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
               <button

@@ -1,6 +1,6 @@
 import { getCliente } from '@/lib/db/clientes';
 import { getFotosCliente, fotoFachadaPublicUrl } from '@/lib/db/fotos';
-import { normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import { notFound } from 'next/navigation';
 import { ClienteTabs } from './tabs';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
@@ -29,7 +29,7 @@ export default async function ClienteDetailPage({ params }: Props) {
     )
   ).filter((f) => f.url);
 
-  const whatsapp = normalizeWhatsAppPhone(cliente.whatsapp ?? cliente.telefono_1);
+  const whatsapp = linkWhatsApp(cliente.whatsapp ?? cliente.telefono_1);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, MessageCircle } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import type { SearchResult } from '@/lib/db/search';
 import { searchClientesLight } from '@/lib/db/search';
 
@@ -124,7 +125,7 @@ export default function GlobalSearch() {
                   </div>
                   {r.telefono_1 && (
                     <a
-                      href={`https://wa.me/${r.telefono_1.replace(/\D/g, '')}`}
+                      href={`https://wa.me/${linkWhatsApp(r.telefono_1)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}

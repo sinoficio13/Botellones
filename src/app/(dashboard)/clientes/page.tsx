@@ -1,4 +1,5 @@
 import { getClientes } from '@/lib/db/clientes';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
 
@@ -93,7 +94,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                 <td className="px-3 py-2.5">
                   {c.telefono_1 && (
                     <a
-                      href={`https://wa.me/${c.telefono_1.replace(/\D/g, '')}`}
+                      href={`https://wa.me/${linkWhatsApp(c.telefono_1)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center rounded p-1 text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950"

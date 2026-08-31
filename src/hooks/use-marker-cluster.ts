@@ -7,6 +7,7 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { defaultIcon } from '@/lib/leaflet/icon-fix';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import type { ClienteMapa } from '@/lib/db/mapa';
 
 /**
@@ -33,7 +34,7 @@ export function useMarkerCluster(markers: ClienteMapa[]) {
       const marker = L.marker([m.latitud, m.longitud], { icon: defaultIcon });
 
       const whatsappLink = m.telefono_1
-        ? `<a href="https://wa.me/58${m.telefono_1.replace(/\D/g, '')}"
+        ? `<a href="https://wa.me/${linkWhatsApp(m.telefono_1)}"
               target="_blank" rel="noopener noreferrer"
               style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;
                      padding:4px 8px;border-radius:4px;background:#25d366;color:#fff;

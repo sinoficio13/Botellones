@@ -10,6 +10,7 @@ import { parseWhatsAppLocation } from '@/lib/utils/location';
 import { comprimirImagen, validarImagen, MAX_LADO } from '@/lib/client/imagen';
 import type { ClienteRow } from '@/lib/db/clientes';
 import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import { FidelidadTab } from './fidelidad-tab';
 import { HistorialCliente } from '@/components/clientes/historial-cliente';
 import { GaleriaFotos, type FotoGaleria } from '@/components/clientes/galeria-fotos';
@@ -96,7 +97,7 @@ function ResumenTab({
       .then(({ data }) => setBotellones((data as unknown as typeof botellones) || []));
   }, [cliente.id]);
 
-  const whatsappNum = (cliente.whatsapp || cliente.telefono_1 || '')?.replace(/\D/g, '');
+  const whatsappNum = linkWhatsApp(cliente.whatsapp || cliente.telefono_1);
   const dirCompuesta = direccion
     ? [direccion.calle, direccion.avenida, direccion.sector, direccion.urbanizacion, direccion.ciudad, direccion.estado]
         .filter(Boolean)

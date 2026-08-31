@@ -10,6 +10,7 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { defaultIcon } from '@/lib/leaflet/icon-fix';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import type { ClienteMapa } from '@/lib/db/mapa';
 
 interface Props {
@@ -76,7 +77,7 @@ function MarkerClusterLayer({ markers }: { markers: ClienteMapa[] }) {
     markers.forEach((m) => {
       const marker = L.marker([m.latitud, m.longitud], { icon: defaultIcon });
 
-      const phone = m.telefono_1 ? `58${m.telefono_1.replace(/\D/g, '')}` : '';
+      const phone = linkWhatsApp(m.telefono_1);
 
       // Compose the zone/address line shown in the pin.
       const dirPartes = [

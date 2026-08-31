@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { mensajeWhatsApp, buildWaLink, normalizeWhatsAppPhone } from '@/lib/utils/whatsapp';
+import { mensajeWhatsApp, buildWaLink, linkWhatsApp } from '@/lib/utils/whatsapp';
 import type { EstadoOperativo, GrupoCola } from '@/hooks/useColaOperaciones';
 
 export type SheetWhatsAppProps = {
@@ -35,7 +35,7 @@ export function SheetWhatsApp({ grupo, estado, onClose }: SheetWhatsAppProps) {
   // D8: the shell remounts this sheet per open (sheetWhatsApp !== null), so the
   // useState initializer re-runs with the CURRENT estado — pre-loaded per tab.
   const [mensaje, setMensaje] = useState(() => mensajeWhatsApp(estado, nombre, cantidad));
-  const digitos = normalizeWhatsAppPhone(cliente?.whatsapp);
+  const digitos = linkWhatsApp(cliente?.whatsapp);
   const href = buildWaLink(digitos, mensaje);
 
   return (

@@ -7,6 +7,7 @@ import { markAsRead, markAllAsRead } from '@/lib/db/notificaciones';
 import type { NotificacionRow } from '@/lib/db/notificaciones';
 import { NotificationIcon } from '@/components/notificaciones/notification-icon';
 import { timeAgo } from '@/lib/utils';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import { MessageCircle, CheckCheck } from 'lucide-react';
 
 const FILTER_TABS = [
@@ -61,8 +62,7 @@ export function NotificacionesList({ items, total, page, userId }: Props) {
 
   // WhatsApp link
   const waLink = (telefono: string) => {
-    const digits = telefono.replace(/\D/g, '');
-    return `https://wa.me/${digits}`;
+    return `https://wa.me/${linkWhatsApp(telefono)}`;
   };
 
   return (

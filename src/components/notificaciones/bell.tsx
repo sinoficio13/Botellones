@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Bell, BellRing, MessageCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 import { NotificationIcon } from './notification-icon';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
@@ -172,8 +173,7 @@ export function BellNotification() {
 
   // Format relative time — now imported from @/lib/utils
   const waLink = (telefono: string) => {
-    const digits = telefono.replace(/\D/g, '');
-    return `https://wa.me/${digits}`;
+    return `https://wa.me/${linkWhatsApp(telefono)}`;
   };
 
   return (

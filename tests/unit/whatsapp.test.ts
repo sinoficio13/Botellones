@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeWhatsAppPhone, mensajeWhatsApp, buildWaLink } from '@/lib/utils/whatsapp';
+import { normalizeWhatsAppPhone, mensajeWhatsApp, buildWaLink, linkWhatsApp } from '@/lib/utils/whatsapp';
 
 describe('normalizeWhatsAppPhone', () => {
   it('converts a local 04xx number to international 58 form', () => {
@@ -27,6 +27,32 @@ describe('normalizeWhatsAppPhone', () => {
 
   it('collapses multiple leading zeros before prepending the country code', () => {
     expect(normalizeWhatsAppPhone('004121234567')).toBe('584121234567');
+  });
+});
+
+describe('linkWhatsApp — wa.me digits from a stored international number', () => {
+  it('passes through a stored VE international number unchanged', () => {
+    expect(linkWhatsApp('584141234567')).toBe('584141234567');
+  });
+
+  it('passes through a stored CO international number unchanged', () => {
+    expect(linkWhatsApp('573001234567')).toBe('573001234567');
+  });
+
+  it('does not force 58 nor drop leading zeros on a local-format string', () => {
+    expect(linkWhatsApp('04141234567')).toBe('584141234567');
+    expect(linkWhatsApp('1144445555')).toBe('581144445555');
+    expect(linkWhatsApp('2125551234')).toBe('582125551234');
+  });
+
+  it('strips formatting characters but keeps the country code', () => {
+    expect(linkWhatsApp('+58 412 123-4567')).toBe('584121234567');
+  });
+
+  it('returns empty string for empty, null and undefined input', () => {
+    expect(linkWhatsApp('')).toBe('');
+    expect(linkWhatsApp(null)).toBe('');
+    expect(linkWhatsApp(undefined)).toBe('');
   });
 });
 

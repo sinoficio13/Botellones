@@ -23,6 +23,23 @@ export function normalizeWhatsAppPhone(raw?: string | null): string {
 }
 
 /**
+ * Digits for a `wa.me/` link from a stored number. Los valores nuevos ya están
+ * en formato internacional (llevan su código de país: `584141234567`,
+ * `573001234567`, `13035551234`…) y se respetan tal cual. Las filas legacy
+ * venezolanas pueden estar en formato local (≤10 dígitos, sin `58`): se asume
+ * VE y se prepone el código. Nunca fuerza un código sobre un internacional.
+ */
+export function linkWhatsApp(numero?: string | null): string {
+  let d = (numero ?? '').replace(/\D/g, '');
+  if (!d) return '';
+  d = d.replace(/^0+/, '');
+  if (!d.startsWith('58') && d.length <= 10) {
+    d = `58${d}`;
+  }
+  return d;
+}
+
+/**
  * Locked `mensajeWhatsApp` literal (user spec §7.3, REQ-COS-28 — verbatim):
  * `{p}` = client FIRST name, `{u}` = "N botellones" or "tu botellón" by count.
  * Per-estado Spanish copy pre-loaded into the WhatsApp sheet; the operator

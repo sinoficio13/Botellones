@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Award, MessageCircle, X } from 'lucide-react';
+import { linkWhatsApp } from '@/lib/utils/whatsapp';
 
 interface Props {
   nombre: string;
@@ -16,7 +17,7 @@ export function PremioAlertCard({ nombre, telefono, nivel, clienteId }: Props) {
 
   if (dismissed) return null;
 
-  const cleanPhone = telefono?.replace(/\D/g, '') || '';
+  const cleanPhone = linkWhatsApp(telefono);
 
   return (
     <div className="rounded-xl border border-amber-300/60 bg-gradient-to-br from-amber-50 to-yellow-50 p-6 shadow-sm dark:border-amber-800/60 dark:from-amber-950/30 dark:to-yellow-950/20">
@@ -52,7 +53,7 @@ export function PremioAlertCard({ nombre, telefono, nivel, clienteId }: Props) {
         </Link>
         {cleanPhone && (
           <a
-            href={`https://wa.me/58${cleanPhone}`}
+            href={`https://wa.me/${cleanPhone}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/50"

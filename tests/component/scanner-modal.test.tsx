@@ -137,6 +137,76 @@ describe('ScannerModal — shell and close', () => {
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  // R4-001 — closing a session with unconfirmed bottles must ask first.
+  it('does not close from the backdrop while a session is unconfirmed and the discard is cancelled', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    const onClose = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<ScannerModal onClose={onClose} />);
+
+    await decode(QR1);
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+
+    const backdrop = screen.getByRole('dialog');
+    await act(async () => {
+      backdrop.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true })
+      );
+    });
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'La sesión tiene 1 botellón(es) sin confirmar. ¿Cerrar y descartarlos?'
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('does not close on Escape while a session is unconfirmed and the discard is cancelled', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    const onClose = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<ScannerModal onClose={onClose} />);
+
+    await decode(QR1);
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('closes from the X only after the operator accepts the discard of an unconfirmed session', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    const onClose = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={onClose} />);
+
+    await decode(QR1);
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
+  });
+
+  it('closes WITHOUT a discard prompt when the session is empty', async () => {
+    const onClose = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={onClose} />);
+
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }));
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
+  });
 });
 
 describe('ScannerModal — camera decode', () => {
@@ -345,6 +415,103 @@ describe('ScannerModal — confirm and result', () => {
     await user.click(screen.getByRole('button', { name: 'Seguir editando' }));
     expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
     expect(screen.getByText('BOT-00007')).toBeInTheDocument();
+  });
+
+  // R4-001 — closing on a full-success result view discards nothing, so the
+  // discard guard (unconfirmed items) must NOT prompt.
+  it('closes WITHOUT a discard prompt on the full-success result view', async () => {
+    const onClose = vi.fn();
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    registrarOperacionMock.mockResolvedValue({
+      success: true,
+      items: [{ botellonId: 'b1', codigo: 'BOT-00001', ok: true }],
+    });
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={onClose} />);
+
+    await decode(QR1);
+    await user.click(confirmButton(1));
+    expect(await screen.findByText('Carga registrada')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
+  });
+
+  // R3-002 — a bottle scanned while confirmar() is in flight would be missing
+  // from the snapshot and silently discarded by limpiar(); the entry gate must
+  // block it.
+  it('does not accumulate a scan while confirmar() is in flight', async () => {
+    getBotellonByCodigoMock.mockImplementation((codigo: string) =>
+      Promise.resolve(codigo === 'BOT-00007' ? BOT_RECIBIDO : BOT_ENTREGADO)
+    );
+    registrarOperacionMock.mockReturnValue(new Promise(() => {})); // never settles
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    await decode(QR1);
+    await user.click(confirmButton(1));
+    expect(screen.getByRole('button', { name: 'Confirmando…' })).toBeInTheDocument();
+
+    await decode(QR7); // scanned while confirmar() is pending
+
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.queryByText('BOT-00007')).not.toBeInTheDocument();
+    expect(screen.getAllByText('BOT-00001')).toHaveLength(1);
+  });
+
+  // R4-003 — the camera <video> must NEVER be unmounted across the result
+  // toggle: useQrScanner attaches the stream to videoRef once on mount, so a
+  // recreated element would be black. It stays in the DOM (hidden) instead.
+  it('keeps the <video> mounted across a partial-failure result and Seguir editando', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_RECIBIDO);
+    registrarOperacionMock.mockResolvedValue({
+      success: false,
+      items: [{ botellonId: 'b7', codigo: 'BOT-00007', ok: false, reason: 'error' }],
+      error: 'update exploded',
+    });
+    const user = userEvent.setup();
+    const { container } = render(<ScannerModal onClose={vi.fn()} />);
+
+    const videoInicial = container.querySelector('video');
+    expect(videoInicial).toBeInTheDocument();
+
+    await decode(QR7);
+    await user.click(confirmButton(1));
+    expect(await screen.findByText('update exploded')).toBeInTheDocument();
+
+    // Result view: the SAME video element stays in the DOM (hidden by CSS).
+    expect(container.querySelector('video')).toBe(videoInicial);
+
+    await user.click(screen.getByRole('button', { name: 'Seguir editando' }));
+    // Back to the session: still the same element, no remount (no black camera).
+    expect(container.querySelector('video')).toBe(videoInicial);
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+  });
+
+  // R4-003 — while the result view is visible the camera keeps decoding (only a
+  // full success stops it), but the handler must short-circuit BEFORE resolving
+  // the botellón so nothing accumulates behind the result.
+  it('ignores a decode while the result view is visible', async () => {
+    getBotellonByCodigoMock.mockImplementation((codigo: string) =>
+      Promise.resolve(codigo === 'BOT-00007' ? BOT_RECIBIDO : BOT_ENTREGADO)
+    );
+    registrarOperacionMock.mockResolvedValue({
+      success: false,
+      items: [{ botellonId: 'b1', codigo: 'BOT-00001', ok: false, reason: 'error' }],
+      error: 'update exploded',
+    });
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    await decode(QR1);
+    await user.click(confirmButton(1));
+    expect(await screen.findByText('update exploded')).toBeInTheDocument();
+
+    await decode(QR7);
+    expect(getBotellonByCodigoMock).not.toHaveBeenCalledWith('BOT-00007');
   });
 });
 

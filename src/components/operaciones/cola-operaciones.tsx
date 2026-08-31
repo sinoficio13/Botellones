@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ESTADO_LABELS } from '@/lib/utils/estados';
 import {
   useColaOperaciones,
@@ -44,6 +45,7 @@ const FIN_SCROLL_MS = 150;
  * UI copy Spanish; tokens only.
  */
 export function ColaOperaciones({ autoOpenScan = false }: { autoOpenScan?: boolean }) {
+  const router = useRouter();
   const [tab, setTab] = useState<EstadoOperativo>('recibido');
   // Unified scanner modal: every "Recibir botellón" trigger (empty state,
   // desktop persistent button, per-tab empty action) opens the SAME batch
@@ -93,10 +95,23 @@ export function ColaOperaciones({ autoOpenScan = false }: { autoOpenScan?: boole
     };
   }, [setScrolleando]);
 
-  // Deep-link from the dashboard (?scan=1): open the scanner right away.
+  // Deep-link from the dashboard (?scan=1): open the scanner right away and
+  // CONSUME the param once (router.replace strips it from the URL), so a reload
+  // or browser-back can no longer silently re-trigger the camera. The replace
+  // is a client-side navigation: the page re-renders with autoOpenScan=false
+  // but the component state is preserved, so the modal stays open — the effect
+  // only opens when autoOpenScan is true, it never closes it.
+  //
+  // The residual auto-camera activation is accepted: the dashboard is staff-only
+  // behind the auth proxy, the first activation is gated by the browser camera
+  // permission prompt, and the deep link itself comes from an explicit staff
+  // action (an "Escanear" entry point in the dashboard shell).
   useEffect(() => {
-    if (autoOpenScan) setScannerAbierto(true);
-  }, [autoOpenScan]);
+    if (autoOpenScan) {
+      setScannerAbierto(true);
+      router.replace('/dashboard', { scroll: false });
+    }
+  }, [autoOpenScan, router]);
 
   const contadores: Record<EstadoOperativo, number> = {
     recibido: porEstado.recibido.length,

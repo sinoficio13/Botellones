@@ -3,12 +3,22 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ColaOperaciones } from '@/components/operaciones/cola-operaciones';
 import type { ColaBotellon } from '@/lib/db/botellones';
 
-const { getColaOperacionesMock, getBotellonesClienteMock, rpcMock, pushMock } = vi.hoisted(() => ({
-  getColaOperacionesMock: vi.fn(),
-  getBotellonesClienteMock: vi.fn(),
-  rpcMock: vi.fn(),
-  pushMock: vi.fn(),
-}));
+const { getColaOperacionesMock, getBotellonesClienteMock, rpcMock, pushMock, replaceMock, mockRouter } = vi.hoisted(() => {
+  const pushMock = vi.fn();
+  const replaceMock = vi.fn();
+  // Stable object identity per useRouter() call, like the real Next router —
+  // the autoOpenScan effect's deps are [autoOpenScan, router], so an unstable
+  // mock identity would re-fire the effect (and the replace) on every render.
+  const mockRouter = { push: pushMock, replace: replaceMock };
+  return {
+    getColaOperacionesMock: vi.fn(),
+    getBotellonesClienteMock: vi.fn(),
+    rpcMock: vi.fn(),
+    pushMock,
+    replaceMock,
+    mockRouter,
+  };
+});
 
 // Fake-channel supabase (estado-en-vivo pattern): the shell mounts
 // useRealtimeCola (REQ-COS-27), so tests dispatch synthetic postgres_changes
@@ -43,7 +53,7 @@ vi.mock('@/lib/supabase/client', () => ({
     removeChannel: vi.fn(),
   }),
 }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushMock }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => mockRouter }));
 // The real ScannerModal owns the camera lifecycle (useQrScanner) which cannot
 // run in jsdom — the shell test only proves the shell OPENS/CLOSES it.
 vi.mock('@/components/scanner/scanner-modal', () => ({
@@ -106,6 +116,8 @@ async function montar(filas: ColaBotellon[]) {
 describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
   beforeEach(() => {
     fakeChannels.length = 0;
+    pushMock.mockClear();
+    replaceMock.mockClear();
   });
 
   afterEach(() => {
@@ -184,20 +196,25 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it('autoOpenScan opens the unified ScannerModal on mount without any interaction', async () => {
+  it('autoOpenScan opens the unified ScannerModal on mount and consumes the deep link once (R4-001)', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones autoOpenScan />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
 
     expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
+    // The ?scan=1 param is stripped from the URL once, so a reload or browser
+    // back cannot silently re-trigger the camera.
+    expect(replaceMock).toHaveBeenCalledTimes(1);
+    expect(replaceMock).toHaveBeenCalledWith('/dashboard', { scroll: false });
   });
 
-  it('does not auto-open the scanner without autoOpenScan', async () => {
+  it('does not auto-open the scanner or touch the URL without autoOpenScan', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it('renders the tablet 2-col sections grid WITHOUT tabs (REQ-21 S1, D9)', async () => {

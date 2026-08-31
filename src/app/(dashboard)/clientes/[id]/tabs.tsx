@@ -15,7 +15,7 @@ import { GaleriaFotos, type FotoGaleria } from '@/components/clientes/galeria-fo
 import { InputDocumento } from '@/components/clientes/input-documento';
 import { InputWhatsapp } from '@/components/clientes/input-whatsapp';
 import { createClient } from '@/lib/supabase/client';
-import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2, X } from 'lucide-react';
+import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2, X, Camera, Upload, ImagePlus } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const MapaEditable = dynamic(() => import('./mapa-editable'), { ssr: false });
@@ -140,41 +140,6 @@ function ResumenTab({
 
   return (
     <div className="space-y-4">
-      {fotos.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Fotos de fachada
-          </h2>
-          <div className="mt-2 flex items-center gap-2">
-            {fotos.slice(0, 5).map((f, i) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => onAbrirGaleria(i)}
-                className="block h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md border border-zinc-200 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:hover:ring-zinc-500"
-                aria-label={`Abrir foto de fachada ${i + 1}`}
-              >
-                <img
-                  src={f.url}
-                  alt={`Foto de fachada ${i + 1}`}
-                  className="h-full w-full object-cover"
-                />
-              </button>
-            ))}
-            {fotos.length > 5 && (
-              <button
-                type="button"
-                onClick={() => onAbrirGaleria(5)}
-                className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-xs font-semibold text-zinc-600 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:ring-zinc-500"
-                aria-label={`Ver ${fotos.length - 5} fotos más`}
-              >
-                +{fotos.length - 5}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Dirección + Contacto */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
@@ -274,6 +239,42 @@ function ResumenTab({
         </div>
       )}
 
+      {/* Fotos de fachada (debajo del mapa, o tras Dirección+Contacto si no hay mapa) */}
+      {fotos.length > 0 && (
+        <div>
+          <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            <Camera size={12} /> Fotos de fachada
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            {fotos.slice(0, 5).map((f, i) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => onAbrirGaleria(i)}
+                className="block h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-md border border-zinc-200 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:hover:ring-zinc-500"
+                aria-label={`Abrir foto de fachada ${i + 1}`}
+              >
+                <img
+                  src={f.url}
+                  alt={`Foto de fachada ${i + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+            {fotos.length > 5 && (
+              <button
+                type="button"
+                onClick={() => onAbrirGaleria(5)}
+                className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-xs font-semibold text-zinc-600 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:ring-zinc-500"
+                aria-label={`Ver ${fotos.length - 5} fotos más`}
+              >
+                +{fotos.length - 5}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Mini-cards */}
       <div className="grid grid-cols-3 gap-3">
         <MiniCard
@@ -338,22 +339,27 @@ function FotosTab({
 }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+      <h2 className="flex items-center gap-2 text-lg font-medium text-zinc-900 dark:text-zinc-50">
+        <Camera size={18} className="text-zinc-400 dark:text-zinc-500" />
         Fotos de fachada ({fotos.length})
       </h2>
 
       <SubirFotos clienteId={clienteId} />
 
       {fotos.length === 0 ? (
-        <p className="text-sm text-zinc-400">Sin fotos de fachada todavía.</p>
+        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 py-10 text-center dark:border-zinc-700">
+          <ImagePlus size={32} className="text-zinc-400 dark:text-zinc-500" />
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Sin fotos de fachada todavía.</p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">Subí la primera foto desde arriba.</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {fotos.map((f, i) => (
-            <div key={f.id} className="relative overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700">
+            <div key={f.id} className="relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
               <button
                 type="button"
                 onClick={() => onAbrirGaleria(i)}
-                className="block w-full cursor-pointer"
+                className="block w-full cursor-pointer transition-transform hover:scale-[1.02]"
                 aria-label={`Abrir foto de fachada ${i + 1}`}
               >
                 <img
@@ -380,21 +386,22 @@ function SubirFotos({ clienteId }: { clienteId: string }) {
   }, [state, router]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-3">
-      <input
-        type="file"
-        name="fotos"
-        multiple
-        accept="image/*"
-        className="max-w-xs text-sm text-zinc-600 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-zinc-800 dark:text-zinc-300 dark:file:bg-zinc-50 dark:file:text-zinc-900 dark:hover:file:bg-zinc-200"
-      />
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-      >
-        {pending ? 'Subiendo…' : 'Subir fotos'}
-      </button>
+    <form action={formAction} className="space-y-3">
+      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-8 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600">
+        <Upload size={32} className="text-zinc-400 dark:text-zinc-500" />
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Elegir fotos</span>
+        <span className="text-xs text-zinc-400 dark:text-zinc-500">JPG, PNG o WebP · hasta 2.5 MB c/u</span>
+        <input type="file" name="fotos" multiple accept="image/*" className="sr-only" />
+      </label>
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          {pending ? 'Subiendo…' : 'Subir fotos'}
+        </button>
+      </div>
       {state?.error && (
         <p className="w-full text-sm text-red-700 dark:text-red-400">{state.error}</p>
       )}
@@ -421,7 +428,7 @@ function QuitarFoto({ clienteId, foto }: { clienteId: string; foto: FotoGaleria 
         onClick={(e) => {
           if (!window.confirm('¿Eliminar esta foto?')) e.preventDefault();
         }}
-        className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-red-600"
+        className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/60 p-1.5 text-white shadow transition-colors hover:bg-red-600"
       >
         <X size={14} />
       </button>

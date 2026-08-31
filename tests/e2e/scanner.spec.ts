@@ -2,7 +2,8 @@
  * E2E: scanner access from the mobile bottom-bar FAB.
  *
  * Full scan loop: FAB tap -> camera modal -> QR decode -> botellón resolve
- * -> redirect to the recarga flow with ?botellon_id=.
+ * -> accumulated into the batch session (no navigation; the unified ScannerModal
+ * keeps scanning in-place).
  *
  * Requires: NEXT_PUBLIC_AUTH_MODE=dev, dev server running, seed data applied
  * (BOT-00001 assigned to a client).
@@ -32,7 +33,7 @@ async function loginAsAdmin(page: Page) {
   await page.waitForURL(/\/clientes/, { timeout: 15000 });
 }
 
-test('scan FAB opens the camera modal and redirects to the recarga flow', async ({
+test('scan FAB opens the camera modal and accumulates the bottle into the batch session', async ({
   page,
   browserName,
 }) => {
@@ -49,7 +50,7 @@ test('scan FAB opens the camera modal and redirects to the recarga flow', async 
   });
 
   // Stub the camera: getUserMedia returns a canvas stream showing the
-  // precomputed QR, so jsQR decodes a real frame and the flow redirects.
+  // precomputed QR, so jsQR decodes a real frame and the modal accumulates it.
   // mediaDevices may be absent in the init-script context (about:blank is
   // not a secure context), so create it defensively first.
   await page.addInitScript(
@@ -94,8 +95,7 @@ test('scan FAB opens the camera modal and redirects to the recarga flow', async 
   // One tap on the center FAB of the bottom bar
   await page.getByRole('button', { name: 'Escanear QR' }).click();
 
-  // Scan -> validate -> resolve -> redirect to the preselected recarga flow
-  await expect(page).toHaveURL(/\/recargas\/nueva\?botellon_id=/, {
-    timeout: 15000,
-  });
+  // Scan -> validate -> accumulate into the batch session (no navigation).
+  await expect(page.getByText('Sesión (1)')).toBeVisible({ timeout: 15000 });
+  await expect(page).toHaveURL(/\/dashboard/);
 });

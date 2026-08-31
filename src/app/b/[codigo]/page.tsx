@@ -107,7 +107,7 @@ export default async function BotellonPublicPage({ params }: Props) {
           ) : (
             isStaff && (
               <Link
-                href={`/recargas/nueva?botellon_id=${botellon.id}`}
+                href="/dashboard?scan=1"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e7490] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0c4a6e]"
               >
                 Registrar recarga

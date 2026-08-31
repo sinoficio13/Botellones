@@ -153,26 +153,51 @@ describe('ColaOperaciones — REQ-COS-21 (Slice E shell)', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 
-  it('opens the Recibir botellón modal from the first-use empty state and closes it (REQ-21 S2)', async () => {
+  it('opens the unified ScannerModal from the first-use empty state and closes it (REQ-21 S2)', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Recibir botellón' }));
-    expect(screen.getByRole('dialog', { name: 'Recibir botellón' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('opens the Recibir botellón modal (no navigation) from the first-use empty state (REQ-21 S2)', async () => {
+  it('opens the unified ScannerModal (no navigation) from the first-use empty state (REQ-21 S2)', async () => {
     getColaOperacionesMock.mockResolvedValue([]);
     render(<ColaOperaciones />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Recibir botellón' }));
-    expect(screen.getByRole('dialog', { name: 'Recibir botellón' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the unified ScannerModal from the desktop persistent button over a populated queue', async () => {
+    await montar(filasTipicas());
+
+    // The desktop persistent button (lg:inline-flex) targets the same modal.
+    fireEvent.click(screen.getByRole('button', { name: 'Recibir botellón' }));
+    expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('autoOpenScan opens the unified ScannerModal on mount without any interaction', async () => {
+    getColaOperacionesMock.mockResolvedValue([]);
+    render(<ColaOperaciones autoOpenScan />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
+
+    expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
+  });
+
+  it('does not auto-open the scanner without autoOpenScan', async () => {
+    getColaOperacionesMock.mockResolvedValue([]);
+    render(<ColaOperaciones />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Recibir botellón' })).toBeInTheDocument());
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('renders the tablet 2-col sections grid WITHOUT tabs (REQ-21 S1, D9)', async () => {

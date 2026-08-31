@@ -1,24 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { ScanLine, X } from 'lucide-react';
 import { getBotellonByCodigo } from '@/lib/db/botellones';
+import type { CargaState } from '@/lib/db/cargas';
 import { parseQrCode } from '@/lib/scanner/parse-qr';
+import { playBeep } from '@/lib/scanner/beep';
 import {
   useQrScanner,
   type QrDecodeOutcome,
 } from '@/lib/scanner/use-qr-scanner';
-import { cn } from '@/lib/utils';
+import { useSesionCarga } from '@/hooks/useSesionCarga';
+import { SesionCarga } from '@/components/operaciones/sesion-carga';
+import { ResultadoCarga } from '@/components/operaciones/resultado-carga';
+import { BuscadorClienteCarga } from '@/components/operaciones/buscador-cliente-carga';
 
 type ScanError =
   | 'permission-denied'
   | 'camera-unavailable'
   | 'invalid-code'
-  | 'not-found'
-  | 'no-client';
-
-type ScanMode = 'recarga' | 'carga';
+  | 'not-found';
 
 const ERROR_COPY: Record<ScanError, { title: string; hint: string }> = {
   'permission-denied': {
@@ -37,35 +38,42 @@ const ERROR_COPY: Record<ScanError, { title: string; hint: string }> = {
     title: 'Botellón no encontrado',
     hint: 'No se encontró un botellón con ese código. Continúa escaneando.',
   },
-  'no-client': {
-    title: 'Sin cliente asignado',
-    hint: 'Este botellón no tiene un cliente asignado. Continúa escaneando.',
-  },
 };
 
 /**
- * Camera scanner modal. Hosts a `Recarga` | `Carga` mode toggle; in `Carga`
- * mode it hands off to the batch page (`/recargas/carga`) with no decode
- * processing, while `Recarga` (default) keeps the single-flow behavior:
- * decode via `useQrScanner`, then redirect to the recarga confirm step.
+ * Unified batch scanner modal. Replaces the old single-flow scanner (which
+ * redirected to /recargas/nueva) and the camera-less "Recibir botellón" modal
+ * (which only accepted manual codes): every QR surface now opens THIS modal,
+ * which scans + accumulates into a session in-place (no navigation).
+ *
+ * The session logic lives in `useSesionCarga` (same as the old batch
+ * terminal): each bottle pre-fills its own destination from its current
+ * estado, dedupe flashes repeated codes with a beep, and a single confirm
+ * posts one `registrarOperacion` per destino group. The client search, manual
+ * digits-only entry (BOT- prefix implied) and the shared result view render
+ * inside the fixed overlay; header/close stay visible on the result screen.
  *
  * The camera/decode lifecycle lives in `useQrScanner`; this component only
- * selects the destination flow. The `no-client` outcome is caller-side (the
- * hook's error type does not include it), so it is tracked locally.
+ * accumulates decoded bottles. `onDecode` is kept in a ref (updated in an
+ * effect) so the camera never restarts on re-render while always reading the
+ * latest handler — the same circular-dependency pattern the previous modal
+ * used.
  */
 export function ScannerModal({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-  const [mode, setMode] = useState<ScanMode>('recarga');
-  const [noClient, setNoClient] = useState(false);
-  // Manual code entry — camera-less PC fallback on the camera-error branch.
+  const { items, flashId, agregar, setDestino, quitar, limpiar, confirmar } =
+    useSesionCarga();
+  // Manual digits-only entry (BOT- prefix implied) — camera-less fallback.
   const [codigoManual, setCodigoManual] = useState('');
   const [errorManual, setErrorManual] = useState<string | null>(null);
+  // Local pending state for the async confirm (one call per destino group).
+  const [confirmando, setConfirmando] = useState(false);
+  const [resultado, setResultado] = useState<CargaState[] | null>(null);
 
   // The hook keeps `onDecode` in a ref updated every render, so we forward a
   // stable wrapper and point it at the latest handler. The handler reads
-  // `stop`/`setDecodeError` from the hook, which creates a circular
-  // dependency; storing it in a ref (updated in an effect, per react-hooks)
-  // breaks that cycle without restarting the camera on re-render.
+  // `setDecodeError` from the hook, which creates a circular dependency;
+  // storing it in a ref (updated in an effect, per react-hooks) breaks that
+  // cycle without restarting the camera on re-render.
   const handleDecodeRef = useRef<
     (raw: string) => Promise<QrDecodeOutcome> | void
   >(async () => ({ outcome: 'failure' }));
@@ -75,141 +83,102 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     handleDecodeRef.current = async (raw: string): Promise<QrDecodeOutcome> => {
-      // Carga mode performs no decode processing — handoff is button-driven.
-      if (mode !== 'recarga') return { outcome: 'failure' };
-
       const parsed = parseQrCode(raw);
-      if (!parsed) return { outcome: 'failure' };
+      if (!parsed) {
+        setDecodeError('invalid-code');
+        return { outcome: 'failure' };
+      }
 
       const botellon = await getBotellonByCodigo(parsed.codigo);
       if (!botellon) {
         setDecodeError('not-found');
         return { outcome: 'failure' };
       }
-      if (!botellon.cliente_id) {
-        setNoClient(true);
-        return { outcome: 'failure' };
-      }
 
-      stop();
-      onClose();
-      router.push(`/recargas/nueva?botellon_id=${botellon.id}`);
-      return { outcome: 'ok' };
+      // No navigation anymore: accumulate into the session and keep scanning
+      // (the hook treats the failure outcome as "decode consumed").
+      const added = await agregar(botellon);
+      if (!added) playBeep();
+      setDecodeError(null);
+      return { outcome: 'failure' };
     };
   });
 
-  const handleCargaHandoff = useCallback(() => {
-    stop();
-    onClose();
-    router.push('/recargas/carga');
-  }, [stop, onClose, router]);
-
-  /**
-   * Manual fallback submit (camera-error branch). In `carga` mode there is no
-   * code to validate — the terminal owns the batch flow with its own manual
-   * entry, so the submit just hands off (same destination as handleCargaHandoff).
-   * In `recarga` mode the typed code (bare BOT-XXXXX or a full QR URL, via
-   * parseQrCode) is resolved and routed exactly like a camera decode.
-   */
-  async function manejarIngresoManual() {
-    const raw = codigoManual.trim();
-    if (raw === '') return;
-
-    if (mode === 'carga') {
-      setErrorManual(null);
-      setCodigoManual('');
-      stop();
-      onClose();
-      router.push('/recargas/carga');
-      return;
+  // Escape closes the modal (keyboard affordance).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
     }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
-    const parsed = parseQrCode(raw);
-    const codigo = parsed?.codigo ?? raw;
-    const botellon = await getBotellonByCodigo(codigo);
+  const resultadoOk = resultado !== null && resultado.every((r) => r.success);
+
+  // Release the camera stream once a batch fully succeeds: the result view
+  // removes the <video>, so without this the getUserMedia track (camera LED)
+  // would stay active. stop() is idempotent. A FAILED attempt keeps the
+  // camera alive — "Seguir editando" returns to the live scanner.
+  useEffect(() => {
+    if (resultadoOk) stop();
+  }, [resultadoOk, stop]);
+
+  const accionables = items.filter((i) => i.destino !== null);
+  const canConfirmar = accionables.length > 0 && !confirmando;
+  const enSesion = new Set(items.map((i) => i.id));
+
+  function onManualChange(e: ChangeEvent<HTMLInputElement>) {
+    // Digits only; tolerates pasted full codes like "BOT-00045".
+    setCodigoManual(e.target.value.replace(/\D/g, ''));
+  }
+
+  async function manejarIngresoManual() {
+    const digits = codigoManual.trim();
+    if (digits === '') return;
+    const botellon = await getBotellonByCodigo(`BOT-${digits}`);
     if (!botellon) {
       setErrorManual('Botellón no encontrado');
       return;
     }
-    if (!botellon.cliente_id) {
-      setNoClient(true);
-      return;
-    }
-
     setErrorManual(null);
     setCodigoManual('');
-    stop();
-    onClose();
-    router.push(`/recargas/nueva?botellon_id=${botellon.id}`);
+    const added = await agregar(botellon);
+    if (!added) playBeep();
+  }
+
+  async function manejarConfirmar() {
+    if (confirmando) return;
+    setConfirmando(true);
+    try {
+      setResultado(await confirmar());
+    } finally {
+      setConfirmando(false);
+    }
   }
 
   const activeCameraError = cameraError ? ERROR_COPY[cameraError] : null;
-  const activeDecodeError =
-    decodeError || noClient ? ERROR_COPY[decodeError ?? 'no-client'] : null;
+  const activeDecodeError = decodeError ? ERROR_COPY[decodeError] : null;
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Escanear código QR"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Escanear QR
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+  let cuerpo: React.ReactNode;
 
-        {/* Mode toggle: only selects the destination flow; does not touch the
-            camera/decode lifecycle owned by useQrScanner. */}
-        <div
-          role="group"
-          aria-label="Modo de escaneo"
-          className="flex gap-1 border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800"
-        >
-          <button
-            type="button"
-            aria-pressed={mode === 'recarga'}
-            onClick={() => setMode('recarga')}
-            className={cn(
-              'flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              mode === 'recarga'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-            )}
-          >
-            Recarga
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'carga'}
-            onClick={() => setMode('carga')}
-            className={cn(
-              'flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              mode === 'carga'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-            )}
-          >
-            Carga
-          </button>
-        </div>
-
+  if (resultado) {
+    cuerpo = (
+      <ResultadoCarga
+        resultado={resultado}
+        items={items}
+        onListo={() => {
+          limpiar();
+          onClose();
+        }}
+        onSeguirEditando={() => setResultado(null)}
+      />
+    );
+  } else {
+    cuerpo = (
+      <div className="space-y-4">
         {activeCameraError ? (
-          <div className="px-6 py-10 text-center">
+          /* Camera-error branch: manual digits-only entry replaces the video. */
+          <div className="rounded-2xl bg-zinc-50 px-6 py-8 text-center dark:bg-zinc-900">
             <ScanLine className="mx-auto h-8 w-8 text-zinc-300 dark:text-zinc-600" />
             <p className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {activeCameraError.title}
@@ -217,72 +186,51 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {activeCameraError.hint}
             </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void manejarIngresoManual();
+              }}
+              className="mx-auto mt-5 max-w-xs text-left"
             >
-              Cerrar
-            </button>
-
-            {/* Manual fallback so a PC without a camera can still continue.
-                A clientless code surfaces here (not over a video) with its own
-                dismiss so the staff can type another code. */}
-            {noClient ? (
-              <div className="mx-auto mt-5 max-w-xs">
-                <ScanLine className="mx-auto h-8 w-8 text-zinc-300 dark:text-zinc-600" />
-                <p className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  Sin cliente asignado
-                </p>
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Este botellón no tiene un cliente asignado. Probá con otro código.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setNoClient(false)}
-                  className="mt-4 w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-                >
-                  Volver a intentar
-                </button>
-              </div>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void manejarIngresoManual();
-                }}
-                className="mx-auto mt-5 max-w-xs"
+              <label
+                htmlFor="scanner-manual-codigo"
+                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
               >
-                <label
-                  htmlFor="scanner-manual-codigo"
-                  className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-                >
-                  ¿Sin cámara? Ingresá el código del botellón
-                </label>
-                <input
-                  id="scanner-manual-codigo"
-                  type="text"
-                  placeholder="BOT-00000"
-                  value={codigoManual}
-                  onChange={(e) => setCodigoManual(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                />
+                ¿Sin cámara? Ingresá el código manualmente
+              </label>
+              <div className="mt-1 flex gap-2">
+                <div className="flex min-w-0 flex-1 items-center rounded-md border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+                  <span className="pl-3 font-mono text-sm text-zinc-400">BOT-</span>
+                  <input
+                    id="scanner-manual-codigo"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="00000"
+                    value={codigoManual}
+                    onChange={onManualChange}
+                    className="w-full min-w-0 bg-transparent px-2 py-2 font-mono text-sm text-zinc-900 outline-none dark:text-zinc-50"
+                  />
+                </div>
                 <button
                   type="submit"
-                  className="mt-2 w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                  disabled={codigoManual === '' || confirmando}
+                  className="shrink-0 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
                 >
-                  Continuar
+                  Agregar a la sesión
                 </button>
-                {errorManual && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                    {errorManual}
-                  </p>
-                )}
-              </form>
-            )}
+              </div>
+              {errorManual && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  {errorManual}
+                </p>
+              )}
+            </form>
           </div>
         ) : (
-          <div className="relative aspect-square bg-black">
+          /* Camera block with a centered reticle; decode errors overlay it. */
+          <div className="relative aspect-square overflow-hidden rounded-2xl bg-black">
             <video
               ref={videoRef}
               playsInline
@@ -304,28 +252,70 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
               </div>
             ) : (
               <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-white/80">
-                {mode === 'carga'
-                  ? "Selecciona 'Iniciar carga' para el escaneo por lotes."
-                  : 'Apunta la cámara al código QR del botellón'}
+                Apunta la cámara al código QR del botellón
               </p>
             )}
           </div>
         )}
 
-        {mode === 'carga' && (
-          <div className="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
-            <p className="mb-3 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              Escaneo por lotes para cargar botellones.
-            </p>
-            <button
-              type="button"
-              onClick={handleCargaHandoff}
-              className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-            >
-              Iniciar carga
-            </button>
-          </div>
-        )}
+        {/* Client search — alternative to camera/manual entry; adds the chosen
+            client's bottles to the SAME session (dedupe + flash via the hook). */}
+        <BuscadorClienteCarga onAgregar={agregar} enSesion={enSesion} />
+
+        {/* Session */}
+        <div>
+          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+            Sesión ({items.length})
+          </h3>
+          <SesionCarga
+            items={items}
+            flashId={flashId}
+            onSetDestino={setDestino}
+            onQuitar={quitar}
+          />
+        </div>
+
+        {/* Confirm */}
+        <button
+          type="button"
+          onClick={() => void manejarConfirmar()}
+          disabled={!canConfirmar}
+          className="w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {confirmando
+            ? 'Confirmando…'
+            : `Confirmar (${accionables.length} botellones)`}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Escanear código QR"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Escanear QR
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-4 py-4">{cuerpo}</div>
       </div>
     </div>
   );

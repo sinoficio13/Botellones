@@ -1,18 +1,8 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-
-import { procesarLoyalty, REALIZADA_POR_PLACEHOLDER } from '@/lib/db/loyalty';
-import { hoyZona, horaAhoraZona } from '@/lib/utils/hora';
+import { hoyZona } from '@/lib/utils/hora';
 
 // ── Types ──
-
-export type RecargaState = {
-  success?: boolean;
-  error?: string;
-  recargaId?: string;
-  premioGenerado?: { nivel: number; id: string };
-};
 
 export type RecargaConBotellon = {
   id: string;
@@ -48,90 +38,6 @@ export async function getClientesForSearch(query: string) {
     return data || [];
   } catch {
     return [];
-  }
-}
-
-export async function getBotellonesDelCliente(clienteId: string) {
-  try {
-    const supabase = await getSupabase();
-    const { data } = await supabase
-      .from('botellones')
-      .select('id, codigo, estado')
-      .eq('cliente_id', clienteId)
-      .in('estado', ['entregado'])
-      .order('codigo');
-    return data || [];
-  } catch {
-    return [];
-  }
-}
-
-export async function registrarRecarga(
-  _prev: RecargaState | null,
-  formData: FormData
-): Promise<RecargaState> {
-  const cliente_id = formData.get('cliente_id') as string;
-  const botellon_id = formData.get('botellon_id') as string;
-
-  if (!cliente_id || !botellon_id) {
-    return { error: 'Cliente y botellón requeridos' };
-  }
-
-  try {
-    const supabase = await getSupabase();
-
-    // Get next registro number (created_at DESC, id DESC so ties break deterministically)
-    const { data: lastRecarga } = await supabase
-      .from('recargas')
-      .select('numero_registro')
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const lastNum = lastRecarga?.numero_registro
-      ? parseInt(lastRecarga.numero_registro.replace('REC-', ''))
-      : 0;
-    const numero_registro = `REC-${String(lastNum + 1).padStart(6, '0')}`;
-
-    // dev placeholder — will be replaced with auth.uid() after EPIC-1 auth hardening
-    const realizada_por = REALIZADA_POR_PLACEHOLDER;
-
-    // Insert recarga
-    const { error } = await supabase.from('recargas').insert({
-      numero_registro,
-      cliente_id,
-      botellon_id,
-      fecha: hoyZona(),
-      hora: horaAhoraZona(),
-      realizada_por,
-    });
-
-    if (error) return { error: error.message };
-
-    // Update botellon estado to 'recarga' if it was 'entregado'
-    await supabase
-      .from('botellones')
-      .update({ estado: 'recarga' })
-      .eq('id', botellon_id)
-      .eq('estado', 'entregado');
-
-    // ── Loyalty detection ──
-    // Shared helper: premio (every 100 recargas) + premio_cerca (5 before next level)
-    const { premios } = await procesarLoyalty([cliente_id], realizada_por);
-    const premioGenerado = premios[0];
-
-    revalidatePath('/clientes');
-    revalidatePath('/recargas');
-    revalidatePath('/botellones');
-
-    const result: RecargaState = { success: true };
-    if (premioGenerado) {
-      result.premioGenerado = premioGenerado;
-    }
-    return result;
-  } catch (err: unknown) {
-    return { error: err instanceof Error ? err.message : 'Error al registrar recarga' };
   }
 }
 

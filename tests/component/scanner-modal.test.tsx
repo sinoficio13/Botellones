@@ -1,302 +1,123 @@
-import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ScannerModal } from '@/components/scanner/scanner-modal';
 
-const jsQrMock = vi.hoisted(() => vi.fn());
-const getUserMediaMock = vi.hoisted(() => vi.fn());
+const useQrScannerMock = vi.hoisted(() => vi.fn());
 const getBotellonByCodigoMock = vi.hoisted(() => vi.fn());
-const pushMock = vi.hoisted(() => vi.fn());
-// Stable router identity — the modal effect depends on it; a fresh object
-// per render would re-run the effect (and restart the camera) every render.
-const routerMock = vi.hoisted(() => ({ push: pushMock }));
+const getClienteMock = vi.hoisted(() => vi.fn());
+const registrarOperacionMock = vi.hoisted(() => vi.fn());
+const playBeepMock = vi.hoisted(() => vi.fn());
+const setDecodeErrorMock = vi.hoisted(() => vi.fn());
+const stopMock = vi.hoisted(() => vi.fn());
 
-vi.mock('jsqr', () => ({ default: jsQrMock }));
+vi.mock('@/lib/scanner/use-qr-scanner', () => ({
+  useQrScanner: useQrScannerMock,
+}));
 vi.mock('@/lib/db/botellones', () => ({
   getBotellonByCodigo: getBotellonByCodigoMock,
 }));
-vi.mock('next/navigation', () => ({
-  useRouter: () => routerMock,
+vi.mock('@/lib/db/clientes', () => ({
+  getCliente: getClienteMock,
+}));
+vi.mock('@/lib/db/cargas', () => ({
+  registrarOperacion: registrarOperacionMock,
+}));
+vi.mock('@/lib/scanner/beep', () => ({
+  playBeep: playBeepMock,
+}));
+// Minimal stub — the client search just needs to render in this suite.
+vi.mock('@/components/operaciones/buscador-cliente-carga', () => ({
+  BuscadorClienteCarga: () => (
+    <section aria-label="Buscar por cliente">
+      <span>o buscá por cliente:</span>
+    </section>
+  ),
 }));
 
-const VALID_QR = 'https://app.example.com/b/BOT-00001';
+const QR1 = 'https://app.example.com/b/BOT-00001';
+const QR7 = 'https://app.example.com/b/BOT-00007';
+// Each bottle's CURRENT estado drives its pre-filled destination.
+const BOT_ENTREGADO = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1', estado: 'entregado' };
+const BOT_RECIBIDO = { id: 'b7', codigo: 'BOT-00007', cliente_id: 'c7', estado: 'recibido' };
 
-type FakeTrack = { stop: ReturnType<typeof vi.fn> };
-type FakeStream = { getTracks: () => FakeTrack[] };
+const MANUAL_LABEL = '¿Sin cámara? Ingresá el código manualmente';
 
-function makeStream(): { stream: FakeStream; track: FakeTrack } {
-  const track = { stop: vi.fn() };
-  return { stream: { getTracks: () => [track] }, track };
+let onDecode: (raw: string) => Promise<unknown> | void;
+let cameraErrorValue: 'permission-denied' | 'camera-unavailable' | null = null;
+
+/** Simulate a QR decode flowing through the captured onDecode handler. */
+async function decode(raw: string) {
+  await act(async () => {
+    await onDecode(raw);
+  });
 }
 
-/**
- * Advance past one throttled decode and flush the async chain.
- * Fake rAF ticks every 16ms; the 66ms throttle means the first decode lands
- * at ~80ms, and each subsequent 100ms advance produces exactly one decode.
- */
-async function decodeFrame(ms = 100) {
-  await act(async () => {
-    vi.advanceTimersByTime(ms);
-    await Promise.resolve();
-  });
+function confirmButton(count: number) {
+  return screen.getByRole('button', { name: new RegExp(`Confirmar \\(${count} botellones\\)`) });
 }
 
 beforeEach(() => {
-  vi.useFakeTimers({
-    toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'],
+  cameraErrorValue = null;
+  useQrScannerMock.mockReset();
+  useQrScannerMock.mockImplementation((opts: {
+    onDecode: (raw: string) => Promise<unknown> | void;
+  }) => {
+    onDecode = opts.onDecode;
+    // Stateful mock: setDecodeError drives decodeError and triggers a
+    // re-render, faithfully simulating the real hook so the overlay reflects
+    // error/clear transitions.
+    const [decodeError, setDecodeErrorState] = useState<string | null>(null);
+    const setDecodeError = (err: string | null) => {
+      setDecodeErrorMock(err);
+      setDecodeErrorState(err);
+    };
+    return {
+      videoRef: { current: null },
+      cameraError: cameraErrorValue,
+      decodeError,
+      setDecodeError,
+      stop: stopMock,
+    };
   });
-
-  Object.defineProperty(navigator, 'mediaDevices', {
-    value: { getUserMedia: getUserMediaMock },
-    configurable: true,
-  });
-
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: vi.fn(),
-    getImageData: () => ({
-      data: new Uint8ClampedArray(4),
-      width: 1,
-      height: 1,
-    }),
-  } as unknown as CanvasRenderingContext2D);
-
-  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  getBotellonByCodigoMock.mockReset();
+  getClienteMock.mockReset();
+  getClienteMock.mockResolvedValue(null);
+  registrarOperacionMock.mockReset();
+  playBeepMock.mockReset();
+  setDecodeErrorMock.mockReset();
+  stopMock.mockReset();
+  onDecode = () => undefined;
 });
 
 afterEach(() => {
-  vi.useRealTimers();
-  // @ts-expect-error -- mediaDevices is not part of the jsdom Navigator type
-  delete navigator.mediaDevices;
-  vi.restoreAllMocks();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
-/** Render, grant the camera, and mark the video element as having a frame. */
-async function renderWithCamera(ui = <ScannerModal onClose={vi.fn()} />) {
-  const utils = render(ui);
-  await act(async () => {
-    await Promise.resolve();
+describe('ScannerModal — shell and close', () => {
+  it('renders the fixed dialog with the camera, empty session and disabled confirm', () => {
+    const { container } = render(<ScannerModal onClose={vi.fn()} />);
+
+    expect(screen.getByRole('dialog', { name: 'Escanear código QR' })).toBeInTheDocument();
+    expect(container.querySelector('video')).toBeInTheDocument();
+    expect(screen.getByText('Aún no se agregaron botellones.')).toBeInTheDocument();
+    expect(confirmButton(0)).toBeDisabled();
   });
 
-  const video = utils.container.querySelector('video');
-  if (video) {
-    Object.defineProperty(video, 'videoWidth', { value: 1280, configurable: true });
-    Object.defineProperty(video, 'videoHeight', { value: 720, configurable: true });
-  }
-  return utils;
-}
-
-describe('ScannerModal — camera lifecycle', () => {
-  it('requests a rear-facing stream on open', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-
-    await renderWithCamera();
-
-    expect(getUserMediaMock).toHaveBeenCalledWith({
-      video: { facingMode: 'environment' },
-      audio: false,
-    });
-  });
-
-  it('shows permission-denied instructions when access is blocked', async () => {
-    getUserMediaMock.mockRejectedValue(
-      new DOMException('Permission denied', 'NotAllowedError')
-    );
-
-    await renderWithCamera();
-
-    expect(screen.getByText('Permiso de cámara denegado')).toBeInTheDocument();
-    // Closable in the error state: header X + panel button.
-    expect(
-      screen.getAllByRole('button', { name: 'Cerrar' })
-    ).toHaveLength(2);
-  });
-
-  it('shows camera-unavailable when no camera exists', async () => {
-    getUserMediaMock.mockRejectedValue(
-      new DOMException('No device', 'NotFoundError')
-    );
-
-    await renderWithCamera();
-
-    expect(screen.getByText('Cámara no disponible')).toBeInTheDocument();
-  });
-
-  it('shows camera-unavailable when getUserMedia is unsupported', async () => {
-    // @ts-expect-error -- simulating missing mediaDevices
-    delete navigator.mediaDevices;
-
-    await renderWithCamera();
-
-    expect(screen.getByText('Cámara no disponible')).toBeInTheDocument();
-  });
-
-  it('stops all tracks and cancels the loop on unmount', async () => {
-    const { stream, track } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-
-    const { unmount } = await renderWithCamera();
-    expect(track.stop).not.toHaveBeenCalled();
-
-    unmount();
-
-    expect(track.stop).toHaveBeenCalledTimes(1);
-  });
-
-  it('is StrictMode-safe: first mount stream is stopped, no duplicate stream', async () => {
-    const first = makeStream();
-    const second = makeStream();
-    getUserMediaMock
-      .mockResolvedValueOnce(first.stream)
-      .mockResolvedValueOnce(second.stream);
-
-    const { unmount } = render(
-      <StrictMode>
-        <ScannerModal onClose={vi.fn()} />
-      </StrictMode>
-    );
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(getUserMediaMock).toHaveBeenCalledTimes(2);
-    expect(first.track.stop).toHaveBeenCalledTimes(1);
-    expect(second.track.stop).not.toHaveBeenCalled();
-
-    // Unmount stops the surviving stream too.
-    unmount();
-    expect(second.track.stop).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('ScannerModal — decode and resolution', () => {
-  it('shows invalid-code error for a foreign QR and keeps scanning', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: 'https://example.com/not-a-botellon' });
-
-    await renderWithCamera();
-    await decodeFrame();
-
-    expect(screen.getByText('Código no válido')).toBeInTheDocument();
-
-    // Loop keeps running: a second frame still decodes.
-    jsQrMock.mockReturnValue({ data: VALID_QR });
-    getBotellonByCodigoMock.mockResolvedValue({
-      id: 'b1',
-      codigo: 'BOT-00001',
-      estado: 'entregado',
-      cliente_id: 'c1',
-      total_recargas: 1,
-      ultima_recarga: null,
-    });
-    await decodeFrame();
-
-    expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00001');
-    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
-  });
-
-  it('shows not-found error when no botellón matches the code', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: VALID_QR });
-    getBotellonByCodigoMock.mockResolvedValue(null);
-
-    await renderWithCamera();
-    await decodeFrame();
-
-    expect(screen.getByText('Botellón no encontrado')).toBeInTheDocument();
-  });
-
-  it('shows sin-cliente error when the botellón has no client', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: VALID_QR });
-    getBotellonByCodigoMock.mockResolvedValue({
-      id: 'b3',
-      codigo: 'BOT-00003',
-      estado: 'recibido',
-      cliente_id: null,
-      total_recargas: 0,
-      ultima_recarga: null,
-    });
-
-    await renderWithCamera();
-    await decodeFrame();
-
-    expect(screen.getByText('Sin cliente asignado')).toBeInTheDocument();
-    expect(pushMock).not.toHaveBeenCalled();
-  });
-
-  it('redirects to the recarga confirm step on a valid botellón', async () => {
-    const { stream, track } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: VALID_QR });
-    getBotellonByCodigoMock.mockResolvedValue({
-      id: 'b1',
-      codigo: 'BOT-00001',
-      estado: 'entregado',
-      cliente_id: 'c1',
-      total_recargas: 1,
-      ultima_recarga: null,
-    });
+  it('closes from the header X button', async () => {
     const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={onClose} />);
 
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await decodeFrame();
-
-    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(track.stop).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores re-decodes of the same code within the 1s lockout', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: VALID_QR });
-    // Not found → the loop resumes and the same QR stays in view.
-    getBotellonByCodigoMock.mockResolvedValue(null);
-
-    await renderWithCamera();
-    await decodeFrame();
-    expect(getBotellonByCodigoMock).toHaveBeenCalledTimes(1);
-
-    // Same QR in view within the lockout window → ignored.
-    await decodeFrame();
-    expect(getBotellonByCodigoMock).toHaveBeenCalledTimes(1);
-
-    // Once the window passes, decodes resolve again.
-    await decodeFrame(1000 + 70);
-    expect(getBotellonByCodigoMock).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('ScannerModal — close behavior', () => {
-  it('calls onClose from the header close button in the decode-error state', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: 'garbage' });
-
-    const onClose = vi.fn();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await decodeFrame();
-
-    expect(screen.getByText('Código no válido')).toBeInTheDocument();
-    // Decode errors overlay the video; the header X is the close affordance.
     await user.click(screen.getByRole('button', { name: 'Cerrar' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('closes from the backdrop click', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-
     const onClose = vi.fn();
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
+    render(<ScannerModal onClose={onClose} />);
 
     const backdrop = screen.getByRole('dialog');
     await act(async () => {
@@ -306,217 +127,232 @@ describe('ScannerModal — close behavior', () => {
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-});
 
-describe('ScannerModal — mode toggle (Recarga | Carga)', () => {
-  it('opens in Recarga mode by default', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-
-    await renderWithCamera();
-
-    expect(screen.getByRole('button', { name: 'Recarga' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    expect(screen.getByRole('button', { name: 'Carga' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
-  });
-
-  it('switches to Carga mode when Carga is selected', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    await renderWithCamera();
-    await user.click(screen.getByRole('button', { name: 'Carga' }));
-
-    expect(screen.getByRole('button', { name: 'Carga' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    expect(screen.getByRole('button', { name: 'Recarga' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
-  });
-
-  it('hands off to the batch page when the Carga action is initiated', async () => {
+  it('closes on Escape', async () => {
     const onClose = vi.fn();
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScannerModal onClose={onClose} />);
 
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await user.click(screen.getByRole('button', { name: 'Carga' }));
-    await user.click(screen.getByRole('button', { name: 'Iniciar carga' }));
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(pushMock).toHaveBeenCalledWith('/recargas/carga');
-  });
-
-  it('does not redirect to /recargas/nueva on the Carga handoff', async () => {
-    const onClose = vi.fn();
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await user.click(screen.getByRole('button', { name: 'Carga' }));
-    await user.click(screen.getByRole('button', { name: 'Iniciar carga' }));
-
-    expect(pushMock).not.toHaveBeenCalledWith(
-      expect.stringContaining('/recargas/nueva')
-    );
-  });
-
-  it('shows button-driven copy in Carga mode instead of the misleading live-scan hint', async () => {
-    const { stream } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    await renderWithCamera(<ScannerModal onClose={vi.fn()} />);
-    expect(
-      screen.getByText('Apunta la cámara al código QR del botellón')
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Carga' }));
-
-    // The camera hint is misleading in Carga mode: scanning is button-driven.
-    expect(
-      screen.queryByText('Apunta la cámara al código QR del botellón')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Selecciona 'Iniciar carga' para el escaneo por lotes.")
-    ).toBeInTheDocument();
-  });
-
-  it('preserves single-flow redirect after switching back to Recarga', async () => {
-    const { stream, track } = makeStream();
-    getUserMediaMock.mockResolvedValue(stream);
-    jsQrMock.mockReturnValue({ data: VALID_QR });
-    getBotellonByCodigoMock.mockResolvedValue({
-      id: 'b1',
-      codigo: 'BOT-00001',
-      estado: 'entregado',
-      cliente_id: 'c1',
-      total_recargas: 1,
-      ultima_recarga: null,
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     });
-    const onClose = vi.fn();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await user.click(screen.getByRole('button', { name: 'Carga' }));
-    await user.click(screen.getByRole('button', { name: 'Recarga' }));
-    await decodeFrame();
-
-    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(track.stop).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('ScannerModal — manual fallback without a camera', () => {
-  const MANUAL_LABEL = '¿Sin cámara? Ingresá el código del botellón';
+describe('ScannerModal — camera decode', () => {
+  it('adds a valid scan to the session with its pre-filled destino and keeps scanning', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    getClienteMock.mockResolvedValue({ id: 'c1', nombre: 'Juan Pérez' });
+    render(<ScannerModal onClose={vi.fn()} />);
 
-  function botellonValido(): unknown {
-    return {
-      id: 'b1',
-      codigo: 'BOT-00001',
-      estado: 'entregado',
-      cliente_id: 'c1',
-      total_recargas: 1,
-      ultima_recarga: null,
-    };
-  }
-
-  it('navigates to the recarga confirm step when a valid bare code is typed', async () => {
-    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
-    getBotellonByCodigoMock.mockResolvedValue(botellonValido());
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00001');
-    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await decode(QR1);
 
     expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00001');
-    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText('BOT-00001')).toBeInTheDocument();
+    expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
+    // entregado → recibir: static arrow text, no chooser.
+    expect(screen.getByText(/Entregado → Recibido/)).toBeInTheDocument();
+    expect(confirmButton(1)).toBeEnabled();
   });
 
-  it('accepts a full QR URL as manual input via the parseQrCode fallback', async () => {
-    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
-    getBotellonByCodigoMock.mockResolvedValue(botellonValido());
-    const user = userEvent.setup();
+  it('shows the invalid-code overlay for a foreign QR and keeps scanning', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    render(<ScannerModal onClose={vi.fn()} />);
 
-    await renderWithCamera();
-    await user.type(screen.getByLabelText(MANUAL_LABEL), VALID_QR);
-    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await decode('https://example.com/not-a-botellon');
+    expect(screen.getByText('Código no válido')).toBeInTheDocument();
+    expect(setDecodeErrorMock).toHaveBeenLastCalledWith('invalid-code');
+
+    // A valid scan clears the overlay and accumulates into the session.
+    await decode(QR1);
+    expect(screen.queryByText('Código no válido')).not.toBeInTheDocument();
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(setDecodeErrorMock).toHaveBeenLastCalledWith(null);
+  });
+
+  it('shows the not-found overlay when no botellón matches the code', async () => {
+    getBotellonByCodigoMock.mockResolvedValueOnce(null);
+    getBotellonByCodigoMock.mockResolvedValueOnce(BOT_ENTREGADO);
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    await decode(QR1);
+    expect(screen.getByText('Botellón no encontrado')).toBeInTheDocument();
+    expect(setDecodeErrorMock).toHaveBeenLastCalledWith('not-found');
+
+    await decode(QR1);
+    expect(screen.queryByText('Botellón no encontrado')).not.toBeInTheDocument();
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+  });
+
+  it('beeps and flashes the existing row on a duplicate scan instead of double-adding', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    await decode(QR1);
+    await decode(QR1);
+
+    expect(playBeepMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('session-row-b1')).toHaveAttribute('data-flash', 'true');
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('BOT-00001')).toHaveLength(1);
+  });
+});
+
+describe('ScannerModal — manual entry (camera-less fallback)', () => {
+  it('shows the manual fallback with the camera-error copy when the camera fails', () => {
+    cameraErrorValue = 'permission-denied';
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    expect(screen.getByText('Permiso de cámara denegado')).toBeInTheDocument();
+    expect(screen.getByLabelText(MANUAL_LABEL)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agregar a la sesión' })).toBeInTheDocument();
+  });
+
+  it('adds a manually typed code to the session with its pre-filled destino', async () => {
+    cameraErrorValue = 'camera-unavailable';
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(MANUAL_LABEL), '00001');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
 
     expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00001');
-    expect(pushMock).toHaveBeenCalledWith('/recargas/nueva?botellon_id=b1');
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Entregado → Recibido/)).toBeInTheDocument();
+    expect(confirmButton(1)).toBeEnabled();
   });
 
-  it('shows an error message for an unknown code and keeps the modal open', async () => {
-    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
+  it('strips non-digits and tolerates pasted full codes like BOT-00045', async () => {
+    cameraErrorValue = 'camera-unavailable';
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    // Simulate a paste of the full code: the input must normalize it to digits.
+    fireEvent.change(screen.getByLabelText(MANUAL_LABEL), { target: { value: 'BOT-00045' } });
+    expect((screen.getByLabelText(MANUAL_LABEL) as HTMLInputElement).value).toBe('00045');
+
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+
+    expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-00045');
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+  });
+
+  it('shows "Botellón no encontrado" for an unknown code and does not accumulate it', async () => {
+    cameraErrorValue = 'camera-unavailable';
     getBotellonByCodigoMock.mockResolvedValue(null);
     const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
 
-    await renderWithCamera();
-    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-99999');
-    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.type(screen.getByLabelText(MANUAL_LABEL), '99999');
+    await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
 
+    expect(getBotellonByCodigoMock).toHaveBeenCalledWith('BOT-99999');
     expect(screen.getByText('Botellón no encontrado')).toBeInTheDocument();
-    expect(pushMock).not.toHaveBeenCalled();
+    expect(screen.getByText('Aún no se agregaron botellones.')).toBeInTheDocument();
   });
 
-  it('blocks a clientless manual code with the sin-cliente state and no navigation', async () => {
-    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
-    getBotellonByCodigoMock.mockResolvedValue({
-      id: 'b3',
-      codigo: 'BOT-00003',
-      estado: 'recibido',
-      cliente_id: null,
-      total_recargas: 0,
-      ultima_recarga: null,
+  it('beeps on a duplicate manual entry instead of double-adding', async () => {
+    cameraErrorValue = 'camera-unavailable';
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    async function agregar(digits: string) {
+      await user.type(screen.getByLabelText(MANUAL_LABEL), digits);
+      await user.click(screen.getByRole('button', { name: 'Agregar a la sesión' }));
+    }
+
+    await agregar('00001');
+    await agregar('00001');
+
+    expect(playBeepMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('BOT-00001')).toHaveLength(1);
+    expect(screen.getByTestId('session-row-b1')).toHaveAttribute('data-flash', 'true');
+  });
+});
+
+describe('ScannerModal — confirm and result', () => {
+  it('posts one registrarOperacion per destino group for a mixed batch and renders the result', async () => {
+    getBotellonByCodigoMock.mockImplementation((codigo: string) =>
+      Promise.resolve(codigo === 'BOT-00001' ? BOT_ENTREGADO : BOT_RECIBIDO)
+    );
+    registrarOperacionMock.mockResolvedValue({ success: true, items: [] });
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    // entregado → recibir, recibido → recargar (mixed batch).
+    await decode(QR1);
+    await decode(QR7);
+
+    await user.click(confirmButton(2));
+    expect(await screen.findByText('Carga registrada')).toBeInTheDocument();
+
+    expect(registrarOperacionMock).toHaveBeenCalledTimes(2);
+    expect(registrarOperacionMock).toHaveBeenCalledWith({
+      botellonIds: ['b1'],
+      operacion: 'recibir',
+      fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
+    });
+    expect(registrarOperacionMock).toHaveBeenCalledWith({
+      botellonIds: ['b7'],
+      operacion: 'recargar',
+      fecha: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      hora: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/),
+    });
+  });
+
+  it('Listo calls onClose and releases the camera on success', async () => {
+    const onClose = vi.fn();
+    getBotellonByCodigoMock.mockResolvedValue(BOT_ENTREGADO);
+    registrarOperacionMock.mockResolvedValue({
+      success: true,
+      items: [{ botellonId: 'b1', codigo: 'BOT-00001', ok: true }],
     });
     const user = userEvent.setup();
+    render(<ScannerModal onClose={onClose} />);
 
-    await renderWithCamera();
-    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00003');
-    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await decode(QR1);
+    await user.click(confirmButton(1));
 
-    expect(screen.getByText('Sin cliente asignado')).toBeInTheDocument();
-    expect(pushMock).not.toHaveBeenCalled();
-  });
+    expect(await screen.findByText('Carga registrada')).toBeInTheDocument();
+    expect(stopMock).toHaveBeenCalledTimes(1); // camera released on success
 
-  it('is a no-op when submitted empty', async () => {
-    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
-    const user = userEvent.setup();
-
-    await renderWithCamera();
-    await user.click(screen.getByRole('button', { name: 'Continuar' }));
-
-    expect(getBotellonByCodigoMock).not.toHaveBeenCalled();
-    expect(pushMock).not.toHaveBeenCalled();
-  });
-
-  it('hands off to the batch terminal in Carga mode without validating the code', async () => {
-    getUserMediaMock.mockRejectedValue(new DOMException('No device', 'NotFoundError'));
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-
-    await renderWithCamera(<ScannerModal onClose={onClose} />);
-    await user.click(screen.getByRole('button', { name: 'Carga' }));
-    await user.type(screen.getByLabelText(MANUAL_LABEL), 'BOT-00001');
-    await user.click(screen.getByRole('button', { name: 'Continuar' }));
-
-    expect(getBotellonByCodigoMock).not.toHaveBeenCalled();
-    expect(pushMock).toHaveBeenCalledWith('/recargas/carga');
+    await user.click(screen.getByRole('button', { name: 'Listo' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('Seguir editando returns to the live session after a failed attempt', async () => {
+    getBotellonByCodigoMock.mockResolvedValue(BOT_RECIBIDO);
+    registrarOperacionMock.mockResolvedValue({
+      success: false,
+      items: [{ botellonId: 'b7', codigo: 'BOT-00007', ok: false, reason: 'error' }],
+      error: 'update exploded',
+    });
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    await decode(QR7);
+    await user.click(confirmButton(1));
+
+    expect(await screen.findByText('update exploded')).toBeInTheDocument();
+    // Failed attempt keeps the camera alive and the session editable.
+    expect(stopMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Seguir editando' }));
+    expect(screen.getByText(/Sesión \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText('BOT-00007')).toBeInTheDocument();
+  });
+});
+
+describe('ScannerModal — client search', () => {
+  it('renders the client search as an alternative to camera/manual entry', () => {
+    render(<ScannerModal onClose={vi.fn()} />);
+
+    expect(screen.getByRole('region', { name: 'Buscar por cliente' })).toBeInTheDocument();
+    expect(screen.getByText('o buscá por cliente:')).toBeInTheDocument();
   });
 });

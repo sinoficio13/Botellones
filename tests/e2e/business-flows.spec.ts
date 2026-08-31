@@ -13,27 +13,10 @@ async function login(page: Page) {
 }
 
 test.describe('Recarga flow', () => {
-  test('3-step wizard', async ({ page }) => {
-    await login(page);
-    await page.goto('/recargas/nueva');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.getByText('Buscar cliente')).toBeVisible();
-    await page.getByPlaceholder('Nombre, código o teléfono…').fill('María');
-    // Wait for debounced search (useDebounce 300ms + network)
-    await page.waitForTimeout(800);
-    // Force-click to bypass Next.js dev overlay on mobile
-    await page.locator('button:has-text("María Rodríguez")').first().click({ force: true });
-
-    await expect(page.getByRole('heading', { name: 'Seleccionar botellón' })).toBeVisible({ timeout: 10000 });
-    await page.locator('button:has-text("BOT-")').first().click();
-
-    await expect(page.getByRole('heading', { name: 'Confirmar recarga' })).toBeVisible();
-    await page.getByRole('button', { name: /confirmar recarga/i }).click();
-    await expect(page.getByText('Recarga registrada')).toBeVisible({ timeout: 10000 });
-  });
-
-  test('quick recarga from client list', async ({ page }) => {
+  // The old 3-step wizard (/recargas/nueva) was removed in the unified-scanner
+  // refactor; the "+ Recarga" actions now deep-link to /dashboard?scan=1, which
+  // auto-opens the batch ScannerModal.
+  test('quick recarga from client list deep-links to the unified scanner', async ({ page }) => {
     await login(page);
     await page.goto('/clientes');
     // Search for Carlos Pérez directly instead of relying on pagination
@@ -43,13 +26,7 @@ test.describe('Recarga flow', () => {
     const row = page.getByRole('row', { name: /Carlos Pérez/ });
     await row.getByText('+ Recarga').click();
 
-    await expect(page).toHaveURL(/cliente_id=/);
-    // Wait for async client lookup + botellones fetch to complete
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByText('Seleccionar botellón')).toBeVisible({ timeout: 10000 });
-    await page.locator('button:has-text("BOT-")').first().click();
-    await page.getByRole('button', { name: /confirmar recarga/i }).click();
-    await expect(page.getByText('Recarga registrada')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboard\?scan=1/, { timeout: 10000 });
   });
 });
 

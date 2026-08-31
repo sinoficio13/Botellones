@@ -322,7 +322,7 @@ export default function BuscarPage() {
                   </td>
                   <td className="px-3 py-2.5">
                     <a
-                      href={`/recargas/nueva?cliente_id=${c.id}`}
+                      href="/dashboard?scan=1"
                       className="inline-flex items-center rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
                     >
                       + Recarga

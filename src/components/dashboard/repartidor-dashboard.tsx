@@ -32,7 +32,7 @@ export function RepartidorDashboard({ data }: RepartidorDashboardProps) {
 
       {/* Quick actions */}
       <div className="flex gap-3">
-        <Link href="/recargas/carga" className="flex-1">
+        <Link href="/dashboard?scan=1" className="flex-1">
           <Button className="w-full">
             <Truck className="mr-2 h-4 w-4" />
             Registrar recarga

@@ -157,18 +157,31 @@ describe('createCliente — asignación del botellón en un solo paso', () => {
     expect(revalidatePath).not.toHaveBeenCalledWith('/botellones');
   });
 
-  it('valida nombre y teléfono antes de tocar la base', async () => {
+  it('valida el nombre antes de tocar la base', async () => {
     const fd = new FormData();
     fd.append('nombre', '  ');
     fd.append('telefono_1', '584141234567');
 
     expect(await createCliente(null, fd)).toEqual({ error: 'El nombre es requerido' });
     expect(createClientMock).not.toHaveBeenCalled();
+  });
 
-    const fd2 = new FormData();
-    fd2.append('nombre', 'Ana');
-    expect(await createCliente(null, fd2)).toEqual({ error: 'El teléfono es requerido' });
-    expect(createClientMock).not.toHaveBeenCalled();
+  it('permite crear sin teléfono (queda null)', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = new FormData();
+    fd.append('nombre', 'Ana');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(insert.insert).toHaveBeenCalled();
+    expect(insert.insert.mock.calls[0][0]).toMatchObject({
+      nombre: 'Ana',
+      telefono_1: null,
+    });
   });
 });
 

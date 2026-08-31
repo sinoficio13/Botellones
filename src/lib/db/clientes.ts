@@ -98,9 +98,8 @@ export async function createCliente(
   if (!nombre) {
     return { error: 'El nombre es requerido' };
   }
-  if (!telefono_1) {
-    return { error: 'El teléfono es requerido' };
-  }
+  // El teléfono y el WhatsApp son opcionales (WhatsApp es el principal, pero
+  // se puede registrar el cliente sin contacto y completarlo después).
 
   try {
     const supabase = await getSupabase();
@@ -109,7 +108,7 @@ export async function createCliente(
       .from('clientes')
       .insert({
         nombre,
-        telefono_1,
+        telefono_1: telefono_1 || null,
         negocio,
         cedula,
         telefono_2,

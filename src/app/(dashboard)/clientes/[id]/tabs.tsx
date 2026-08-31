@@ -354,24 +354,34 @@ function FotosTab({
           <p className="text-xs text-zinc-400 dark:text-zinc-500">Subí la primera foto desde arriba.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-          {fotos.map((f, i) => (
-            <div key={f.id} className="relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
-              <button
-                type="button"
-                onClick={() => onAbrirGaleria(i)}
-                className="block w-full cursor-pointer transition-transform hover:scale-[1.02]"
-                aria-label={`Abrir foto de fachada ${i + 1}`}
+        <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+            {fotos.map((f, i) => (
+              <div
+                key={f.id}
+                className="relative overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-700"
               >
-                <img
-                  src={f.url}
-                  alt={`Foto de fachada ${i + 1}`}
-                  className="aspect-square w-full object-cover"
-                />
-              </button>
-              <QuitarFoto clienteId={clienteId} foto={f} />
-            </div>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => onAbrirGaleria(i)}
+                  className="block w-full cursor-pointer transition-transform hover:scale-[1.02]"
+                  aria-label={`Abrir foto de fachada ${i + 1}`}
+                >
+                  <img
+                    src={f.url}
+                    alt={`Foto de fachada ${i + 1}`}
+                    className="aspect-square w-full object-cover"
+                  />
+                </button>
+                <div className="flex items-center justify-between border-t border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
+                  <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                    Foto {i + 1}
+                  </span>
+                </div>
+                <QuitarFoto clienteId={clienteId} foto={f} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

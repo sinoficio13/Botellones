@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ScannerModal } from '@/components/scanner/scanner-modal';
@@ -35,6 +35,24 @@ vi.mock('@/components/operaciones/buscador-cliente-carga', () => ({
     </section>
   ),
 }));
+// next/link renders a plain anchor in jsdom so the modal's "Asignar/Crear
+// cliente" links can be clicked without pulling in the app router.
+vi.mock('next/link', () => ({
+  default: ({
+    href,
+    onClick,
+    children,
+    ...rest
+  }: {
+    href: string;
+    onClick?: () => void;
+    children: ReactNode;
+  }) => (
+    <a href={href} onClick={onClick} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 const QR1 = 'https://app.example.com/b/BOT-00001';
 const QR7 = 'https://app.example.com/b/BOT-00007';
@@ -43,6 +61,10 @@ const QR9 = 'https://app.example.com/b/BOT-00009';
 const BOT_ENTREGADO = { id: 'b1', codigo: 'BOT-00001', cliente_id: 'c1', estado: 'entregado' };
 const BOT_RECIBIDO = { id: 'b7', codigo: 'BOT-00007', cliente_id: 'c7', estado: 'recibido' };
 const BOT_LISTO = { id: 'b9', codigo: 'BOT-00009', cliente_id: 'c9', estado: 'listo' };
+// Clientless 'recibido' bottle → pre-filled destino 'recargar' (requiresCliente),
+// so its row shows the "Sin cliente asignado" warning with the assign links.
+const BOT_CLIENTELESS_RECIBIDO = { id: 'b3', codigo: 'BOT-00003', cliente_id: null, estado: 'recibido' };
+const QR3 = 'https://app.example.com/b/BOT-00003';
 
 const MANUAL_LABEL = '¿Sin cámara? Ingresá el código manualmente';
 
@@ -637,5 +659,40 @@ describe('ScannerModal — client search', () => {
 
     expect(screen.getByRole('region', { name: 'Buscar por cliente' })).toBeInTheDocument();
     expect(screen.getByText('o buscá por cliente:')).toBeInTheDocument();
+  });
+});
+
+describe('ScannerModal — "Asignar/Crear cliente" links close the modal', () => {
+  it('closes on click of the links of a clientless actionable session row', async () => {
+    const onClose = vi.fn();
+    getBotellonByCodigoMock.mockResolvedValue(BOT_CLIENTELESS_RECIBIDO);
+    render(<ScannerModal onClose={onClose} />);
+
+    await decode(QR3);
+    expect(screen.getByText('Sin cliente asignado')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Asignar cliente' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Crear cliente' }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes on click of the links of a sin-cliente rejected result row', async () => {
+    const onClose = vi.fn();
+    getBotellonByCodigoMock.mockResolvedValue(BOT_CLIENTELESS_RECIBIDO);
+    registrarOperacionMock.mockResolvedValue({
+      success: false,
+      items: [{ botellonId: 'b3', codigo: 'BOT-00003', ok: false, reason: 'sin-cliente' }],
+    });
+    const user = userEvent.setup();
+    render(<ScannerModal onClose={onClose} />);
+
+    await decode(QR3);
+    await user.click(confirmButton(1));
+    expect(await screen.findByText('Rechazado: sin-cliente')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Asignar cliente' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

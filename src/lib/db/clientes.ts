@@ -71,6 +71,10 @@ export async function createCliente(
   const dias_preferidos = (formData.get('dias_preferidos') as string)?.trim() || null;
   const contacto_preferido = (formData.get('contacto_preferido') as string) || null;
   const observaciones = (formData.get('observaciones') as string)?.trim() || null;
+  // Flujo "Crear cliente" desde la sesión de carga: el checkbox solo envía
+  // `botellon_id` (hidden) y `asignar_botellon=on` cuando vino de un botellón.
+  const botellonId = (formData.get('botellon_id') as string)?.trim() || null;
+  const asignarBotellon = formData.get('asignar_botellon') as string | null;
 
   if (!nombre) {
     return { error: 'El nombre es requerido' };
@@ -102,6 +106,17 @@ export async function createCliente(
 
     if (error) {
       return { error: `Error al crear cliente: ${error.message}` };
+    }
+
+    // Asignación opcional del botellón en un solo paso: SOLO si sigue sin
+    // cliente (`.is('cliente_id', null)`), para nunca pisar un dueño existente.
+    if (asignarBotellon === 'on' && botellonId) {
+      await supabase
+        .from('botellones')
+        .update({ cliente_id: data.id })
+        .eq('id', botellonId)
+        .is('cliente_id', null);
+      revalidatePath('/botellones');
     }
 
     revalidatePath('/clientes');

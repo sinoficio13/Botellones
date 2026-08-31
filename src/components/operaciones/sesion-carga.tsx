@@ -16,6 +16,9 @@ export type SesionCargaProps = {
   flashId: string | null;
   onSetDestino: (id: string, destino: OperacionId | null) => void;
   onQuitar: (id: string) => void;
+  /** Hooked when the row lives in an overlay (ScannerModal): the "Asignar/Crear
+      cliente" links must close it on click so the navigation is visible. */
+  onNavegar?: () => void;
 };
 
 /**
@@ -31,7 +34,13 @@ export type SesionCargaProps = {
  * "Asignar cliente" and "Crear cliente" links. Every row has a ✕ remove button.
  * Token classes only (φ spacing).
  */
-export function SesionCarga({ items, flashId, onSetDestino, onQuitar }: SesionCargaProps) {
+export function SesionCarga({
+  items,
+  flashId,
+  onSetDestino,
+  onQuitar,
+  onNavegar,
+}: SesionCargaProps) {
   if (items.length === 0) {
     return <p className="mt-1 text-sm text-text-muted">Aún no se agregaron botellones.</p>;
   }
@@ -113,12 +122,14 @@ export function SesionCarga({ items, flashId, onSetDestino, onQuitar }: SesionCa
                 <span className="flex items-center gap-3">
                   <Link
                     href={`/botellones/${item.id}`}
+                    onClick={() => onNavegar?.()}
                     className="text-xs font-medium text-text-primary underline"
                   >
                     Asignar cliente
                   </Link>
                   <Link
                     href={`/clientes/nuevo?botellon_id=${item.id}`}
+                    onClick={() => onNavegar?.()}
                     className="text-xs font-medium text-text-primary underline"
                   >
                     Crear cliente

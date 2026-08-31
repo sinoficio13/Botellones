@@ -22,6 +22,9 @@ export type ResultadoCargaProps = {
   onListo: () => void;
   /** Failure action: hide the result and keep the session editable. */
   onSeguirEditando: () => void;
+  /** Hooked when the list lives in an overlay (ScannerModal): the "Asignar/Crear
+      cliente" links must close it on click so the navigation is visible. */
+  onNavegar?: () => void;
 };
 
 /**
@@ -39,6 +42,7 @@ export function ResultadoCarga({
   items,
   onListo,
   onSeguirEditando,
+  onNavegar,
 }: ResultadoCargaProps) {
   const todoOk = resultado.length > 0 && resultado.every((r) => r.success);
   const filas = resultado.flatMap((r) => r.items);
@@ -91,12 +95,14 @@ export function ResultadoCarga({
                 <span className="flex items-center gap-3">
                   <Link
                     href={`/botellones/${item.botellonId}`}
+                    onClick={() => onNavegar?.()}
                     className="text-sm font-medium text-marca hover:underline"
                   >
                     Asignar cliente
                   </Link>
                   <Link
                     href={`/clientes/nuevo?botellon_id=${item.botellonId}`}
+                    onClick={() => onNavegar?.()}
                     className="text-sm font-medium text-marca hover:underline"
                   >
                     Crear cliente

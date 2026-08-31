@@ -388,6 +388,7 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
             onClose();
           }}
           onSeguirEditando={() => setResultado(null)}
+          onNavegar={onClose}
         />
       ) : (
         <>
@@ -405,6 +406,7 @@ export function ScannerModal({ onClose }: { onClose: () => void }) {
               flashId={flashId}
               onSetDestino={setDestino}
               onQuitar={quitar}
+              onNavegar={onClose}
             />
           </div>
 

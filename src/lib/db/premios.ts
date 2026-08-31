@@ -1,7 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-
 // ── Types ──
 
 export type PremioRow = {
@@ -20,8 +18,6 @@ export type PremioRow = {
     id: string;
   } | null;
 };
-
-export type PremioState = { success?: boolean; error?: string };
 
 // ── Helpers ──
 
@@ -75,51 +71,5 @@ export async function getPremiosByCliente(clienteId: string): Promise<PremioRow[
     return (data as PremioRow[]) || [];
   } catch {
     return [];
-  }
-}
-
-// ── Update (entregar) ──
-
-export async function entregarPremio(
-  _prev: PremioState | null,
-  formData: FormData
-): Promise<PremioState> {
-  const premio_id = formData.get('premio_id') as string;
-  const tipo_premio = formData.get('tipo_premio') as string;
-  const observaciones = (formData.get('observaciones') as string)?.trim() || null;
-
-  if (!premio_id || !tipo_premio) {
-    return { error: 'Premio ID y tipo de premio son requeridos' };
-  }
-
-  try {
-    const supabase = await getSupabase();
-
-    // dev placeholder — will be replaced with auth.uid() after EPIC-1 auth hardening
-    const userId = '00000000-0000-0000-0000-000000000000';
-
-    const { error } = await supabase
-      .from('premios')
-      .update({
-        tipo_premio,
-        estado: 'entregado',
-        entregado_por: userId,
-        observaciones,
-      })
-      .eq('id', premio_id);
-
-    if (error) {
-      return { error: `Error al entregar premio: ${error.message}` };
-    }
-
-    revalidatePath('/premios');
-    return { success: true };
-  } catch (err) {
-    return {
-      error:
-        err instanceof Error
-          ? err.message
-          : 'Error desconocido',
-    };
   }
 }

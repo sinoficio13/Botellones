@@ -6,10 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logout } from '@/app/(auth)/logout/actions';
 import {
-  ArrowLeftRight,
-  Bell,
   Droplets,
-  Gift,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -37,18 +34,15 @@ const ScannerModal = dynamic(
 // All links are visible to every user — no role gating on mobile.
 const MOBILE_TABS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/recargas', label: 'Recargas', icon: ArrowLeftRight },
+  { href: '/botellones', label: 'Botellones', icon: Droplets },
   { href: '/clientes', label: 'Clientes', icon: Users },
 ] as const;
 
 // Secondary destinations inside the "Más" drawer.
 const DRAWER_ITEMS = [
-  { href: '/botellones', label: 'Botellones', icon: Droplets },
-  { href: '/premios', label: 'Premios', icon: Gift },
   { href: '/mapa', label: 'Mapa', icon: MapPin },
   { href: '/reportes', label: 'Reportes', icon: TrendingUp },
   { href: '/configuracion', label: 'Configuración', icon: Settings },
-  { href: '/notificaciones', label: 'Notificaciones', icon: Bell },
 ] as const;
 
 /**

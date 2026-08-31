@@ -55,22 +55,10 @@ export async function Header() {
             Dashboard
           </Link>
           <Link
-            href="/recargas"
-            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-          >
-            Recargas
-          </Link>
-          <Link
             href="/botellones"
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
           >
             Botellones
-          </Link>
-          <Link
-            href="/premios"
-            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-          >
-            Premios
           </Link>
           <Link
             href="/mapa"
@@ -98,12 +86,6 @@ export async function Header() {
             className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
           >
             Configuración
-          </Link>
-          <Link
-            href="/notificaciones"
-            className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-          >
-            Notificaciones
           </Link>
         </nav>
 

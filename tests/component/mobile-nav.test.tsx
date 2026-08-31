@@ -33,7 +33,7 @@ describe('MobileNav', () => {
 
     // 3 primary tabs
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Recargas' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Botellones' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Clientes' })).toBeInTheDocument();
 
     // Center FAB + Más trigger
@@ -49,15 +49,15 @@ describe('MobileNav', () => {
       'aria-current',
       'page'
     );
-    expect(screen.getByRole('link', { name: 'Recargas' })).not.toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Botellones' })).not.toHaveAttribute(
       'aria-current'
     );
   });
 
-  it('marks Recargas active on /recargas', () => {
-    mockPathname.current = '/recargas';
+  it('marks Botellones active on /botellones', () => {
+    mockPathname.current = '/botellones';
     render(<MobileNav />);
-    expect(screen.getByRole('link', { name: 'Recargas' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Botellones' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -82,19 +82,16 @@ describe('MobileNav', () => {
     );
   });
 
-  it('opens the Más drawer listing all six secondary links', async () => {
+  it('opens the Más drawer listing all three secondary links', async () => {
     const user = userEvent.setup();
     render(<MobileNav />);
 
     await user.click(screen.getByRole('button', { name: 'Más' }));
 
     for (const label of [
-      'Botellones',
-      'Premios',
       'Mapa',
       'Reportes',
       'Configuración',
-      'Notificaciones',
     ]) {
       expect(await screen.findByRole('link', { name: label })).toBeVisible();
     }
@@ -105,13 +102,13 @@ describe('MobileNav', () => {
     render(<MobileNav />);
 
     await user.click(screen.getByRole('button', { name: 'Más' }));
-    const link = await screen.findByRole('link', { name: 'Botellones' });
+    const link = await screen.findByRole('link', { name: 'Mapa' });
     await user.click(link);
 
     // Drawer closed via state (link unmounted synchronously, no exit
     // animation in jsdom) while the bottom bar itself stays mounted.
     expect(
-      screen.queryByRole('link', { name: 'Botellones' })
+      screen.queryByRole('link', { name: 'Mapa' })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('navigation', { name: 'Navegación móvil' })

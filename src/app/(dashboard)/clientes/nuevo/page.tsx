@@ -9,6 +9,7 @@ import { createCliente } from '@/lib/db/clientes';
 import { resolveMapLink } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import { FachadaUploader } from '@/components/clientes/fachada-uploader';
+import { InputDocumento } from '@/components/clientes/input-documento';
 import { InputWhatsapp } from '@/components/clientes/input-whatsapp';
 
 const MapaPreview = dynamic(() => import('@/components/clientes/mapa-preview'), { ssr: false });
@@ -112,22 +113,7 @@ function NuevoClienteForm() {
             </div>
           </Grid2>
 
-          <div>
-            <label htmlFor="cedula" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Cédula
-            </label>
-            <input
-              id="cedula"
-              name="cedula"
-              type="text"
-              pattern="[VE]-?[0-9]{6,8}"
-              title="Formato venezolano: V-12345678"
-              className={`${INPUT_CLASS} md:max-w-sm`}
-            />
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-              Formato venezolano: V-12345678
-            </p>
-          </div>
+          <InputDocumento />
         </Card>
 
         {/* Contacto (WhatsApp primero) */}

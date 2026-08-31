@@ -282,6 +282,51 @@ describe('createCliente — composición de WhatsApp con país (InputWhatsapp)',
   });
 });
 
+describe('createCliente — composición de tipo de documento (InputDocumento)', () => {
+  it('compone V-12345678 por defecto con la cédula de persona natural', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('cedula', '12345678');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ cedula: 'V-12345678' })
+    );
+  });
+
+  it('compone J-123456789 para una persona jurídica', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    const fd = formBasico();
+    fd.append('tipo_documento', 'J');
+    fd.append('cedula', '123456789');
+
+    const result = await createCliente(null, fd);
+
+    expect(result).toEqual({ clienteId: 'c1', success: true });
+    expect(insert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ cedula: 'J-123456789' })
+    );
+  });
+
+  it('guarda cedula null cuando no llegan dígitos', async () => {
+    const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));
+    const supabase = makeSupabase([insert]);
+    createClientMock.mockResolvedValue(supabase);
+
+    await createCliente(null, formBasico());
+
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({ cedula: null }));
+  });
+});
+
 describe('createCliente — link de Google Maps + coordenadas → fila en direcciones', () => {
   it('inserta en direcciones cuando llegan link_mapa y coordenadas ocultas', async () => {
     const insert = makeChain(async () => ({ data: { id: 'c1' }, error: null }));

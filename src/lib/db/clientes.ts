@@ -73,7 +73,11 @@ export async function createCliente(
   const nombre = (formData.get('nombre') as string)?.trim();
   const telefono_1 = (formData.get('telefono_1') as string)?.trim();
   const negocio = (formData.get('negocio') as string)?.trim() || null;
-  const cedula = (formData.get('cedula') as string)?.trim() || null;
+  // Cédula/RIF: el form manda `tipo_documento` (letra del combobox, default V)
+  // y `cedula` (solo dígitos). Se compone "V-12345678"; si no llegan dígitos → null.
+  const tipoDocumento = (formData.get('tipo_documento') as string)?.trim() || 'V';
+  const cedulaDigitos = (formData.get('cedula') as string)?.trim() || '';
+  const cedula = cedulaDigitos ? `${tipoDocumento}-${cedulaDigitos}` : null;
   const telefono_2 = (formData.get('telefono_2') as string)?.trim() || null;
   // WhatsApp se guarda SIEMPRE en formato internacional, con el código de país
   // elegido en el form (`pais_whatsapp`, default 58 para Venezuela).

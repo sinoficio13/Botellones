@@ -14,10 +14,22 @@ const INPUT_CLASS =
  * no-controlado (funciona dentro del form nativo): expone `whatsapp` (número
  * nacional) y un hidden `pais_whatsapp` con el código internacional (ej: "58",
  * "57", "1" o el código custom de "Otro").
+ * Sin props se comporta como el form de creación; `paisInicial`/`numeroInicial`/
+ * `codigoOtroInicial` permiten precargar un número existente (form de edición).
  */
-export function InputWhatsapp() {
-  const [pais, setPais] = useState('58');
-  const [codigoOtro, setCodigoOtro] = useState('');
+export function InputWhatsapp({
+  paisInicial,
+  numeroInicial,
+  codigoOtroInicial,
+}: {
+  paisInicial?: string;
+  numeroInicial?: string;
+  codigoOtroInicial?: string;
+}) {
+  const [pais, setPais] = useState(() =>
+    PAISES.some((p) => p.codigo === (paisInicial ?? '')) ? (paisInicial as string) : '58'
+  );
+  const [codigoOtro, setCodigoOtro] = useState(codigoOtroInicial ?? '');
   const [abierto, setAbierto] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +121,7 @@ export function InputWhatsapp() {
           maxLength={15}
           pattern="[0-9]{7,15}"
           title="Solo dígitos, entre 7 y 15"
+          defaultValue={numeroInicial ?? ''}
           className={`${INPUT_CLASS} min-w-0 flex-1`}
         />
       </div>

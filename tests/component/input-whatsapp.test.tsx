@@ -88,3 +88,31 @@ describe('InputWhatsapp — combobox de país con bandera', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 });
+
+describe('InputWhatsapp — precarga (prefill) para edición', () => {
+  it('muestra Colombia y el número precargado con paisInicial/numeroInicial', () => {
+    const { container } = render(<InputWhatsapp paisInicial="57" numeroInicial="3001234567" />);
+
+    expect(screen.getByRole('button', { name: /Colombia \+57/ })).toBeInTheDocument();
+    expect(paisHidden(container).value).toBe('57');
+    expect(screen.getByLabelText('WhatsApp')).toHaveValue('3001234567');
+  });
+
+  it('"Otro" precargado muestra el código de país custom (codigoOtroInicial)', () => {
+    const { container } = render(
+      <InputWhatsapp paisInicial="otro" numeroInicial="7123456789" codigoOtroInicial="44" />
+    );
+
+    expect(screen.getByRole('button', { name: /Otro \+44/ })).toBeInTheDocument();
+    expect(paisHidden(container).value).toBe('44');
+    expect(screen.getByLabelText('WhatsApp')).toHaveValue('7123456789');
+    expect(screen.getByPlaceholderText('Código del país, ej: 44')).toBeInTheDocument();
+  });
+
+  it('cae a Venezuela +58 cuando el paisInicial no es válido', () => {
+    const { container } = render(<InputWhatsapp paisInicial="99" />);
+
+    expect(screen.getByRole('button', { name: /Venezuela \+58/ })).toBeInTheDocument();
+    expect(paisHidden(container).value).toBe('58');
+  });
+});

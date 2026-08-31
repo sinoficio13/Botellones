@@ -71,3 +71,21 @@ describe('InputDocumento — combobox de tipo de documento + dígitos', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 });
+
+describe('InputDocumento — precarga (prefill) para edición', () => {
+  it('muestra J y los dígitos precargados con prefijoInicial/numeroInicial', () => {
+    const { container } = render(<InputDocumento prefijoInicial="J" numeroInicial="123456789" />);
+
+    expect(screen.getByRole('button', { name: 'J' })).toBeInTheDocument();
+    expect(tipoDocumentoHidden(container).value).toBe('J');
+    expect(screen.getByLabelText('Tipo de documento')).toHaveValue('123456789');
+    expect(screen.getByText('RIF: entre 8 y 10 dígitos')).toBeInTheDocument();
+  });
+
+  it('cae a V cuando el prefijoInicial no es válido', () => {
+    const { container } = render(<InputDocumento prefijoInicial="X" />);
+
+    expect(screen.getByRole('button', { name: 'V' })).toBeInTheDocument();
+    expect(tipoDocumentoHidden(container).value).toBe('V');
+  });
+});

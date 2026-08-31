@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { normalizeWhatsAppPhone, componerWhatsApp } from '@/lib/utils/whatsapp';
+import { componerWhatsApp } from '@/lib/utils/whatsapp';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 
 // ── Types ──
@@ -346,19 +346,31 @@ export async function updateCliente(
 ): Promise<ClienteState> {
   const id = formData.get('id') as string;
   const nombre = (formData.get('nombre') as string)?.trim();
-  const telefono_1 = (formData.get('telefono_1') as string)?.trim();
 
   if (!id) return { error: 'ID de cliente no proporcionado' };
   if (!nombre) return { error: 'El nombre es requerido' };
-  if (!telefono_1) return { error: 'El teléfono es requerido' };
+
+  // Teléfono opcional (el contacto principal es WhatsApp): vacío → null.
+  const telefono_1 = (formData.get('telefono_1') as string)?.trim() || null;
+  // Cédula/RIF: el form manda `tipo_documento` (letra del combobox, default V)
+  // y `cedula` (solo dígitos). Se compone "V-12345678"; sin dígitos → null.
+  const tipoDocumento = (formData.get('tipo_documento') as string)?.trim() || 'V';
+  const cedulaDigitos = (formData.get('cedula') as string)?.trim() || '';
+  const cedula = cedulaDigitos ? `${tipoDocumento}-${cedulaDigitos}` : null;
+  // WhatsApp se guarda SIEMPRE en formato internacional con el código de país
+  // elegido en el form (`pais_whatsapp`, default 58). Vacío → null.
+  const whatsappRaw = (formData.get('whatsapp') as string)?.trim() || '';
+  const paisWhatsapp = (formData.get('pais_whatsapp') as string)?.trim() || '58';
+  const whatsapp = componerWhatsApp(paisWhatsapp, whatsappRaw) || null;
 
   const updates: Record<string, unknown> = {
     nombre,
     telefono_1,
     negocio: (formData.get('negocio') as string)?.trim() || null,
-    cedula: (formData.get('cedula') as string)?.trim() || null,
+    cedula,
     telefono_2: (formData.get('telefono_2') as string)?.trim() || null,
-    whatsapp: normalizeWhatsAppPhone((formData.get('whatsapp') as string)?.trim() || telefono_1) || null,
+    whatsapp,
+    direccion_entrega: (formData.get('direccion_entrega') as string)?.trim() || null,
     tipo_cliente: (formData.get('tipo_cliente') as string) || null,
     horario_preferido: (formData.get('horario_preferido') as string) || null,
     dias_preferidos: (formData.get('dias_preferidos') as string)?.trim() || null,

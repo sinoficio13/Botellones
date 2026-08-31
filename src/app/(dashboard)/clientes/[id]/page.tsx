@@ -20,9 +20,14 @@ export default async function ClienteDetailPage({ params }: Props) {
 
   if (!cliente) notFound();
 
-  const fotos = fotosCliente
-    .map((f) => ({ id: f.id, url: fotoFachadaPublicUrl(f.ruta_storage) }))
-    .filter((f) => f.url);
+  const fotos = (
+    await Promise.all(
+      fotosCliente.map(async (f) => ({
+        id: f.id,
+        url: await fotoFachadaPublicUrl(f.ruta_storage),
+      }))
+    )
+  ).filter((f) => f.url);
 
   const whatsapp = normalizeWhatsAppPhone(cliente.whatsapp ?? cliente.telefono_1);
 

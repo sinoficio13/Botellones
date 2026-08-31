@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useRouter } from 'next/navigation';
 import { updateCliente } from '@/lib/db/clientes';
+import { subirFotosCliente, eliminarFotoCliente } from '@/lib/db/fotos';
 import { saveDireccion, getDireccion, resolveMapLink } from '@/lib/db/direcciones';
 import { parseWhatsAppLocation } from '@/lib/utils/location';
 import type { ClienteRow } from '@/lib/db/clientes';
@@ -10,8 +12,10 @@ import { ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils/estados';
 import { FidelidadTab } from './fidelidad-tab';
 import { HistorialCliente } from '@/components/clientes/historial-cliente';
 import { GaleriaFotos, type FotoGaleria } from '@/components/clientes/galeria-fotos';
+import { InputDocumento } from '@/components/clientes/input-documento';
+import { InputWhatsapp } from '@/components/clientes/input-whatsapp';
 import { createClient } from '@/lib/supabase/client';
-import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2 } from 'lucide-react';
+import { MapPin, MessageCircle, ExternalLink, Droplets, CalendarDays, Award, Share2, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const MapaEditable = dynamic(() => import('./mapa-editable'), { ssr: false });
@@ -51,7 +55,7 @@ export function ClienteTabs({
         {activeTab === 'Resumen' && <ResumenTab cliente={cliente} fotos={fotos} onAbrirGaleria={setGaleria} />}
         {activeTab === 'Datos' && <DatosTab cliente={cliente} />}
         {activeTab === 'Dirección' && <DireccionTab clienteId={cliente.id} />}
-        {activeTab === 'Fotos' && <FotosTab fotos={fotos} onAbrirGaleria={setGaleria} />}
+        {activeTab === 'Fotos' && <FotosTab clienteId={cliente.id} fotos={fotos} onAbrirGaleria={setGaleria} />}
         {activeTab === 'Botellones' && <BotellonesTab clienteId={cliente.id} />}
         {activeTab === 'Historial' && <HistorialCliente clienteId={cliente.id} />}
         {activeTab === 'Fidelidad' && (
@@ -324,46 +328,104 @@ function MiniCard({ icon, label, value }: { icon: React.ReactNode; label: string
 // ── FOTOS TAB ──
 
 function FotosTab({
+  clienteId,
   fotos,
   onAbrirGaleria,
 }: {
+  clienteId: string;
   fotos: FotoGaleria[];
   onAbrirGaleria: (i: number) => void;
 }) {
-  if (fotos.length === 0) {
-    return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-          Fotos de fachada
-        </h2>
-        <p className="text-sm text-zinc-400">Sin fotos de fachada todavía.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
         Fotos de fachada ({fotos.length})
       </h2>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-        {fotos.map((f, i) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => onAbrirGaleria(i)}
-            className="block cursor-pointer overflow-hidden rounded-md border border-zinc-200 transition-shadow hover:ring-2 hover:ring-zinc-400 dark:border-zinc-700 dark:hover:ring-zinc-500"
-            aria-label={`Abrir foto de fachada ${i + 1}`}
-          >
-            <img
-              src={f.url}
-              alt={`Foto de fachada ${i + 1}`}
-              className="aspect-square w-full object-cover"
-            />
-          </button>
-        ))}
-      </div>
+
+      <SubirFotos clienteId={clienteId} />
+
+      {fotos.length === 0 ? (
+        <p className="text-sm text-zinc-400">Sin fotos de fachada todavía.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          {fotos.map((f, i) => (
+            <div key={f.id} className="relative overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700">
+              <button
+                type="button"
+                onClick={() => onAbrirGaleria(i)}
+                className="block w-full cursor-pointer"
+                aria-label={`Abrir foto de fachada ${i + 1}`}
+              >
+                <img
+                  src={f.url}
+                  alt={`Foto de fachada ${i + 1}`}
+                  className="aspect-square w-full object-cover"
+                />
+              </button>
+              <QuitarFoto clienteId={clienteId} foto={f} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function SubirFotos({ clienteId }: { clienteId: string }) {
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(subirFotosCliente.bind(null, clienteId), null);
+
+  useEffect(() => {
+    if (state?.success) router.refresh();
+  }, [state, router]);
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-3">
+      <input
+        type="file"
+        name="fotos"
+        multiple
+        accept="image/*"
+        className="max-w-xs text-sm text-zinc-600 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-zinc-800 dark:text-zinc-300 dark:file:bg-zinc-50 dark:file:text-zinc-900 dark:hover:file:bg-zinc-200"
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+      >
+        {pending ? 'Subiendo…' : 'Subir fotos'}
+      </button>
+      {state?.error && (
+        <p className="w-full text-sm text-red-700 dark:text-red-400">{state.error}</p>
+      )}
+    </form>
+  );
+}
+
+function QuitarFoto({ clienteId, foto }: { clienteId: string; foto: FotoGaleria }) {
+  const router = useRouter();
+  const [state, formAction] = useActionState(eliminarFotoCliente.bind(null, clienteId), null);
+
+  useEffect(() => {
+    if (state?.success) router.refresh();
+  }, [state, router]);
+
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="foto_id" value={foto.id} />
+      <input type="hidden" name="ruta" value={foto.url.split('/public/fotos-clientes/')[1] ?? ''} />
+      <button
+        type="submit"
+        aria-label="Eliminar foto"
+        title="Eliminar foto"
+        onClick={(e) => {
+          if (!window.confirm('¿Eliminar esta foto?')) e.preventDefault();
+        }}
+        className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-red-600"
+      >
+        <X size={14} />
+      </button>
+    </form>
   );
 }
 
@@ -401,28 +463,72 @@ function DatosTab({ cliente }: { cliente: ClienteRow }) {
     );
   }
 
+  const cedulaInicial = splitCedula(cliente.cedula);
+  const whatsappInicial = splitWhatsApp(cliente.whatsapp);
+
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Editar datos</h2>
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="id" value={cliente.id} />
-        <Grid2>
-          <IField label="Nombre *" name="nombre" def={cliente.nombre} />
-          <IField label="Negocio" name="negocio" def={cliente.negocio || ''} />
-        </Grid2>
-        <IField label="Cédula" name="cedula" def={cliente.cedula || ''} cls="max-w-sm" />
-        <Grid2>
-          <IField label="Teléfono 1 *" name="telefono_1" def={cliente.telefono_1 || ''} type="tel" />
-          <IField label="Teléfono 2" name="telefono_2" def={cliente.telefono_2 || ''} type="tel" />
-        </Grid2>
-        <IField label="WhatsApp" name="whatsapp" def={cliente.whatsapp || ''} type="tel" cls="max-w-sm" />
-        <Grid2>
-          <IField label="Tipo" name="tipo_cliente" def={cliente.tipo_cliente || ''} />
-          <IField label="Horario" name="horario_preferido" def={cliente.horario_preferido || ''} />
-        </Grid2>
-        <IField label="Días preferidos" name="dias_preferidos" def={cliente.dias_preferidos || ''} cls="max-w-sm" />
-        <IField label="Contacto preferido" name="contacto_preferido" def={cliente.contacto_preferido || ''} cls="max-w-sm" />
-        <IField label="Observaciones" name="observaciones" def={cliente.observaciones || ''} ta />
+
+        {/* Datos básicos */}
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Datos básicos</p>
+          <Grid2>
+            <IField label="Nombre *" name="nombre" def={cliente.nombre} />
+            <IField label="Negocio" name="negocio" def={cliente.negocio || ''} />
+          </Grid2>
+          <InputDocumento prefijoInicial={cedulaInicial.prefijo} numeroInicial={cedulaInicial.numero} />
+        </div>
+
+        {/* Contacto */}
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Contacto</p>
+          <Grid2>
+            <InputWhatsapp
+              paisInicial={whatsappInicial.pais}
+              numeroInicial={whatsappInicial.numero}
+              codigoOtroInicial={whatsappInicial.codigoOtro}
+            />
+            <IField label="Teléfono (opcional)" name="telefono_1" def={cliente.telefono_1 || ''} type="tel" />
+          </Grid2>
+        </div>
+
+        {/* Dirección de entrega */}
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Dirección de entrega</p>
+          <div>
+            <label htmlFor="direccion_entrega" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Dirección de entrega
+            </label>
+            <textarea
+              id="direccion_entrega"
+              name="direccion_entrega"
+              rows={2}
+              defaultValue={cliente.direccion_entrega ?? ''}
+              className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            />
+            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+              La dirección que mandás por WhatsApp.
+            </p>
+          </div>
+        </div>
+
+        {/* Observaciones */}
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Observaciones</p>
+          <IField label="Observaciones" name="observaciones" def={cliente.observaciones || ''} ta />
+        </div>
+
+        {/* Columnas legacy que el form ya no muestra pero NO se pueden pisar
+            al guardar (updateCliente vuelca todo el update map): viajan ocultas
+            con su valor actual. */}
+        <input type="hidden" name="telefono_2" value={cliente.telefono_2 ?? ''} />
+        <input type="hidden" name="tipo_cliente" value={cliente.tipo_cliente ?? ''} />
+        <input type="hidden" name="horario_preferido" value={cliente.horario_preferido ?? ''} />
+        <input type="hidden" name="dias_preferidos" value={cliente.dias_preferidos ?? ''} />
+        <input type="hidden" name="contacto_preferido" value={cliente.contacto_preferido ?? ''} />
 
         {state?.error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-300">{state.error}</div>}
         {state?.success && <div className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-300">Cambios guardados.</div>}
@@ -680,6 +786,44 @@ function BotellonesTab({ clienteId }: { clienteId: string }) {
 }
 
 // ── SHARED ──
+
+const TIPOS_DOCUMENTO_VALIDOS = ['V', 'E', 'J', 'G', 'P'];
+
+/**
+ * Divide la cédula almacenada ("V-12345678") en prefijo + dígitos para
+ * precargar InputDocumento. Sin guión → todo el string son dígitos (prefijo V).
+ * Best-effort: un prefijo inválido cae a 'V' y el operador puede corregirlo.
+ */
+function splitCedula(cedula?: string | null): { prefijo: string; numero: string } {
+  const raw = cedula ?? '';
+  const idx = raw.indexOf('-');
+  if (idx === -1) return { prefijo: 'V', numero: raw };
+  const prefijo = raw.slice(0, idx).trim();
+  return {
+    prefijo: TIPOS_DOCUMENTO_VALIDOS.includes(prefijo) ? prefijo : 'V',
+    numero: raw.slice(idx + 1).trim(),
+  };
+}
+
+/**
+ * Divide el WhatsApp almacenado (formato internacional "584141234567") en
+ * país + número nacional para precargar InputWhatsapp. Best-effort: un número
+ * que no arranca con ningún código listado cae a "Otro" con el código de los
+ * primeros 1-3 dígitos (si no se puede, '58'). El operador puede corregirlo.
+ */
+function splitWhatsApp(digitos?: string | null): { pais: string; numero: string; codigoOtro: string } {
+  const d = (digitos ?? '').replace(/\D/g, '');
+  if (!d) return { pais: '58', numero: '', codigoOtro: '' };
+  for (const codigo of ['58', '57', '34', '1', '52', '54']) {
+    if (d.startsWith(codigo)) {
+      // Estados Unidos (+1) solo se reconoce con el formato completo (11 dígitos).
+      if (codigo === '1' && d.length !== 11) break;
+      return { pais: codigo, numero: d.slice(codigo.length), codigoOtro: '' };
+    }
+  }
+  const codigoOtro = d.slice(0, 3) || '58';
+  return { pais: 'otro', numero: d.slice(codigoOtro.length), codigoOtro };
+}
 
 function Field({ label, value, span }: { label: string; value: string | null; span?: boolean }) {
   return (

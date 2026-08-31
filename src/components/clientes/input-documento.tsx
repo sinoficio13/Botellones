@@ -12,9 +12,19 @@ const INPUT_CLASS =
  * la lista desplegable una fila por tipo. Es no-controlado (funciona dentro
  * del form nativo): expone `cedula` (solo dígitos) y un hidden `tipo_documento`
  * con la letra del tipo elegido. La composición "V-12345678" la hace el server.
+ * Sin props se comporta como el form de creación; `prefijoInicial`/`numeroInicial`
+ * permiten precargar un documento existente (form de edición de la ficha).
  */
-export function InputDocumento() {
-  const [tipo, setTipo] = useState<TipoDocumento>('V');
+export function InputDocumento({
+  prefijoInicial,
+  numeroInicial,
+}: {
+  prefijoInicial?: string;
+  numeroInicial?: string;
+}) {
+  const [tipo, setTipo] = useState<TipoDocumento>(() =>
+    TIPOS_DOCUMENTO.some((t) => t.letra === (prefijoInicial ?? '')) ? (prefijoInicial as TipoDocumento) : 'V'
+  );
   const [abierto, setAbierto] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +105,7 @@ export function InputDocumento() {
           maxLength={12}
           pattern="[0-9]{6,12}"
           title="Solo dígitos, entre 6 y 12"
+          defaultValue={numeroInicial ?? ''}
           className={`${INPUT_CLASS} min-w-0 flex-1`}
         />
       </div>

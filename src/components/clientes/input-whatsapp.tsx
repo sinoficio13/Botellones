@@ -1,23 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 const INPUT_CLASS =
   'rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50';
 
 /**
- * Input de WhatsApp con selector de país. El `<select>` es un select nativo
- * (estilado como el resto de los inputs); cada opción muestra su bandera SVG
- * inline + nombre + código. La opción "Otro" revela un input para el código
- * de país. El componente es no-controlado (funciona dentro del form nativo):
- * expone `whatsapp` (número nacional) y un hidden `pais_whatsapp` con el
- * código internacional (ej: "58", "57", "1" o el código custom de "Otro").
+ * Input de WhatsApp con selector de país. Es un combobox custom (el `<select>`
+ * nativo no renderiza el SVG inline de la bandera en el dropdown): el trigger
+ * muestra bandera + nombre + código, y la lista desplegable una fila por país.
+ * La opción "Otro" revela un input para el código de país. El componente es
+ * no-controlado (funciona dentro del form nativo): expone `whatsapp` (número
+ * nacional) y un hidden `pais_whatsapp` con el código internacional (ej: "58",
+ * "57", "1" o el código custom de "Otro").
  */
 export function InputWhatsapp() {
   const [pais, setPais] = useState('58');
   const [codigoOtro, setCodigoOtro] = useState('');
+  const [abierto, setAbierto] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const codigoPais = pais === 'otro' ? codigoOtro : pais;
+  const seleccionado = PAISES.find((p) => p.codigo === pais) ?? PAISES[0];
+
+  useEffect(() => {
+    if (!abierto) return;
+    function onMouseDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAbierto(false);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [abierto]);
+
+  function seleccionar(codigo: string) {
+    setPais(codigo);
+    setAbierto(false);
+  }
 
   return (
     <div>
@@ -25,22 +53,53 @@ export function InputWhatsapp() {
         WhatsApp
       </label>
       <div className="mt-1 flex gap-2">
-        <select
-          aria-label="País del número de WhatsApp"
-          value={pais}
-          onChange={(e) => setPais(e.target.value)}
-          className={`${INPUT_CLASS} w-40 shrink-0`}
-        >
-          {PAISES.map((p) => (
-            <option key={p.codigo} value={p.codigo}>
-              <span className="inline-flex items-center gap-1.5">
-                {p.flag}
-                {p.nombre}
-                {p.codigo !== 'otro' && ` +${p.codigo}`}
+        <div ref={rootRef} className="relative w-40 shrink-0">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={abierto}
+            aria-controls="pais-listbox"
+            onClick={() => setAbierto((v) => !v)}
+            className={`${INPUT_CLASS} flex w-full items-center justify-between gap-1.5 text-left`}
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              {seleccionado.flag}
+              <span className="truncate">
+                {seleccionado.codigo === 'otro'
+                  ? `Otro${codigoOtro ? ` +${codigoOtro}` : ''}`
+                  : `${seleccionado.nombre} +${seleccionado.codigo}`}
               </span>
-            </option>
-          ))}
-        </select>
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${abierto ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {abierto && (
+            <ul
+              id="pais-listbox"
+              role="listbox"
+              aria-label="País del número de WhatsApp"
+              className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-auto rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              {PAISES.map((p) => (
+                <li
+                  key={p.codigo}
+                  role="option"
+                  aria-selected={p.codigo === pais}
+                  onClick={() => seleccionar(p.codigo)}
+                  className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  {p.flag}
+                  <span>
+                    {p.nombre}
+                    {p.codigo !== 'otro' && ` (+${p.codigo})`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <input
           id="whatsapp"
           name="whatsapp"
@@ -149,7 +208,7 @@ function FlagOtro() {
   );
 }
 
-const PAISES: Array<{ codigo: string; nombre: string; flag: React.ReactNode }> = [
+const PAISES: Array<{ codigo: string; nombre: string; flag: ReactNode }> = [
   { codigo: '58', nombre: 'Venezuela', flag: <FlagVE /> },
   { codigo: '57', nombre: 'Colombia', flag: <FlagCO /> },
   { codigo: '34', nombre: 'España', flag: <FlagES /> },
